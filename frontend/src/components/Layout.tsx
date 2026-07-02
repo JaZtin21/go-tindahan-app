@@ -62,7 +62,9 @@ export const Layout = () => {
 
                 {/* THE MAP CANVAS - Wrapped inside a standard display toggle */}
                 {/* Using display: none keeps the map component fully alive in memory, preventing reloads! */}
-                <div style={{ display: isMainMapPage ? 'block' : 'none', width: '100%', height: '100%' }}>
+                {
+                    /*
+   <div style={{ display: isMainMapPage ? 'block' : 'none', width: '100%', height: '100%' }}>
                     <BaseMap
                         ref={mapRef}
                         mapLib={maplibregl}
@@ -76,6 +78,9 @@ export const Layout = () => {
                         style={{ width: '100%', height: '100%' }}
                     />
                 </div>
+                    */
+                }
+             
 
                 {/* THE PAGE INJECTION POINT */}
                 {/* Standard sub-pages render natively here in normal layout flow when you navigate away from '/' */}

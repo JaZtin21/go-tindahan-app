@@ -1,0 +1,175 @@
+# --- TYPES ---
+
+extend type User {
+  shops(limit: Int!, offset: Int!): PaginatedOwnerShops!
+}
+
+# The Public Shop profile that anyone can view
+type Shop {
+  id: ID!
+  shopName: String!
+  address: String!     
+  description: String    
+  photo: String          
+  photos: [String!]!     
+  reviews: [ShopReview!]! 
+  createdAt: String!
+}
+
+# The Admin version of the shop (Only the owner can see this)
+type OwnerShop {
+  id: ID!
+  ownerId: String!   
+  owner: User!       
+  shopName: String!
+  address: String!     
+  description: String    
+  photo: String          
+  photos: [String!]!     
+  createdAt: String!
+}
+
+type ShopReview {
+  id: ID!
+  userId: String!
+  rating: Int!           
+  comment: String
+  photos: [String!]!     # Added: Array of photos attached to a review
+  createdAt: String!
+}
+
+# 🌐 PUBLIC PRODUCT TYPE: For normal client buyers (Completely Safe)
+type PublicProduct {
+  id: ID!
+  shopId: ID!        
+  itemName: String!      
+  description: String    
+  category: String
+  unitOfMeasure: String  
+  photo: String          
+  sellingPrice: Float    
+  stockQuantity: Int     
+}
+
+# 🔐 OWNER PRODUCT TYPE: For store management (Contains sensitive financials)
+type OwnerInventoryItem {
+  id: ID!
+  shopId: ID!        
+  itemName: String!      
+  description: String    
+  barcode: String
+  category: String
+  unitOfMeasure: String  
+  photo: String          
+  sellingPrice: Float    
+  stockQuantity: Int     
+  costPrice: Float       
+  reorderLevel: Int      
+  updatedAt: String!
+}
+
+# --- PAGINATION WRAPPERS ---
+
+type PaginatedShops {
+  shops: [Shop!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type PaginatedOwnerShops {
+  shops: [OwnerShop!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type PaginatedOwnerInventory {
+  items: [OwnerInventoryItem!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type PaginatedPublicProducts {
+  products: [PublicProduct!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+# --- INPUTS FOR MUTATIONS ---
+
+input CreateShopInput {
+  shopName: String!
+  address: String!     
+  description: String    
+  photo: String          
+  photos: [String!]      
+}
+
+input AddInventoryItemInput {
+  shopId: ID!
+  itemName: String!      
+  description: String    
+  barcode: String
+  category: String
+  unitOfMeasure: String
+  costPrice: Float       
+  sellingPrice: Float    
+  stockQuantity: Int     
+  reorderLevel: Int
+  photo: String          
+}
+
+input IncrementStockInput {
+  itemId: ID!
+  quantityToAdd: Int!  
+}
+
+input DecrementStockInput {
+  itemId: ID!
+  quantityToRemove: Int! 
+}
+
+input UpdateShopInput {
+  shopId: ID!
+  shopName: String!
+  address: String!
+  description: String
+  photo: String
+  photos: [String!]
+}
+
+input UpdateInventoryItemInput {
+  itemId: ID!
+  itemName: String!
+  description: String
+  barcode: String
+  category: String
+  unitOfMeasure: String
+  costPrice: Float
+  sellingPrice: Float
+  stockQuantity: Int
+  reorderLevel: Int
+  photo: String
+}
+
+# --- EXTENSIONS ---
+
+extend type Query {
+  # --- 🔐 OWNER INTERFACES (Full Data Access) ---
+  getMyShops(limit: Int!, offset: Int!): PaginatedOwnerShops! @isAuthenticated
+  getShopInventory(shopId: ID!, limit: Int!, offset: Int!): PaginatedOwnerInventory! @isAuthenticated
+
+  # --- 🌐 CUSTOMER PUBLIC INTERFACES (Returns Public Types) ---
+  searchShop(query: String!, limit: Int!, offset: Int!): PaginatedShops!
+  searchProduct(query: String!, limit: Int!, offset: Int!): PaginatedPublicProducts!
+}
+
+extend type Mutation {
+  createShop(input: CreateShopInput!): OwnerShop! @isAuthenticated
+  updateShop(input: UpdateShopInput!): OwnerShop! @isAuthenticated
+  deleteShop(shopId: ID!): Boolean! @isAuthenticated
+  addInventoryItem(input: AddInventoryItemInput!): OwnerInventoryItem! @isAuthenticated
+  updateInventoryItem(input: UpdateInventoryItemInput!): OwnerInventoryItem! @isAuthenticated
+  deleteInventoryItem(itemId: ID!): Boolean! @isAuthenticated
+  incrementStock(input: IncrementStockInput!): OwnerInventoryItem! @isAuthenticated
+  decrementStock(input: DecrementStockInput!): OwnerInventoryItem! @isAuthenticated
+}

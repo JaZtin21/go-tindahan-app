@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { useAuth } from '../config/ApolloProviderWithAuth';
 import { Login } from '../pages/Login';
 import { Layout } from './Layout';
-import { Home, ProfilePage,  } from '../pages';
+import { Home, ProfilePage, ScanPage  } from '../pages';
 
 
 const ProtectedRouteGuard = () => {
@@ -29,7 +29,9 @@ export const App = () => {
           {/* Protected routes */}
           <Route element={<ProtectedRouteGuard />}>
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/scan" element={<ScanPage />} />
           </Route>
+           
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

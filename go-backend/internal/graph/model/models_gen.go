@@ -2,6 +2,20 @@
 
 package model
 
+type AddInventoryItemInput struct {
+	ShopID        string   `json:"shopId"`
+	ItemName      string   `json:"itemName"`
+	Description   *string  `json:"description,omitempty"`
+	Barcode       *string  `json:"barcode,omitempty"`
+	Category      *string  `json:"category,omitempty"`
+	UnitOfMeasure *string  `json:"unitOfMeasure,omitempty"`
+	CostPrice     *float64 `json:"costPrice,omitempty"`
+	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity *int     `json:"stockQuantity,omitempty"`
+	ReorderLevel  *int     `json:"reorderLevel,omitempty"`
+	Photo         *string  `json:"photo,omitempty"`
+}
+
 type AuthResponse struct {
 	User        *User  `json:"user"`
 	AccessToken string `json:"accessToken"`
@@ -12,15 +26,85 @@ type CreatePostInput struct {
 	Content string `json:"content"`
 }
 
+type CreateShopInput struct {
+	ShopName    string   `json:"shopName"`
+	Address     string   `json:"address"`
+	Description *string  `json:"description,omitempty"`
+	Photo       *string  `json:"photo,omitempty"`
+	Photos      []string `json:"photos,omitempty"`
+}
+
+type DecrementStockInput struct {
+	ItemID           string `json:"itemId"`
+	QuantityToRemove int    `json:"quantityToRemove"`
+}
+
 type GoogleLoginInput struct {
 	Code string `json:"code"`
+}
+
+type IncrementStockInput struct {
+	ItemID        string `json:"itemId"`
+	QuantityToAdd int    `json:"quantityToAdd"`
 }
 
 type Mutation struct {
 }
 
+type OwnerInventoryItem struct {
+	ID            string   `json:"id"`
+	ShopID        string   `json:"shopId"`
+	ItemName      string   `json:"itemName"`
+	Description   *string  `json:"description,omitempty"`
+	Barcode       *string  `json:"barcode,omitempty"`
+	Category      *string  `json:"category,omitempty"`
+	UnitOfMeasure *string  `json:"unitOfMeasure,omitempty"`
+	Photo         *string  `json:"photo,omitempty"`
+	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity *int     `json:"stockQuantity,omitempty"`
+	CostPrice     *float64 `json:"costPrice,omitempty"`
+	ReorderLevel  *int     `json:"reorderLevel,omitempty"`
+	UpdatedAt     string   `json:"updatedAt"`
+}
+
+type OwnerShop struct {
+	ID          string   `json:"id"`
+	OwnerID     string   `json:"ownerId"`
+	Owner       *User    `json:"owner"`
+	ShopName    string   `json:"shopName"`
+	Address     string   `json:"address"`
+	Description *string  `json:"description,omitempty"`
+	Photo       *string  `json:"photo,omitempty"`
+	Photos      []string `json:"photos"`
+	CreatedAt   string   `json:"createdAt"`
+}
+
+type PaginatedOwnerInventory struct {
+	Items       []*OwnerInventoryItem `json:"items"`
+	TotalCount  int                   `json:"totalCount"`
+	HasNextPage bool                  `json:"hasNextPage"`
+}
+
+type PaginatedOwnerShops struct {
+	Shops       []*OwnerShop `json:"shops"`
+	TotalCount  int          `json:"totalCount"`
+	HasNextPage bool         `json:"hasNextPage"`
+}
+
 type PaginatedPosts struct {
 	Posts       []*Post `json:"posts"`
+	TotalCount  int     `json:"totalCount"`
+	HasNextPage bool    `json:"hasNextPage"`
+}
+
+type PaginatedPublicProducts struct {
+	Products    []*PublicProduct `json:"products"`
+	TotalCount  int              `json:"totalCount"`
+	HasNextPage bool             `json:"hasNextPage"`
+}
+
+type PaginatedShops struct {
+	Shops       []*Shop `json:"shops"`
 	TotalCount  int     `json:"totalCount"`
 	HasNextPage bool    `json:"hasNextPage"`
 }
@@ -33,6 +117,18 @@ type Post struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+type PublicProduct struct {
+	ID            string   `json:"id"`
+	ShopID        string   `json:"shopId"`
+	ItemName      string   `json:"itemName"`
+	Description   *string  `json:"description,omitempty"`
+	Category      *string  `json:"category,omitempty"`
+	UnitOfMeasure *string  `json:"unitOfMeasure,omitempty"`
+	Photo         *string  `json:"photo,omitempty"`
+	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity *int     `json:"stockQuantity,omitempty"`
+}
+
 type Query struct {
 }
 
@@ -41,16 +137,60 @@ type RefreshResponse struct {
 	User        *User  `json:"user"`
 }
 
+type Shop struct {
+	ID          string        `json:"id"`
+	ShopName    string        `json:"shopName"`
+	Address     string        `json:"address"`
+	Description *string       `json:"description,omitempty"`
+	Photo       *string       `json:"photo,omitempty"`
+	Photos      []string      `json:"photos"`
+	Reviews     []*ShopReview `json:"reviews"`
+	CreatedAt   string        `json:"createdAt"`
+}
+
+type ShopReview struct {
+	ID        string   `json:"id"`
+	UserID    string   `json:"userId"`
+	Rating    int      `json:"rating"`
+	Comment   *string  `json:"comment,omitempty"`
+	Photos    []string `json:"photos"`
+	CreatedAt string   `json:"createdAt"`
+}
+
+type UpdateInventoryItemInput struct {
+	ItemID        string   `json:"itemId"`
+	ItemName      string   `json:"itemName"`
+	Description   *string  `json:"description,omitempty"`
+	Barcode       *string  `json:"barcode,omitempty"`
+	Category      *string  `json:"category,omitempty"`
+	UnitOfMeasure *string  `json:"unitOfMeasure,omitempty"`
+	CostPrice     *float64 `json:"costPrice,omitempty"`
+	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity *int     `json:"stockQuantity,omitempty"`
+	ReorderLevel  *int     `json:"reorderLevel,omitempty"`
+	Photo         *string  `json:"photo,omitempty"`
+}
+
 type UpdatePostInput struct {
 	ID      string `json:"id"`
 	Title   string `json:"title"`
 	Content string `json:"content"`
 }
 
+type UpdateShopInput struct {
+	ShopID      string   `json:"shopId"`
+	ShopName    string   `json:"shopName"`
+	Address     string   `json:"address"`
+	Description *string  `json:"description,omitempty"`
+	Photo       *string  `json:"photo,omitempty"`
+	Photos      []string `json:"photos,omitempty"`
+}
+
 type User struct {
-	ID           string `json:"id"`
-	FirstName    string `json:"firstName"`
-	LastName     string `json:"lastName"`
-	Email        string `json:"email"`
-	ProfilePhoto string `json:"profilePhoto"`
+	ID           string               `json:"id"`
+	FirstName    string               `json:"firstName"`
+	LastName     string               `json:"lastName"`
+	Email        string               `json:"email"`
+	ProfilePhoto string               `json:"profilePhoto"`
+	Shops        *PaginatedOwnerShops `json:"shops"`
 }

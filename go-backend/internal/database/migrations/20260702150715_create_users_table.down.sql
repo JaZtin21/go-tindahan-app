@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS shop_reviews;
+DROP TABLE IF EXISTS inventory_items;
+DROP TABLE IF EXISTS shops;
