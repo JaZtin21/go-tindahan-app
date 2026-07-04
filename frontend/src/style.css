@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* 1. Tell Tailwind how to identify the custom dark variant */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 2. Map classes and establish light mode default values */
+@theme {
+    /* --- LIGHT MODE ENVIRONMENT DESIGN TOKENS --- */
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f9fafb;
+    --color-bg-primary-hover: #f3f4f6;
+
+    /* Text Sizing Hierarchy - Light Environments */
+    --color-text-main: #000000;
+    --color-text-sub: #374151;
+    --color-text-muted: #6b7280;
+    --color-text-white: #ffffff;
+
+    /* Brand Elements & Interactive Actions */
+    --color-brand-gold: #efb666;
+    --color-brand-gold-hover: #cf9d57;
+    --color-brand-green: #71dbba;
+    --color-brand-green-hover: #5fc7a5;
+    --color-brand-red: #ff8980;
+    --color-brand-red-hover: #ff6b60;
+
+    /* Interaction Highlight States */
+    --color-item-hover: #f5f5f5;
+}
+
+/* 3. Swap the variable values under the hood when .dark is present */
+.dark {
+    /* --- DARK MODE ENVIRONMENT DESIGN TOKENS --- */
+    --color-bg-primary: #121212;
+    --color-bg-secondary: #1e1e1e;
+    --color-bg-primary-hover: #424242;
+
+    /* Text Sizing Hierarchy - Dark Environments */
+    --color-text-main: #ffffff;
+    --color-text-sub: #d1d5db;
+    --color-text-muted: #9ca3af;
+
+    --color-brand-gold: #efb666;
+    --color-brand-gold-hover: #e9c38f;
+
+    --color-brand-green: #71dbba;
+    --color-brand-green-hover: #5fc7a5;
+
+    --color-brand-red: #ff8980;
+    --color-brand-red-hover: #ff6b60;
+
+    --color-item-hover: #2a2a2a;
+}
