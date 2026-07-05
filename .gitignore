@@ -37,3 +37,4 @@ yarn-error.log*
 .vercel
 
 go-backend/.env
+backend/
