@@ -37,7 +37,7 @@ export interface Shop {
   description?: string;
   address: string;
   coordinates: { lat: number; lng: number };
-  photo: string;
+  photo: string | File | null;
   photos: string[];
   businessHours: BusinessHours;
   businessType?: 'SARI_SARI_STORE' | 'GROCERY' | 'CONVENIENCE_STORE' | 'MINI_MART' | 'Sari-Sari Store' | 'Grocery' | 'Convenience Store' | 'Mini-Mart';

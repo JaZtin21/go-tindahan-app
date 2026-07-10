@@ -17,3 +17,7 @@ resolver:
   layout: follow-schema
   dir: internal/graph/resolvers
   package: graph
+
+models:
+  Upload:
+    model: github.com/99designs/gqlgen/graphql.Upload

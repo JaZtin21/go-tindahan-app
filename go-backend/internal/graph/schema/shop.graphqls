@@ -1,3 +1,5 @@
+scalar Upload
+
 # --- TYPES ---
 
 extend type User {
@@ -166,8 +168,8 @@ input CreateShopInput {
   socialMedia: SocialMediaInput!          #  FIXED
   contactDetails: ContactDetailsInput!    #  FIXED
   coordinates: CoordinatesInput!
-  photo: String          
-  photos: [String!]      
+  photo: Upload         
+  photos: [Upload!]      
 }
 
 input BusinessHoursInput {
@@ -242,8 +244,8 @@ input UpdateShopInput {
   contactDetails: ContactDetailsInput!    #  FIXED
   address: String!
   coordinates: CoordinatesInput!
-  photo: String
-  photos: [String!]
+  photo: Upload
+  photos: [Upload!]
 }
 
 input UpdateInventoryItemInput {

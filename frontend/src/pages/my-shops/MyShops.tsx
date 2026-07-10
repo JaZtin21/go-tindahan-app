@@ -132,7 +132,7 @@ export const MyShops: React.FC = () => {
                                 <div className="w-full aspect-square bg-bg-secondary rounded-xl mb-4 shrink-0 overflow-hidden relative">
                                     {shop.photo ? (
                                         <img
-                                            src={shop.photo}
+                                            src={typeof shop?.photo === 'string' ? shop.photo : ''}
                                             alt={shop.shopName}
                                             className="w-full h-full object-cover"
                                         />

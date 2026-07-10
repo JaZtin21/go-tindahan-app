@@ -2,6 +2,10 @@
 
 package model
 
+import (
+	"github.com/99designs/gqlgen/graphql"
+)
+
 type AddInventoryItemInput struct {
 	ShopID        string   `json:"shopId"`
 	ItemName      string   `json:"itemName"`
@@ -70,8 +74,8 @@ type CreateShopInput struct {
 	SocialMedia    *SocialMediaInput     `json:"socialMedia"`
 	ContactDetails *ContactDetailsInput  `json:"contactDetails"`
 	Coordinates    *CoordinatesInput     `json:"coordinates"`
-	Photo          *string               `json:"photo,omitempty"`
-	Photos         []string              `json:"photos,omitempty"`
+	Photo          *graphql.Upload       `json:"photo,omitempty"`
+	Photos         []*graphql.Upload     `json:"photos,omitempty"`
 }
 
 type DecrementStockInput struct {
@@ -286,8 +290,8 @@ type UpdateShopInput struct {
 	ContactDetails *ContactDetailsInput  `json:"contactDetails"`
 	Address        string                `json:"address"`
 	Coordinates    *CoordinatesInput     `json:"coordinates"`
-	Photo          *string               `json:"photo,omitempty"`
-	Photos         []string              `json:"photos,omitempty"`
+	Photo          *graphql.Upload       `json:"photo,omitempty"`
+	Photos         []*graphql.Upload     `json:"photos,omitempty"`
 }
 
 type User struct {

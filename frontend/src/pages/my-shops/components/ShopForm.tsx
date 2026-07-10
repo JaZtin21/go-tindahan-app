@@ -77,7 +77,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     });
 
     // Cover photo upload state - track existing and new separately like EditPostModal
-    const [existingCoverPhoto, setExistingCoverPhoto] = useState<string>(shop?.photo || '');
+    const [existingCoverPhoto, setExistingCoverPhoto] = useState<string>(typeof shop?.photo === 'string' ? shop.photo : '');
     const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
     const [newCoverPreview, setNewCoverPreview] = useState<string>('');
 
@@ -129,6 +129,8 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
         }
     };
 
+    console.log(existingCoverPhoto, 'this is cover hpoto')
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -148,9 +150,11 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
 
 
         // Build complete Shop object with all required fields for API
+        // Build complete Shop object with all required fields for API
         const shopData: Shop = {
-            photo: existingCoverPhoto,
-            photos: [],
+            // 🟢 FIXED: Send the raw File object if it exists, otherwise pass null
+            photo: newCoverFile ? newCoverFile : existingCoverPhoto ? existingCoverPhoto : null,
+            photos: [], // Add your carousel file arrays here if you have any
             shopName: formData.name,
             description: formData.description,
             address: '123',
@@ -174,18 +178,19 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                 radius: 0,
                 fee: 0
             },
-
             socialMedia: {
                 facebook: '',
                 instagram: ''
             },
-            // Business hours from form
             businessHours: {
                 openTime: formData.openTime,
                 closeTime: formData.closeTime,
                 days: formData.businessDays
             },
         };
+
+
+        console.log(existingCoverPhoto, shopData);
 
         if (isEdit) {
             updateShopMutation({

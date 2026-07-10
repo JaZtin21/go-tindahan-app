@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, createContext, useContext, useRef, useCallback } from 'react';
-import { ApolloClient, InMemoryCache, from, split, HttpLink, gql} from '@apollo/client';
+import { ApolloClient, InMemoryCache, from, split, HttpLink, gql } from '@apollo/client';
 import { ApolloProvider } from '@apollo/client/react';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
@@ -8,6 +8,7 @@ import { createClient } from 'graphql-ws';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { useGoogleLogin } from '@react-oauth/google';
 import { Observable } from '@apollo/client/utilities';
+import { createUploadLink } from '~/api/graphql';
 
 // =========================================================================
 // 1. EMBEDDED GRAPHQL SCHEMAS & QUERIES (Ground-Truth Contracts)
@@ -148,7 +149,7 @@ export const ApolloProviderWithAuth = ({ children }: { children: React.ReactNode
         isRefreshingRef.current = true;
         refreshPromiseRef.current = (async () => {
             try {
-                const { data } = await authLinkClient.mutate({
+                const { data }: { data: any } = await authLinkClient.mutate({
                     mutation: REFRESH_TOKEN_MUTATION,
                 });
 
@@ -199,7 +200,7 @@ export const ApolloProviderWithAuth = ({ children }: { children: React.ReactNode
             }
             setIsLoading(true);
             try {
-                const { data } = await authLinkClient.mutate({
+                const { data }: { data: any } = await authLinkClient.mutate({
                     mutation: GOOGLE_LOGIN_MUTATION,
                     variables: {
                         input: {
@@ -232,9 +233,9 @@ export const ApolloProviderWithAuth = ({ children }: { children: React.ReactNode
 
     // Memoize the compiled multi-link Apollo pipeline to survive re-renders
     const clientInstance = useMemo(() => {
-        const httpUploadLink = new HttpLink({
+        const httpUploadLink = createUploadLink({
             uri: GRAPHQL_ENDPOINT,
-            credentials: 'include' // 🌟 CRITICAL: Allows browser to read/send HttpOnly cookies
+            credentials: 'include'
         });
 
         const authInterceptorLink = setContext((_, { headers }) => {
