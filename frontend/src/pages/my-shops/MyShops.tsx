@@ -139,7 +139,6 @@ export const MyShops: React.FC = () => {
     };
 
 
-
     return (
         <>
             <div className="w-full min-h-screen pb-10">
@@ -337,7 +336,6 @@ export const MyShops: React.FC = () => {
                     )}
                 </div>
             </Modal>
-
 
             <Modal
                 isOpen={isAddShopModalOpen}

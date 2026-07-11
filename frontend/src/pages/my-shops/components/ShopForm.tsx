@@ -275,7 +275,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                     */
                 }
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                         <div>
                             <label className="block text-sm text-text-main font-medium mb-2">Shop Name *</label>
@@ -283,19 +283,19 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-3 py-2 border text-text-main focus:outline-none border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                                className="w-full px-3 py-2 border text-text-main focus:outline-none border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                                 placeholder="Enter shop name"
                                 required
                             />
                         </div>
                     </div>
 
-                    <div>
+                    <div className="mb-2">
                         <label className="block text-sm text-text-main font-medium mb-2">Description</label>
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-3 py-2 focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                            className="w-full px-3 py-2  focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                             placeholder="Describe your shop, what you sell, special offers, etc."
                             rows={4}
                         />
@@ -308,7 +308,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                className="w-full px-3 py-2 focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                                className="w-full px-3 py-2 focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                                 placeholder="+63 XXX XXX XXXX"
                             />
                         </div>
@@ -319,7 +319,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-3 py-2  focus:outline-none text-text-main   border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                                className="w-full px-3 py-2  focus:outline-none text-text-main   border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                                 placeholder="shop@email.com"
                             />
                         </div>
@@ -365,7 +365,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                     type="time"
                                     value={formData.openTime}
                                     onChange={(e) => setFormData({ ...formData, openTime: e.target.value })}
-                                    className="w-full focus:outline-none px-3 py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                                    className="w-full focus:outline-none px-3 py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                                 />
                             </div>
                             <div>
@@ -374,7 +374,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                     type="time"
                                     value={formData.closeTime}
                                     onChange={(e) => setFormData({ ...formData, closeTime: e.target.value })}
-                                    className="w-full px-3 focus:outline-none py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary  focus:ring-2 focus:ring-primary"
+                                    className="w-full px-3 focus:outline-none py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
                                 />
                             </div>
                         </div>
@@ -530,6 +530,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                     </button>
                 </div>
             </Modal>
+
         </div>
     );
 }

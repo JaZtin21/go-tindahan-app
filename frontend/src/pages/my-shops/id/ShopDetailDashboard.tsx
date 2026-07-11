@@ -21,6 +21,7 @@ import {
 } from 'recharts';
 import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft } from 'lucide-react';
 import { setAddShopModalOpen } from '~/store/uiSlice';
+import AddInventory from '../components/AddInventory';
 
 
 // ... Keep SHOP_METRICS mock data exactly the same ...
@@ -73,6 +74,11 @@ export const ShopDetailDashboard = () => {
     const triggerModalAction = (title: string) => {
         dispatch(setAddShopModalOpen(true));
     };
+
+
+    const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+    const handleCloseInventoryModal = () => setIsInventoryModalOpen(false);
+    const handleOpenInventoryModal = () => setIsInventoryModalOpen(true);
 
 
 
@@ -249,7 +255,7 @@ export const ShopDetailDashboard = () => {
 
                 {/* 2. Add Items in Inventory (Modal Trigger) */}
                 <div
-                    onClick={() => triggerModalAction('Add Items in Inventory')}
+                    onClick={handleOpenInventoryModal}
                     className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
                 >
                     <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
@@ -300,7 +306,7 @@ export const ShopDetailDashboard = () => {
                 </div>
 
             </div>
-
+            <AddInventory isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
 
             <Modal
                 isOpen={isAddShopModalOpen}
