@@ -33,7 +33,7 @@ export function createUploadLink(options: CreateUploadLinkOptions): ApolloLink {
       if (files.size > 0) {
         // Multipart upload - ORDER MATTERS for gqlgen: operations, map, then files
         const formData = new FormData();
-        
+
         // 1. Operations (query, variables)
         const operations = JSON.stringify({
           query: print(query),
@@ -52,7 +52,7 @@ export function createUploadLink(options: CreateUploadLinkOptions): ApolloLink {
           fileEntries.push({ index: i.toString(), file, path: graphqlPath });
           i++;
         });
-        
+
         // 3. Append map (second)
         formData.append('map', JSON.stringify(map));
 
@@ -77,9 +77,44 @@ export function createUploadLink(options: CreateUploadLinkOptions): ApolloLink {
       fetchOptions.body = body;
 
       fetch(uri, fetchOptions)
-        .then((response) => {
+        .then(async (response) => {
           if (!response.ok) {
-            throw new Error(`Network error: ${response.status}`);
+            let serverErrorMessage = `Network error: ${response.status}`;
+
+            try {
+              const rawBodyText = await response.text();
+
+              try {
+                const parsed = JSON.parse(rawBodyText);
+
+                // 👇 FIXED: Safely look into the FIRST item of your errors array list block
+                if (parsed.errors && Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+                  const targetError = parsed.errors[0];
+
+                  // Extract the field parameter key from the end of the path array (e.g., 'shopId')
+                  if (targetError.path && targetError.path.length > 0) {
+                    const errorField = targetError.path[targetError.path.length - 1];
+                    serverErrorMessage = `${errorField}: ${targetError.message}`; // 🎯 Outputs: "shopId: must be defined"
+                  } else {
+                    serverErrorMessage = targetError.message || serverErrorMessage;
+                  }
+                } else if (parsed.message || parsed.error) {
+                  serverErrorMessage = parsed.message || parsed.error || serverErrorMessage;
+                }
+              } catch {
+                if (rawBodyText) {
+                  serverErrorMessage = rawBodyText;
+                }
+              }
+            } catch (readErr) {
+              console.error("Failed to read raw network error body stream:", readErr);
+            }
+
+            const networkError = new Error(serverErrorMessage);
+            (networkError as any).statusCode = response.status;
+            (networkError as any).response = response;
+
+            throw networkError;
           }
           return response.json();
         })

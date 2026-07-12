@@ -191,7 +191,7 @@ export const MyShops: React.FC = () => {
                             <div
                                 key={shop.id}
                                 onClick={() => navigate(`/my-shops/${shop.id}`)}
-                                className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer"
+                                className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300  hover:bg-bg-primary-hover/40 cursor-pointer"
                             >
                                 {/* Square Core Image Asset Representation Box */}
                                 <div className="w-full aspect-square bg-bg-secondary rounded-xl mb-4 shrink-0 overflow-hidden relative">

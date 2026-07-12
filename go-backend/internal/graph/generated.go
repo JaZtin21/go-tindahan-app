@@ -182,6 +182,7 @@ type ComplexityRoot struct {
 		GetMyShops       func(childComplexity int, limit int, offset int) int
 		GetPostByID      func(childComplexity int, id string) int
 		GetPosts         func(childComplexity int, limit int, offset int) int
+		GetShopByID      func(childComplexity int, shopID string) int
 		GetShopInventory func(childComplexity int, shopID string, limit int, offset int) int
 		Me               func(childComplexity int) int
 		Ping             func(childComplexity int) int
@@ -273,6 +274,7 @@ type QueryResolver interface {
 	GetPosts(ctx context.Context, limit int, offset int) (*model.PaginatedPosts, error)
 	GetPostByID(ctx context.Context, id string) (*model.Post, error)
 	GetMyShops(ctx context.Context, limit int, offset int) (*model.PaginatedOwnerShops, error)
+	GetShopByID(ctx context.Context, shopID string) (*model.OwnerShop, error)
 	GetShopInventory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedOwnerInventory, error)
 	SearchShop(ctx context.Context, query string, limit int, offset int) (*model.PaginatedShops, error)
 	SearchProduct(ctx context.Context, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
@@ -958,6 +960,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.GetPosts(childComplexity, args["limit"].(int), args["offset"].(int)), true
+	case "Query.getShopById":
+		if e.ComplexityRoot.Query.GetShopByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getShopById_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.GetShopByID(childComplexity, args["shopId"].(string)), true
 	case "Query.getShopInventory":
 		if e.ComplexityRoot.Query.GetShopInventory == nil {
 			break
@@ -2065,6 +2078,20 @@ func (ec *executionContext) field_Query_getPosts_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["offset"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getShopById_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "shopId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["shopId"] = arg0
 	return args, nil
 }
 
@@ -5050,6 +5077,63 @@ func (ec *executionContext) fieldContext_Query_getMyShops(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_getShopById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_getShopById(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().GetShopByID(ctx, fc.Args["shopId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.OwnerShop
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.OwnerShop) graphql.Marshaler {
+			return ec.marshalOOwnerShop2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOwnerShop(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_getShopById(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_OwnerShop(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getShopById_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_getShopInventory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7390,7 +7474,7 @@ func (ec *executionContext) unmarshalInputAddInventoryItemInput(ctx context.Cont
 			it.ReorderLevel = data
 		case "photo":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photo"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -7916,7 +8000,7 @@ func (ec *executionContext) unmarshalInputUpdateInventoryItemInput(ctx context.C
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"itemId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo"}
+	fieldsInOrder := [...]string{"itemId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -8000,6 +8084,13 @@ func (ec *executionContext) unmarshalInputUpdateInventoryItemInput(ctx context.C
 				return it, err
 			}
 			it.Photo = data
+		case "newPhoto":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newPhoto"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewPhoto = data
 		}
 	}
 	return it, nil
@@ -9301,6 +9392,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_getMyShops(ctx, field)
 				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getShopById":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getShopById(ctx, field)
+				if res == graphql.RequiredNull {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
@@ -11003,6 +11116,13 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	_ = ctx
 	res := graphql.MarshalInt(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOOwnerShop2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOwnerShop(ctx context.Context, sel ast.SelectionSet, v *model.OwnerShop) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._OwnerShop(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOPost2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {

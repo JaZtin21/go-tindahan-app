@@ -39,7 +39,12 @@ const myShopsSlice = createSlice({
         updateShop: (state, action: PayloadAction<Shop>) => {
             const index = state.shops.findIndex(shop => shop.id === action.payload.id);
             if (index !== -1) {
+                // 🔄 Case A: It exists already -> Overwrite it in place
                 state.shops[index] = action.payload;
+            } else {
+                // 📥 Case B: Array is empty (F5 Reload) -> Insert it fresh into state
+                state.shops.push(action.payload);
+                state.totalCount += 1;
             }
         },
 

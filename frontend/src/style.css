@@ -8,12 +8,13 @@
     /* --- LIGHT MODE ENVIRONMENT DESIGN TOKENS --- */
     --color-bg-primary: #ffffff;
     --color-bg-secondary: #f9fafb;
-    --color-bg-primary-hover: #f3f4f6;
+    --color-bg-primary-hover: #dadde2;
 
     /* 👇 ADDED BORDER TOKENS (LIGHT MODE) */
     --color-border-main: #e5e7eb;
     /* Border for prominent edges, cards, inputs */
     --color-border-sub: #f3f4f6;
+    --color-border-muted: #c0c2c7;
     /* Soft subtle border for structural dividers */
 
     /* Text Sizing Hierarchy - Light Environments */
@@ -45,6 +46,7 @@
     --color-border-main: #2a2a2a;
     /* Subtle border for dark panels */
     --color-border-sub: #1f1f1f;
+    --color-border-muted: #c0c2c7;
     /* Extra soft divider line */
 
     /* Text Sizing Hierarchy - Dark Environments */

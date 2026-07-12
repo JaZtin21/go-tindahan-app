@@ -145,8 +145,8 @@ export const UPDATE_INVENTORY_ITEM_MUTATION = gql`
 `;
 
 export const DELETE_INVENTORY_ITEM_MUTATION = gql`
-  mutation DeleteInventoryItem($itemId: String!) {
-    deleteInventoryItem(itemId: $itemId)
+  mutation DeleteInventoryItem($itemId: ID!) { 
+    deleteInventoryItem(itemID: $itemId)       
   }
 `;
 
@@ -236,12 +236,59 @@ export const GET_MY_SHOPS_QUERY = gql`
     }
   }
 `;
-
+export const GET_SHOP_BY_ID_QUERY = gql`
+  query GetShopById($shopId: ID!) {
+    getShopById(shopId: $shopId) {
+      id
+      ownerId
+      shopName
+      address
+      description
+      photo
+      photos
+      createdAt
+      coordinates {
+        lat
+        lng
+      }
+      businessHours {
+        openTime
+        closeTime
+        days
+      }
+      paymentMethods {
+        cash
+        gcash
+        paymaya
+        card
+      }
+      delivery {
+        available
+        radius
+        fee
+        minOrder
+      }
+      socialMedia {
+        facebook
+        instagram
+      }
+      contactDetails {
+        phone
+        email
+        address
+      }
+      status {
+        isActive
+      }
+      verification {
+        isVerified
+      }
+    }
+  }
+`;
 export const GET_SHOP_INVENTORY_QUERY = gql`
-  query GetShopInventory($shopId: String!, $limit: Int!, $offset: Int!) {
+  query GetShopInventory($shopId: ID!, $limit: Int!, $offset: Int!) { # 👈 FIXED: Changed from String! to ID!
     getShopInventory(shopId: $shopId, limit: $limit, offset: $offset) {
-      totalCount
-      hasNextPage
       items {
         id
         shopId
@@ -257,6 +304,8 @@ export const GET_SHOP_INVENTORY_QUERY = gql`
         reorderLevel
         updatedAt
       }
+      totalCount
+      hasNextPage
     }
   }
 `;

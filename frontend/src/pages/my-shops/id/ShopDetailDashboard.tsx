@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { RootState } from '~/store/store'; // Adjust import path to match your file structure
 import { Shop } from '~/types/shop';
 import { ShopForm } from '~/pages/my-shops/components/ShopForm';
 import { Modal } from '~/components';
 import { useSelector, useDispatch } from 'react-redux';
+import { useQuery } from '@apollo/client/react';
 import {
     ResponsiveContainer,
     AreaChart,
@@ -21,7 +22,9 @@ import {
 } from 'recharts';
 import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft } from 'lucide-react';
 import { setAddShopModalOpen } from '~/store/uiSlice';
-import AddInventory from '../components/AddInventory';
+import InventoryForm from '../components/InventoryForm';
+import { GET_SHOP_BY_ID_QUERY } from '~/api/graphql';
+import { updateShop } from '~/store/myShopsSlice';
 
 
 // ... Keep SHOP_METRICS mock data exactly the same ...
@@ -66,6 +69,21 @@ export const ShopDetailDashboard = () => {
         state.myShops.shops.find((s: Shop) => s.id === id)
     );
 
+    console.log(shop, 'this is shop');
+
+    // 2. RUN STANDALONE FALLBACK QUERY (Skips network roundtrips if shop is already cached in Redux)
+    const { loading: isLoading, data, error } = useQuery(GET_SHOP_BY_ID_QUERY, {
+        variables: { shopId: id },
+        skip: !id || !!shop, // 💡 True security guard optimization bypass
+        fetchPolicy: 'no-cache' // Pure utility strategy to directly mirror database states
+    }) as { loading: boolean; error: any; data: { getShopById: Shop } | undefined };
+
+    // 3. LIFECYCLE DATA BOUNDARY SYNC: Merge back directly into your core array on reload
+    useEffect(() => {
+        if (data?.getShopById) {
+            dispatch(updateShop(data.getShopById)); // Reuses your existing upsert/overwrite logic handler
+        }
+    }, [data, dispatch]);
 
     const handleModalClose = () => {
         dispatch(setAddShopModalOpen(false))
@@ -79,7 +97,6 @@ export const ShopDetailDashboard = () => {
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
     const handleCloseInventoryModal = () => setIsInventoryModalOpen(false);
     const handleOpenInventoryModal = () => setIsInventoryModalOpen(true);
-
 
 
     return (
@@ -306,7 +323,7 @@ export const ShopDetailDashboard = () => {
                 </div>
 
             </div>
-            <AddInventory isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
+            <InventoryForm isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
 
             <Modal
                 isOpen={isAddShopModalOpen}

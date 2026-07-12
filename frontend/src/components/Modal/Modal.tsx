@@ -86,7 +86,7 @@ const Modal = ({ isOpen, onClose, title, subtitle, children }: ResponsiveModalPr
                         </div>
 
                         {/* FLEXIBLE CONTENT STREAM */}
-                        <div className="overflow-y-auto min-h-[80vh] md:min-h-[unset] max-h-[95vh] md:max-h-[95vh]">
+                        <div className="overflow-y-auto flex flex-col min-h-[80vh] md:min-h-[unset] max-h-[75vh] md:max-h-[95vh]">
                             {children}
                         </div>
 

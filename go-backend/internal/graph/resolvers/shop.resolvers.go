@@ -22,21 +22,6 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func diffPhotoURLs(oldSlice, currentSlice []string) []string {
-	diff := []string{}
-	currentMap := make(map[string]bool)
-
-	for _, url := range currentSlice {
-		currentMap[url] = true
-	}
-	for _, url := range oldSlice {
-		if !currentMap[url] {
-			diff = append(diff, url)
-		}
-	}
-	return diff
-}
-
 // CreateShop is the resolver for the createShop field.
 func (r *mutationResolver) CreateShop(ctx context.Context, input model.CreateShopInput) (*model.OwnerShop, error) {
 	// SECURITY GUARD: Enforce valid user identity state from Redis session
@@ -282,7 +267,7 @@ func (r *mutationResolver) UpdateShop(ctx context.Context, input model.UpdateSho
 	// Diffs old database array against incoming retained slice to find deletions
 	var deletedGalleryPhotos []string
 	if input.Photos != nil {
-		deletedGalleryPhotos = diffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
+		deletedGalleryPhotos = imageutil.DiffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
 	}
 
 	// Stream and append any brand new image uploads into the gallery container slice
@@ -452,7 +437,7 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 
 // AddInventoryItem is the resolver for the addInventoryItem field.
 func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.AddInventoryItemInput) (*model.OwnerInventoryItem, error) {
-	// SECURITY GUARD 1: Is user logged in?
+	// SECURITY GUARD 1: Enforce valid user identity state from Redis session
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
 	// SECURITY GUARD 2: Verify the caller is the actual owner of the target shop
@@ -462,18 +447,14 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
-				Message: "not found: target shop resource does not exist",
-				Extensions: map[string]interface{}{
-					"code": "NOT_FOUND",
-				},
+				Message:    "not found: target shop resource does not exist",
+				Extensions: map[string]interface{}{"code": "NOT_FOUND"},
 			})
 			return nil, nil
 		}
 		graphql.AddError(ctx, &gqlerror.Error{
-			Message: "internal server error: shop lookup failure",
-			Extensions: map[string]interface{}{
-				"code": "INTERNAL_SERVER_ERROR",
-			},
+			Message:    "internal server error: shop lookup failure",
+			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
 		})
 		return nil, nil
 	}
@@ -481,14 +462,45 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	if shopOwnerID != currentUser.ID {
 		log.Printf("⚠️ SECURITY ALERT: User %s tried to add items to shop %s owned by user %s", currentUser.ID, input.ShopID, shopOwnerID)
 		graphql.AddError(ctx, &gqlerror.Error{
-			Message: "forbidden: you do not have permission to modify this shop",
-			Extensions: map[string]interface{}{
-				"code": "FORBIDDEN",
-			},
+			Message:    "forbidden: you do not have permission to modify this shop",
+			Extensions: map[string]interface{}{"code": "FORBIDDEN"},
 		})
 		return nil, nil
 	}
 
+	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
+	uploader, err := imageutil.NewImageUploader(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+		os.Getenv("CLOUDINARY_FOLDER"),
+	)
+	if err != nil {
+		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER FOR INVENTORY: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: media processing failure",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
+	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
+	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, input.ShopID)
+	inventoryUploader := uploader.WithFolder(uploadFolder)
+
+	// 2. UPLOAD PRODUCT PHOTO TO CLOUDINARY IF PROVIDED
+	finalProductPhoto := ""
+	if input.Photo != nil && input.Photo.File != nil {
+		result, err := inventoryUploader.UploadImage(ctx, input.Photo.File, input.Photo.Filename)
+		if err == nil {
+			finalProductPhoto = result.URL
+		} else {
+			log.Printf("⚠️ Product photo upload failed: %v", err)
+			// Optional: Return a graphql error here if photos are strictly mandatory
+		}
+	}
+
+	// 3. PERSIST RECORD TO POSTGRES CONFIGURED WITH SECURE CLOUDINARY PATH URL
 	query := `
 		INSERT INTO inventory_items (
 			shop_id, item_name, description, barcode, category, 
@@ -506,15 +518,14 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 
 	err = r.Resolver.DB.QueryRow(ctx, query,
 		input.ShopID, input.ItemName, input.Description, input.Barcode, input.Category,
-		input.UnitOfMeasure, input.Photo, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel,
+		input.UnitOfMeasure, finalProductPhoto, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel,
 	).Scan(&insertedID, &costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &updatedAt)
 
 	if err != nil {
+		log.Printf("🔴 DATABASE TRANSACTION FAILED IN ADDINVENTORYITEM: %v", err)
 		graphql.AddError(ctx, &gqlerror.Error{
-			Message: "internal server error: failed to create inventory item entry",
-			Extensions: map[string]interface{}{
-				"code": "INTERNAL_SERVER_ERROR",
-			},
+			Message:    "internal server error: failed to create inventory item entry",
+			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
 		})
 		return nil, nil
 	}
@@ -527,7 +538,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		Barcode:       input.Barcode,
 		Category:      input.Category,
 		UnitOfMeasure: input.UnitOfMeasure,
-		Photo:         input.Photo,
+		Photo:         &finalProductPhoto, // Pointers sync accurately with your models schema representation
 		CostPrice:     &costPrice,
 		SellingPrice:  &sellingPrice,
 		StockQuantity: &stockQuantity,
@@ -538,16 +549,20 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 
 // UpdateInventoryItem is the resolver for the updateInventoryItem field.
 func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.UpdateInventoryItemInput) (*model.OwnerInventoryItem, error) {
+	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// Verify owner through relation table JOIN
+	// SECURITY GUARD 2: Fetch current database values to evaluate owner and grab old photo
 	var shopOwnerID string
+	var oldPhoto *string
+	var shopID string
+
 	checkQuery := `
-		SELECT s.owner_id FROM inventory_items i
+		SELECT s.owner_id, i.photo, i.shop_id FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &oldPhoto, &shopID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -568,6 +583,49 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		return nil, nil
 	}
 
+	// INITIALIZE THE CLOUDINARY UPLOADER UTILITY VIA REGULAR ENVS
+	uploader, err := imageutil.NewImageUploader(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+		os.Getenv("CLOUDINARY_FOLDER"),
+	)
+	if err != nil {
+		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN UPDATEINVENTORYITEM: %v", err)
+		return nil, fmt.Errorf("media processor error")
+	}
+
+	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
+	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopID)
+	inventoryUploader := uploader.WithFolder(uploadFolder)
+
+	// =========================================================================
+	// 1. PRODUCT PHOTO UPDATES REFACTOR (Matches UpdateShop pattern exactly)
+	// =========================================================================
+	finalPhoto := ""
+	if input.Photo != nil {
+		finalPhoto = *input.Photo // Take what the frontend wants to retain
+	}
+
+	// Compare DB record with incoming state: if it changed or cleared, flag it for cleanup
+	var deletedPhoto string
+	if oldPhoto != nil && *oldPhoto != "" && *oldPhoto != finalPhoto {
+		deletedPhoto = *oldPhoto
+	}
+
+	// Process the new binary upload stream if sent by the client input layer
+	if input.NewPhoto != nil && input.NewPhoto.File != nil {
+		result, uploadErr := inventoryUploader.UploadImage(ctx, input.NewPhoto.File, input.NewPhoto.Filename)
+		if uploadErr == nil {
+			finalPhoto = result.URL
+		} else {
+			log.Printf("🔴 Product photo upload failed during update: %v", uploadErr)
+		}
+	}
+
+	// =========================================================================
+	// 2. PERSIST AND EXECUTE SQL DATABASE UPDATE MATRIX
+	// =========================================================================
 	updateQuery := `
 		UPDATE inventory_items 
 		SET item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5, photo = $6,
@@ -579,31 +637,46 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	var updatedAt time.Time
 
 	err = r.Resolver.DB.QueryRow(ctx, updateQuery,
-		input.ItemName, input.Description, input.Barcode, input.Category, input.UnitOfMeasure, input.Photo,
+		input.ItemName, input.Description, input.Barcode, input.Category, input.UnitOfMeasure, finalPhoto,
 		input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel, input.ItemID,
 	).Scan(
 		&item.ID, &item.ShopID, &item.ItemName, &item.Description, &item.Barcode, &item.Category,
 		&item.UnitOfMeasure, &item.Photo, &item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &updatedAt,
 	)
 	if err != nil {
+		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEINVENTORYITEM: %v", err)
 		return nil, err
 	}
 
 	item.UpdatedAt = updatedAt.Format(time.RFC3339)
+
+	// =========================================================================
+	// 3. SECURE CLOUDINARY CLEANUP SWEEPS (Best-effort execution pipeline)
+	// =========================================================================
+	// Purges old orphaned asset from Cloudinary storage if overwritten or cleared
+	if deletedPhoto != "" {
+		_ = inventoryUploader.DeleteImageByURL(ctx, deletedPhoto)
+	}
+
 	return &item, nil
 }
 
 // DeleteInventoryItem is the resolver for the deleteInventoryItem field.
 func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID string) (bool, error) {
+	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
+	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id, photo link, and shop id before resource wipeout
 	var shopOwnerID string
+	var oldPhoto *string
+	var shopID string
+
 	checkQuery := `
-		SELECT s.owner_id FROM inventory_items i
+		SELECT s.owner_id, i.photo, i.shop_id FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID, &oldPhoto, &shopID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -624,9 +697,34 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		return false, nil
 	}
 
+	// 1. INITIALIZE THE CLOUDINARY UPLOADER UTILITY DIRECTLY VIA OS ENVS
+	uploader, err := imageutil.NewImageUploader(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+		os.Getenv("CLOUDINARY_FOLDER"),
+	)
+	if err != nil {
+		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN DELETEINVENTORYITEM: %v", err)
+		return false, fmt.Errorf("media processor error")
+	}
+
+	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
+	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopID)
+	inventoryUploader := uploader.WithFolder(uploadFolder)
+
+	// 2. TRIGGER CLOUDINARY CLEANUP CODES FOR SINGLE PRODUCT PHOTO
+	if oldPhoto != nil && *oldPhoto != "" {
+		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, *oldPhoto); cleanErr != nil {
+			log.Printf("⚠️ Failed to remove inventory product image %s on deletion: %v", *oldPhoto, cleanErr)
+		}
+	}
+
+	// 3. DATABASE ROW ELIMINATION
 	deleteQuery := "DELETE FROM inventory_items WHERE id = $1"
 	_, err = r.Resolver.DB.Exec(ctx, deleteQuery, itemID)
 	if err != nil {
+		log.Printf("🔴 DATABASE DELETION FAILED IN DELETEINVENTORYITEM: %v", err)
 		return false, err
 	}
 
@@ -895,6 +993,87 @@ func (r *queryResolver) GetMyShops(ctx context.Context, limit int, offset int) (
 		TotalCount:  int(totalCount),
 		HasNextPage: hasNextPage,
 	}, nil
+}
+
+// GetShopByID is the resolver for the getShopById field.
+func (r *queryResolver) GetShopByID(ctx context.Context, shopID string) (*model.OwnerShop, error) {
+	// SECURITY GUARD: Enforce valid user identity state from Redis session
+	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
+
+	// Fetch the specific row matching the target UUID
+	selectQuery := `
+		SELECT id, shop_name, address, description, photo, photos, owner_id, created_at, 
+		       verification, contact_details, status, coordinates, business_hours, payment_methods, delivery, social_media
+		FROM shops 
+		WHERE id = $1 LIMIT 1
+	`
+	row := r.Resolver.DB.QueryRow(ctx, selectQuery, shopID)
+
+	var shop model.OwnerShop
+	var createdAt time.Time
+
+	// Allocate temporary raw byte buffers to hold JSONB structures from PostgreSQL columns
+	var verificationBytes []byte
+	var contactBytes []byte
+	var statusBytes []byte
+	var coordinatesBytes []byte
+	var hoursBytes []byte
+	var paymentsBytes []byte
+	var deliveryBytes []byte
+	var socialBytes []byte
+
+	// Scan all 16 distinct columns perfectly 1-to-1 matching your model layout
+	err := row.Scan(
+		&shop.ID, &shop.ShopName, &shop.Address, &shop.Description,
+		&shop.Photo, &shop.Photos, &shop.OwnerID, &createdAt,
+		&verificationBytes, &contactBytes, &statusBytes, &coordinatesBytes,
+		&hoursBytes, &paymentsBytes, &deliveryBytes, &socialBytes,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: target shop resource does not exist",
+				Extensions: map[string]interface{}{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		log.Printf("🔴 Single shop row scan failure: %v", err)
+		return nil, err
+	}
+
+	// 🔒 OWNERSHIP SECURITY VALIDATION GATE: Ensure user actually owns this row
+	if shop.OwnerID != currentUser.ID {
+		log.Printf("⚠️ SECURITY ALERT: User %s tried to fetch shop detail parameters for %s owned by %s", currentUser.ID, shopID, shop.OwnerID)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "forbidden: access denied to view this shop dashboard context",
+			Extensions: map[string]interface{}{"code": "FORBIDDEN"},
+		})
+		return nil, nil
+	}
+
+	// Initialize structural payload containers to prevent nil pointer encoding memory exceptions
+	shop.Verification = &model.Verification{}
+	shop.ContactDetails = &model.ContactDetails{}
+	shop.Status = &model.ShopStatus{}
+	shop.Coordinates = &model.Coordinates{}
+	shop.BusinessHours = &model.BusinessHours{}
+	shop.PaymentMethods = &model.PaymentMethods{}
+	shop.Delivery = &model.DeliveryOptions{}
+	shop.SocialMedia = &model.SocialMedia{}
+
+	// Safely decode JSON buffers straight back into your model layouts
+	_ = json.Unmarshal(verificationBytes, shop.Verification)
+	_ = json.Unmarshal(contactBytes, shop.ContactDetails)
+	_ = json.Unmarshal(statusBytes, shop.Status)
+	_ = json.Unmarshal(coordinatesBytes, shop.Coordinates)
+	_ = json.Unmarshal(hoursBytes, shop.BusinessHours)
+	_ = json.Unmarshal(paymentsBytes, shop.PaymentMethods)
+	_ = json.Unmarshal(deliveryBytes, shop.Delivery)
+	_ = json.Unmarshal(socialBytes, shop.SocialMedia)
+
+	shop.CreatedAt = createdAt.Format(time.RFC3339)
+
+	return &shop, nil
 }
 
 // GetShopInventory is the resolver for the getShopInventory field.

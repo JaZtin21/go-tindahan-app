@@ -45,6 +45,21 @@ func NewImageUploader(cloudName, apiKey, apiSecret, folder string) (*ImageUpload
 	}, nil
 }
 
+func DiffPhotoURLs(oldSlice, currentSlice []string) []string {
+	diff := []string{}
+	currentMap := make(map[string]bool)
+
+	for _, url := range currentSlice {
+		currentMap[url] = true
+	}
+	for _, url := range oldSlice {
+		if !currentMap[url] {
+			diff = append(diff, url)
+		}
+	}
+	return diff
+}
+
 // UploadImage uploads a single image to Cloudinary
 func (u *ImageUploader) UploadImage(ctx context.Context, reader io.Reader, filename string) (*UploadResult, error) {
 	if err := u.validateFile(filename); err != nil {

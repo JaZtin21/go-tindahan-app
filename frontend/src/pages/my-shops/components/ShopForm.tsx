@@ -1,5 +1,5 @@
 
-import { useState, useRef, type ChangeEvent } from 'react';
+import { useState, useRef, type ChangeEvent, useEffect } from 'react';
 //import { LocationPicker } from './LocationPicker';
 import { useMutation } from '@apollo/client/react';
 import { CREATE_SHOP_MUTATION, UPDATE_SHOP_MUTATION } from '~/api/graphql';
@@ -107,6 +107,17 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     });
 
     const isLoading = createLoading || isMutationLoading;
+    // COVERS ASSET LOGIC MANAGEMENT (REFACTORED STRATEGY SIMILAR TO EDITPOSTMODAL)
+    const [existingCoverPhoto, setExistingCoverPhoto] = useState<string>(typeof shop?.photo === 'string' ? shop.photo : '');
+    const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
+    const [newCoverPreview, setNewCoverPreview] = useState<string>('');
+
+    // CAROUSEL GALLERY LOGIC MANAGEMENT (ADDED TO SUPPORT PREVIOUS BLOCK STRUCTURE)
+    const [existingGalleryPhotos, setExistingGalleryPhotos] = useState<string[]>(shop?.photos || []);
+    const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const coverPhotoPreview = newCoverPreview || existingCoverPhoto;
 
     // FORM STATE HANDLERS
     const [formData, setFormData] = useState({
@@ -122,17 +133,26 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
         businessDays: shop?.businessHours?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     });
 
-    // COVERS ASSET LOGIC MANAGEMENT (REFACTORED STRATEGY SIMILAR TO EDITPOSTMODAL)
-    const [existingCoverPhoto, setExistingCoverPhoto] = useState<string>(typeof shop?.photo === 'string' ? shop.photo : '');
-    const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
-    const [newCoverPreview, setNewCoverPreview] = useState<string>('');
+    useEffect(() => {
+        if (shop) {
+            setFormData({
+                name: shop?.shopName || '',
+                description: shop?.description || '',
+                phone: shop?.contactDetails?.phone || '',
+                email: shop?.contactDetails?.email || '',
+                address: shop?.contactDetails?.address || '',
+                coverPhotoUrl: shop?.photo || DEFAULT_IMAGE,
+                coordinates: shop?.coordinates || { lat: 14.5995, lng: 120.9842 },
+                openTime: shop?.businessHours?.openTime || '08:00',
+                closeTime: shop?.businessHours?.closeTime || '20:00',
+                businessDays: shop?.businessHours?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            });
 
-    // CAROUSEL GALLERY LOGIC MANAGEMENT (ADDED TO SUPPORT PREVIOUS BLOCK STRUCTURE)
-    const [existingGalleryPhotos, setExistingGalleryPhotos] = useState<string[]>(shop?.photos || []);
-    const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
+            typeof shop.photo === 'string' && setExistingCoverPhoto(shop.photo);
+            setExistingGalleryPhotos(shop?.photos || []);
+        }
+    }, [shop]);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const coverPhotoPreview = newCoverPreview || existingCoverPhoto;
 
     const handleLocationSelect = (coordinates: { lat: number; lng: number }, address: string) => {
         console.log('Location selected in ShopForm:', coordinates, address);
@@ -283,7 +303,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-3 py-2 border text-text-main focus:outline-none border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                                className="w-full px-3 py-2 border text-text-main focus:outline-none border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                                 placeholder="Enter shop name"
                                 required
                             />
@@ -295,7 +315,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-3 py-2  focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                            className="w-full px-3 py-2  focus:outline-none text-text-main border border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                             placeholder="Describe your shop, what you sell, special offers, etc."
                             rows={4}
                         />
@@ -308,7 +328,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                className="w-full px-3 py-2 focus:outline-none text-text-main border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                                className="w-full px-3 py-2 focus:outline-none text-text-main border border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                                 placeholder="+63 XXX XXX XXXX"
                             />
                         </div>
@@ -319,7 +339,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-3 py-2  focus:outline-none text-text-main   border border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                                className="w-full px-3 py-2  focus:outline-none text-text-main   border border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                                 placeholder="shop@email.com"
                             />
                         </div>
@@ -365,7 +385,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                     type="time"
                                     value={formData.openTime}
                                     onChange={(e) => setFormData({ ...formData, openTime: e.target.value })}
-                                    className="w-full focus:outline-none px-3 py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                                    className="w-full focus:outline-none px-3 py-2 border text-text-main border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                                 />
                             </div>
                             <div>
@@ -374,7 +394,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                     type="time"
                                     value={formData.closeTime}
                                     onChange={(e) => setFormData({ ...formData, closeTime: e.target.value })}
-                                    className="w-full px-3 focus:outline-none py-2 border text-text-main border-zinc-300 dark:border-zinc-600 rounded-lg bg-bg-primary   focus:border-[var(--color-text-muted)]"
+                                    className="w-full px-3 focus:outline-none py-2 border text-text-main border-border-main rounded-lg bg-bg-primary   focus:border-border-muted"
                                 />
                             </div>
                         </div>
@@ -428,7 +448,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="aspect-video rounded-lg bg-zinc-100 dark:bg-zinc-800 border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center mb-4">
+                            <div className="aspect-video rounded-lg bg-zinc-100 dark:bg-zinc-800 border-2 border-dashed border-border-main flex items-center justify-center mb-4">
                                 <div className="text-center">
                                     <ImageIcon className="w-12 h-12 text-zinc-400 mx-auto mb-2" />
                                     <p className="text-sm text-zinc-500 dark:text-zinc-400">No cover photo selected</p>
@@ -513,7 +533,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                     </div>
 
                     {/* Dynamic Text Content */}
-                    <p className="mt-2 text-lg text-text-main dark:text-zinc-400">
+                    <p className="mt-2 text-lg font-bold text-text-main dark:text-zinc-400">
                         {modalMessage}
                     </p>
 
