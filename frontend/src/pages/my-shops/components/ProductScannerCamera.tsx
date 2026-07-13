@@ -25,7 +25,13 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
 
     useEffect(() => {
         initScannerAssets((status) => {
-            setLoadPhase(status.phase);
+            if (status.phase === 'ready') {
+                setTimeout(() => setLoadPhase(status.phase), 200);
+            } else {
+                setLoadPhase(status.phase)
+            }
+            ;
+
             setLoadProgress(status.progress);
         }).catch((err) => {
             console.error(err);
@@ -274,7 +280,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
 
     if (loadPhase !== 'ready') {
         return (
-            <div className="relative flex flex-col flex-1 w-full bg-[#3f3f3f] h-full min-h-[400px] items-center justify-center text-white px-8">
+            <div className="relative flex flex-col flex-1 w-full bg-bg-secondary h-full min-h-[400px] items-center justify-center text-white px-8">
                 <div className="w-full max-w-xs flex flex-col items-center gap-3">
                     {loadPhase === 'error' ? (
                         <div className="flex flex-col items-center gap-3 text-center w-full">
@@ -282,7 +288,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                             <div className="text-xs font-semibold uppercase tracking-wider text-red-400">
                                 Initialization Failed
                             </div>
-                            <p className="text-[11px] text-white/60 leading-normal">
+                            <p className="text-[11px] text-text-main leading-normal">
                                 Failed to stream neural network assets or reference vectors from server channels.
                             </p>
                             <button
@@ -295,8 +301,8 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                         </div>
                     ) : (
                         <>
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                            <div className="text-xs font-semibold uppercase tracking-wider opacity-70">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-text-main"></div>
+                            <div className="text-xs font-semibold text-text-main uppercase tracking-wider opacity-70">
                                 {loadPhase === 'model' && 'Downloading Neural Weights...'}
                                 {loadPhase === 'names' && 'Syncing Registry Catalog...'}
                                 {loadPhase === 'embeddings' && 'Loading Vector Gallery...'}
@@ -304,7 +310,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                             <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-1">
                                 <div className="bg-[var(--color-brand-green)] h-full transition-all duration-150 ease-out" style={{ width: `${loadProgress}%` }} />
                             </div>
-                            <span className="text-[11px] font-bold text-white/50">{loadProgress}%</span>
+                            <span className="text-[11px] font-bold text-text-main/50">{loadProgress}%</span>
                         </>
                     )}
                 </div>

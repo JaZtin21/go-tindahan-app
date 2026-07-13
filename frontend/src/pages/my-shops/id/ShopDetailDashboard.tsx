@@ -258,7 +258,7 @@ export const ShopDetailDashboard = () => {
 
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
-                    onClick={() => triggerModalAction('Someone is buying')}
+                    onClick={handleOpenInventoryModal}
                     className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
                 >
                     {/* Centered Asset Representation Box matching your shop card geometry layout */}
