@@ -78,7 +78,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
 
 
     // Clean up all local string variables and close the view
-    const handleCloseInventoryModal = () => {
+    const handleCloseInventoryModal = (shoudClose?: boolean) => {
         setFormData({
             itemName: '',
             description: '',
@@ -92,9 +92,10 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         });
         setPhoto(null);
         setPhotoPreview('');
-        setActiveTab('manual');
         setScannerStep('camera');
-        onClose();
+
+        if (shoudClose)
+            onClose();
     };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +159,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 dispatch(addInventoryItemAction(data.addInventoryItem));
             }
 
-            handleCloseInventoryModal();
+            handleCloseInventoryModal(false);
             openModal({ isSuccess: true, type: 'add' });
         },
         onError: (err) => {
@@ -340,7 +341,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                     : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
                                 }`}
                         >
-                            <Camera className="h-4 w-4" /> Image Scanner
+                            <Camera className="h-4 w-4" /> AI Image Scanner
                         </button>
                     </div>
 
