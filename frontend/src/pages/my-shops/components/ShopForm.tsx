@@ -285,7 +285,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     };
 
     return (
-        <div className="w-full max-h-[80vh] md:max-h-[80vh] ">
+        <div className="w-full ">
             <div className="bg-bg-secondary rounded-lg p-6 shadow-lg">
                 {
                     /*
@@ -498,7 +498,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="px-6 py-2 bg-brand-green hover:bg-brand-green-hover text-text-white cursor-pointer rounded-lg hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                         >
                             {isLoading ? (
                                 <>
@@ -521,12 +521,16 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                 onClose={handleModalClose}
                 title={isSuccess ? "Yay!" : "Error"}
                 subtitle=""
+                isMobileVariant={false}
+                maxWidth="max-w-[340px]"
+                isHeaderVisible={false}
+                unsetHeight
             >
                 <div className="flex flex-col items-center justify-center p-6 min-h-[200px]">
                     {/* Visual Success/Error Indicator Anchor (Optional styling) */}
                     <div className=''>
                         {isSuccess ? (
-                            <Check className="w-8 h-8 text-brand-green" />
+                            <Check className="w-8 h-8 text-brand-gold" />
                         ) : (
                             <X className="w-8 h-8 text-brand-red" />
                         )}
@@ -544,7 +548,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                     {/* Confirmation Button to trigger close function */}
                     <button
                         onClick={handleModalClose}
-                        className='mt-6 p-2 px-4 bg-brand-green hover:bg-brand-green-hover cursor-pointer text-text-white rounded-lg  transition-colors'
+                        className='mt-6 p-2 px-4 bg-brand-gold hover:bg-brand-gold-hover cursor-pointer text-text-white rounded-lg  transition-colors'
                     >
                         OK
                     </button>

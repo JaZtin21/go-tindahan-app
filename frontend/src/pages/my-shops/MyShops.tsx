@@ -285,6 +285,10 @@ export const MyShops: React.FC = () => {
                 onClose={handleModalClose}
                 title={isConfirmingDelete ? "Are you absolutely sure?" : (isSuccess ? "Success" : "Error")}
                 subtitle=""
+                isMobileVariant={false}
+                maxWidth="max-w-[360px] md:max-w-[400px]"
+                isHeaderVisible={false}
+                unsetHeight
             >
                 <div className="flex flex-col gap-4 items-center text-center p-2">
 

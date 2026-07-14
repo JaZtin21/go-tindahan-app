@@ -11,9 +11,10 @@ import {
     updateInventoryItem as updateInventoryItemAction
 } from "~/store/inventorySlice";
 import { Check, X, XIcon } from 'lucide-react';
-import { ProductScannerCamera } from './ProductScannerCamera';
+import { ProductScannerCamera } from '../components';
+import { ChevronLeft } from 'lucide-react';
 
-export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
+export default function Checkout({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
 
 
     const isEdit: boolean = !!data && Object.keys(data).length > 0;
@@ -314,41 +315,69 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
             <Modal
                 isOpen={isOpen}
                 onClose={handleCloseInventoryModal}
-                title={isEdit ? 'Update Item' : 'Add Item'}
-                subtitle={isEdit ? 'Update Items in your inventory' : 'Add Item to your inventory'}
+                isFullScreenModal
+                title={isEdit ? 'Update Item' : 'Add Item to Cart'}
+                subtitle=''
+                customHeader={<div className={` flex items-center  px-2 py-6 `}>
+                    {/* 💡 Note: layout="position" is safe to leave here, or remove if unneeded */}
+                    <button
+                        onClick={() => { handleCloseInventoryModal(); onClose(); }}
+                        className="p-1.5 text-text-sub hover:text-text-main hover:bg-item-hover z-1 rounded-lg transition-colors cursor-pointer shrink-0"
+                    >
+                        <ChevronLeft size={18} strokeWidth={2.5} />
+                    </button>
+                    <div className="flex-1 flex  min-w-0 pr-4 -ml-4 text-center self-center justify-center">
+                        <h2 className="text-lg font-bold text-text-main  leading-tight truncate">{activeTab === 'manual' ? 'Add Item' : activeTab === 'scanner' ? 'Scan Item' : 'Checkout'}</h2>
+                    </div>
+
+                </div>}
             >
-                <div className="flex flex-col w-full bg-bg-secondary h-full">
+                {/* HEADER BLOCK for fullscreen modals */}
+
+                <div className="flex flex-col w-full bg-bg-primary flex-1 h-full ">
 
                     {/* --- TAB HEADERS --- */}
-                    <div className={`flex border-b bg-bg-primary border-[var(--color-border-main)] w-full ${isEdit ? 'hidden' : ''}`}>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('manual')}
-                            className={`flex-1 flex flex-row gap-2 items-center justify-center py-4 text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
-                                ${activeTab === 'manual'
-                                    ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
-                                    : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
-                                }`}
-                        >
-                            <Pencil className="h-4 w-4" /> Manual Input
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('scanner')}
-                            className={`flex-1  py-4 flex flex-row gap-2 items-center justify-center text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
-                                ${activeTab === 'scanner'
-                                    ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
-                                    : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
-                                }`}
-                        >
-                            <Camera className="h-4 w-4" /> AI Image Scanner
-                        </button>
+                    <div className='mx-4'>
+                        <div className="flex bg-bg-primary my-2 rounded-full w-full max-w-xl  border border-border-main ">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('manual')}
+                                className={`flex-1 flex flex-row gap-2 items-center justify-center py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-full cursor-pointer ${activeTab === 'manual'
+                                    ? 'bg-brand-gold text-text-white shadow-sm'
+                                    : 'text-text-sub hover:text-text-main'
+                                    }`}
+                            >
+                                Manual Input
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('scanner')}
+                                className={`flex-1 flex flex-row gap-2 items-center justify-center py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-full cursor-pointer ${activeTab === 'scanner'
+                                    ? 'bg-brand-gold text-text-white shadow-sm'
+                                    : 'text-text-sub hover:text-text-main'
+                                    }`}
+                            >
+                                AI Scanner
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('checkout')}
+                                className={`flex-1 flex flex-row gap-2 items-center justify-center py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-full cursor-pointer ${activeTab === 'checkout'
+                                    ? 'bg-brand-gold text-text-white shadow-sm'
+                                    : 'text-text-sub hover:text-text-main'
+                                    }`}
+                            >
+                                Checkout
+                            </button>
+                        </div>
                     </div>
 
                     {/* --- INVENTORY CONTAINER DATA MATRIX --- */}
-                    <div className="w-full bg-bg-secondary h-full flex-1 flex">
+                    <div className="w-full bg-bg-primary h-full flex-1 flex">
                         {activeTab === 'manual' ? (
-                            <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 p-6 w-full">
+                            <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 md:p-6 p-5 w-full">
 
                                 {/* Item Name Input */}
                                 <div className="flex flex-col gap-2 text-left">
@@ -364,7 +393,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                 </div>
 
                                 {/* Financial Estimates Metrics Layout Row */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div className="flex flex-col gap-1 text-left">
                                         <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
                                         <input
@@ -390,7 +419,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                 </div>
 
                                 {/* Quantities Operational Inventory Controls Row */}
-                                <div className="grid grid-cols-2 gap-4 items-end">
+                                <div className="grid grid-cols-1 gap-4 items-end">
                                     <div className="flex flex-col gap-1 text-left">
                                         <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
                                         <input
@@ -412,56 +441,14 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                         />
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-1 text-left w-full">
-                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Product Image (Optional)</label>
-
-                                    {!photoPreview ? (
-                                        /* Dropzone Upload UI Target State Area */
-                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-primary)] hover:bg-[var(--color-bg-primary-hover)] transition-colors cursor-pointer">
-                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                <span className="text-2xl mb-1"><Camera className="text-[var(--color-text-sub)]" /></span>
-                                                <p className="text-xs font-semibold text-[var(--color-text-sub)]">Click to browse image asset</p>
-                                                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">PNG or JPG variants accepted</p>
-                                            </div>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handlePhotoChange}
-                                                className="hidden"
-                                            />
-                                        </label>
-                                    ) : (
-                                        /* Active Local Preview Matrix Overlay Canvas */
-                                        <div className="relative w-full h-48 border border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-secondary)] overflow-hidden flex items-center justify-center">
-                                            <img
-                                                src={photoPreview || ''}
-                                                alt="Product preview grid reference"
-                                                className="h-full object-contain"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handleRemovePhoto}
-                                                className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
-                                            >
-                                                <XIcon className="w-4 h-4 text-white" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
 
                                 {/* Bottom Window Choice Action Items */}
-                                <div className="flex justify-end gap-3 mt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleCloseInventoryModal(true)}
-                                        className="px-5 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
+                                <div className="flex justify-center w-full  gap-3 mt-auto">
+
                                     <button
                                         type="submit"
                                         disabled={isLoading}
-                                        className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                        className="px-6 py-3 justify-center font-semibold w-full text-center bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-xl hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                                     >
                                         {isLoading ? (
                                             <>
@@ -469,14 +456,15 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                 <span>{isEdit ? 'Updating...' : 'Adding...'}</span>
                                             </>
                                         ) : (
-                                            <span>{isEdit ? 'Update Item' : 'Add Item'}</span>
+                                            <span>{isEdit ? 'Update Item' : 'Add Item to Cart'}</span>
                                         )}
                                     </button>
                                 </div>
 
                             </form>
                         ) : activeTab === 'scanner' && (
-                            <div className="flex flex-col flex-1 w-full bg-[var(--color-bg-secondary)] ">
+                            /* --- DISPATCH SCANNER HARDWARE SLOT --- */
+                            <div className="flex flex-col flex-1 h-full w-full bg-[var(--color-bg-secondary)] min-h-0 md:min-h-[521px]">
 
                                 {scannerStep === 'camera' && (
                                     <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-[var(--color-bg-secondary)] ">
@@ -494,10 +482,11 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             }}
                                         />
                                     </div>
+
                                 )}
 
                                 {scannerStep === 'form' && (
-                                    <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 p-6  w-full bg-[var(--color-bg-secondary)]">
+                                    <form onSubmit={handleInventoryFormSubmit} className="flex flex-col h-full gap-5 md:p-6 p-5 w-full bg-[var(--color-bg-primary)]">
                                         {/* Item Name Input */}
                                         <div className="flex flex-col gap-2 text-left">
                                             <label className="text-xs font-semibold text-[var(--color-text-sub)]">Item Name *</label>
@@ -512,18 +501,8 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                         </div>
 
                                         {/* Financial Estimates Metrics Layout Row */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="flex flex-col gap-1 text-left">
-                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.costPrice}
-                                                    onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
+                                        <div className="grid grid-cols-1 gap-4">
+
                                             <div className="flex flex-col gap-1 text-left">
                                                 <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
                                                 <input
@@ -538,7 +517,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                         </div>
 
                                         {/* Quantities Operational Inventory Controls Row */}
-                                        <div className="grid grid-cols-2 gap-4 items-end">
+                                        <div className="grid grid-cols-1 gap-4">
                                             <div className="flex flex-col gap-1 text-left">
                                                 <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
                                                 <input
@@ -570,21 +549,22 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                         </div>
 
                                         {/* Bottom Window Choice Action Items */}
-                                        <div className="flex justify-between items-center mt-4">
+                                        <div className="flex justify-between items-center mt-auto">
                                             {/* Go Back Left Anchor: Re-triggers camera tab frame loops */}
-                                            <button
-                                                type="button"
-                                                onClick={handleGoBackToCamera}
-                                                className="px-4 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
-                                            >
-                                                ← Go Back to Camera
-                                            </button>
 
-                                            <div className="flex gap-3">
+
+                                            <div className="flex gap-3 w-full">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGoBackToCamera}
+                                                    className="px-2 md:px-4  py-2 md:w-[200px] w-[150px] bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-xl font-bold text-xs md:text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
+                                                >
+                                                    ← Go Back to Camera
+                                                </button>
                                                 <button
                                                     type="submit"
                                                     disabled={isLoading}
-                                                    className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                                    className="px-6 py-3 text-sm md:text-sm align-center justify-center font-semibold flex-1 w-full flex bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-xl disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                                                 >
                                                     {isLoading ? (
                                                         <>
@@ -592,7 +572,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                             <span>Adding Item...</span>
                                                         </>
                                                     ) : (
-                                                        <span>Add Item</span>
+                                                        <span>Add Item to cart</span>
                                                     )}
                                                 </button>
                                             </div>
@@ -612,6 +592,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 subtitle=""
                 isMobileVariant={false}
                 maxWidth="max-w-[340px]"
+                isFullScreenModal={false}
                 isHeaderVisible={false}
                 unsetHeight
             >

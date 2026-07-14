@@ -25,6 +25,7 @@ import { setAddShopModalOpen } from '~/store/uiSlice';
 import InventoryForm from '../components/InventoryForm';
 import { GET_SHOP_BY_ID_QUERY } from '~/api/graphql';
 import { updateShop } from '~/store/myShopsSlice';
+import Checkout from './Checkout';
 
 
 // ... Keep SHOP_METRICS mock data exactly the same ...
@@ -97,6 +98,10 @@ export const ShopDetailDashboard = () => {
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
     const handleCloseInventoryModal = () => setIsInventoryModalOpen(false);
     const handleOpenInventoryModal = () => setIsInventoryModalOpen(true);
+
+    const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+    const handleCloseCheckoutModal = () => setIsCheckoutModalOpen(false);
+    const handleOpenCheckoutModal = () => setIsCheckoutModalOpen(true);
 
 
     return (
@@ -258,7 +263,7 @@ export const ShopDetailDashboard = () => {
 
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
-                    onClick={handleOpenInventoryModal}
+                    onClick={handleOpenCheckoutModal}
                     className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
                 >
                     {/* Centered Asset Representation Box matching your shop card geometry layout */}
@@ -324,6 +329,7 @@ export const ShopDetailDashboard = () => {
 
             </div>
             <InventoryForm isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
+            <Checkout isOpen={isCheckoutModalOpen} onClose={handleCloseCheckoutModal} />
 
             <Modal
                 isOpen={isAddShopModalOpen}

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ChevronLeft } from 'lucide-react';
 
 interface ResponsiveModalProps {
     isOpen: boolean;
@@ -9,12 +9,19 @@ interface ResponsiveModalProps {
     title: string;
     subtitle?: string;
     children: React.ReactNode;
+    isFullScreenModal?: boolean;
+    isMobileVariant?: boolean;
+    maxWidth?: string;
+    isHeaderVisible?: boolean;
+    customHeader?: React.ReactNode;
+    unsetHeight?: boolean;
 }
 
-const Modal = ({ isOpen, onClose, title, subtitle, children }: ResponsiveModalProps) => {
+const Modal = ({ isOpen, onClose, title, subtitle, children, isFullScreenModal, isMobileVariant, maxWidth, isHeaderVisible, customHeader, unsetHeight }: ResponsiveModalProps) => {
     // Keep your useEffect exactly the same...
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const isMobile = (typeof isMobileVariant === 'boolean') ? isMobileVariant : typeof window !== 'undefined' && window.innerWidth < 768;
+    const headerVisible = (typeof isHeaderVisible === 'boolean') ? isHeaderVisible : true;
 
     // 💡 FIX: Replace scale transforms with clean positional translations (y)
     // This stops Framer Motion from altering the box width/height model entirely
@@ -29,7 +36,7 @@ const Modal = ({ isOpen, onClose, title, subtitle, children }: ResponsiveModalPr
     return createPortal(
         <AnimatePresence mode="wait">
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center p-0 md:p-4">
+                <div className={`fixed inset-0 z-50  ${isMobile ? 'items-end flex items-center' : 'flex items-center'} justify-center md:items-center p-0 md:p-4`}>
 
                     {/* BACKDROP */}
                     <motion.div
@@ -63,15 +70,15 @@ const Modal = ({ isOpen, onClose, title, subtitle, children }: ResponsiveModalPr
                         onDragEnd={(_, info) => {
                             if (info.offset.y > 140) onClose();
                         }}
-                        className="relative z-10 w-full md:max-w-lg bg-bg-primary rounded-t-2xl md:rounded-2xl shadow-xl flex flex-col pointer-events-auto overflow-hidden"
+                        className={`${unsetHeight ? 'unset' : 'h-full'} relative z-10 ${maxWidth ? maxWidth : 'md:max-w-lg'}  flex flex-col w-full overflow-hidden bg-bg-primary ${isFullScreenModal ? 'h-[100vh] md:h-[90vh]' : !isMobile ? 'max-h-[90vh] rounded-2xl' : 'max-h-[95vh] rounded-t-2xl'} md:rounded-2xl shadow-xl  pointer-events-auto `}
                     >
                         {/* MOBILE DRAG BAR */}
-                        <div className="flex md:hidden w-full justify-center py-3 cursor-grab active:cursor-grabbing shrink-0">
+                        <div className={`${isFullScreenModal || !headerVisible ? 'hidden' : ''} flex md:hidden w-full justify-center py-3 cursor-grab active:cursor-grabbing `}>
                             <div className="w-12 h-1.5 rounded-full bg-text-sub/20" />
                         </div>
 
-                        {/* HEADER BLOCK */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-border-sub shrink-0">
+                        {/* HEADER BLOCK for non fullscreen modals */}
+                        <div className={`${isFullScreenModal || !headerVisible ? 'hidden' : ''} flex items-center justify-between px-5 py-4 border-b border-border-sub `}>
                             {/* 💡 Note: layout="position" is safe to leave here, or remove if unneeded */}
                             <div className="flex flex-col min-w-0 pr-4">
                                 <h2 className="text-lg font-bold text-text-main leading-tight truncate">{title}</h2>
@@ -79,21 +86,29 @@ const Modal = ({ isOpen, onClose, title, subtitle, children }: ResponsiveModalPr
                             </div>
                             <button
                                 onClick={onClose}
-                                className="p-1.5 text-text-sub hover:text-text-main hover:bg-item-hover rounded-lg transition-colors cursor-pointer shrink-0"
+                                className="p-1.5 text-text-sub hover:text-text-main hover:bg-item-hover rounded-lg transition-colors cursor-pointer "
                             >
                                 <X size={18} strokeWidth={2.5} />
                             </button>
                         </div>
 
+                        {
+                            customHeader && customHeader
+                        }
+
+
+
+
+
                         {/* FLEXIBLE CONTENT STREAM */}
-                        <div className="overflow-y-auto flex flex-col min-h-[80vh] md:min-h-[unset] max-h-[75vh] md:max-h-[95vh]">
+                        <div className='flex-1 min-h-0 overflow-y-auto'>
                             {children}
                         </div>
 
                     </motion.div>
-                </div>
+                </div >
             )}
-        </AnimatePresence>,
+        </AnimatePresence >,
         document.body
     );
 };

@@ -308,7 +308,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                                 {loadPhase === 'embeddings' && 'Loading Vector Gallery...'}
                             </div>
                             <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-1">
-                                <div className="bg-[var(--color-brand-green)] h-full transition-all duration-150 ease-out" style={{ width: `${loadProgress}%` }} />
+                                <div className="bg-[var(--color-brand-gold)] h-full transition-all duration-150 ease-out" style={{ width: `${loadProgress}%` }} />
                             </div>
                             <span className="text-[11px] font-bold text-text-main/50">{loadProgress}%</span>
                         </>
@@ -333,7 +333,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                     </button>
                 </div>
             ) : (
-                <div className="relative flex-1 w-full h-full min-h-0">
+                <div className="relative flex-1 w-full h-full min-h-0 ">
                     <video
                         ref={videoRef}
                         autoPlay
