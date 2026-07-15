@@ -57,3 +57,5 @@ export interface Shop {
   createdBy?: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'active' | 'inactive' | 'suspended';
 }
+
+

@@ -1,3 +1,5 @@
 export * from './InventoryForm'
 export * from './ProductScannerCamera'
 export * from './ShopForm'
+export * from './ManualSearchTab'
+export * from './ScannerTab'

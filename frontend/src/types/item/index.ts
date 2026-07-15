@@ -28,3 +28,25 @@ export interface Item {
   updatedAt?: string;
   shopId?: string; // Reference to the shop that owns this item
 }
+
+export interface CartItem {
+  id: string;
+  itemName: string;
+  sellingPrice: number;
+  stockQuantity: number;
+  quantity: number;
+  unitOfMeasure?: string;
+  photo?: string;
+}
+
+export interface Product {
+  id: string;
+  shopId: string;
+  itemName: string;
+  description?: string;
+  category?: string;
+  unitOfMeasure?: string;
+  photo?: string;
+  sellingPrice: number;
+  stockQuantity: number;
+}
