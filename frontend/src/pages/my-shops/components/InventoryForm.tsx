@@ -19,7 +19,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const isEdit: boolean = !!data && Object.keys(data).length > 0;
     const item: any | undefined = data;
 
-    console.log(data, item)
     // --- 1. STATES ---
     const [activeTab, setActiveTab] = useState('manual');
     const { id: shopId } = useParams();
@@ -62,7 +61,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         }
     }, [item]);
 
-    console.log(formData.itemName, ';tjhis formadata')
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -119,6 +117,9 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         setIsModalOpen(false);
         setIsSuccess(false);
         setModalMessage('');
+        if (isEdit) {
+            onClose();
+        }
     };
 
     const openModal = ({ isSuccess, type, error }: { isSuccess: boolean, type: string, error?: string }) => {
