@@ -5,7 +5,7 @@ import { useLazyQuery } from '@apollo/client/react';
 import { SEARCH_SHOP_PRODUCTS_QUERY } from '~/api/graphql';
 import { Product } from '~/types/item';
 import { useDebounce } from '~/utils';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, Minus, Plus, ChevronDown } from 'lucide-react';
 import { ProductScannerCamera } from './ProductScannerCamera';
 
 
@@ -13,64 +13,129 @@ interface ScannerTabProps {
     shopId: string
     addToCart: (product: Product, quantity: number) => void
 }
-
+let searchTimeoutId: ReturnType<typeof setTimeout>;
 export function ScannerTab({ shopId, addToCart }: ScannerTabProps) {
+    // 🚀 Component States
+    // 🚀 Component States
     const [scannerStep, setScannerStep] = useState<'camera' | 'search'>('camera');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [quantity, setQuantity] = useState(1);
+    const [quantity, setQuantity] = useState(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
 
-    const debouncedSearchQuery = useDebounce(searchQuery, 300);
-    const [searchProducts] = useLazyQuery(SEARCH_SHOP_PRODUCTS_QUERY);
+    // 🚀 Added state to save the camera snapshot preview URL link string
+    const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
 
-    // Search effect
-    useEffect(() => {
-        if (debouncedSearchQuery.trim() && shopId) {
-            setIsSearching(true);
-            searchProducts({
-                variables: {
-                    shopId,
-                    query: debouncedSearchQuery,
-                    limit: 5,
-                    offset: 0
-                }
-            }).then(result => {
-                setIsSearching(false);
-                if (result.data?.searchShopProducts?.products) {
-                    setSearchResults(result.data.searchShopProducts.products);
-                    setShowDropdown(true);
-                }
-            }).catch(err => {
-                setIsSearching(false);
-                console.error("Search failed:", err);
-            });
-        } else {
+    // Grouped alternative variants states
+    const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
+    const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+
+    const [searchProducts] = useLazyQuery(SEARCH_SHOP_PRODUCTS_QUERY, {
+        fetchPolicy: 'network-only',
+    });
+
+    const runSearch = (text: string, isScannerCapture = false) => {
+        if (!shopId || !text.trim()) {
             setSearchResults([]);
-            setShowDropdown(false);
+            setIsSearching(false);
+            return;
         }
-    }, [debouncedSearchQuery, shopId, searchProducts]);
+        setIsSearching(true);
+
+        if (!isScannerCapture) {
+            setShowDropdown(true);
+        }
+
+        searchProducts({
+            variables: {
+                shopId: String(shopId),
+                query: text,
+                limit: 7,
+                offset: 0
+            }
+        }).then(result => {
+            setIsSearching(false);
+            const products = result.data?.searchShopProducts?.products || [];
+            setSearchResults(products);
+
+            if (isScannerCapture && products.length > 0) {
+                const firstProduct = products[0];
+                setSelectedProduct(firstProduct);
+
+                const matchingItems = products.filter(
+                    (item: Product) => item.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
+                );
+                setGroupedProducts(matchingItems);
+                setQuantity(firstProduct.stockQuantity === 0 ? 0 : 1);
+                setShowDropdown(false);
+            }
+        }).catch(err => {
+            setIsSearching(false);
+            console.error("Search failed:", err);
+        });
+    };
 
     const handleScannerCapture = (file: File, previewUrl: string, matchedName: string, unitOfMeasure: string) => {
+        setCapturedImagePreview(previewUrl); // 🚀 Saves the captured thumbnail link right into local component state
         setSearchQuery(matchedName);
         setScannerStep('search');
+        setGroupedProducts([]);
+        setShowUnitDropdown(false);
+        clearTimeout(searchTimeoutId);
+        runSearch(matchedName, true);
     };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setSearchQuery(value);
+
         if (selectedProduct && value !== selectedProduct.itemName) {
             setSelectedProduct(null);
         }
+
+        setGroupedProducts([]);
+        setShowUnitDropdown(false);
+        clearTimeout(searchTimeoutId);
+
+        if (selectedProduct && value === selectedProduct.itemName) {
+            setIsSearching(false);
+            return;
+        }
+
+        searchTimeoutId = setTimeout(() => {
+            runSearch(value, false);
+        }, 500);
     };
 
     const handleSelectProduct = (product: Product) => {
+        clearTimeout(searchTimeoutId);
         setSelectedProduct(product);
         setSearchQuery(product.itemName);
+        setIsSearching(false);
         setShowDropdown(false);
-        setQuantity(1);
+
+        const matchingItems = searchResults.filter(
+            (item) => item.itemName.toLowerCase() === product.itemName.toLowerCase()
+        );
+        setGroupedProducts(matchingItems);
+
+        if (product.stockQuantity === 0) {
+            setQuantity(0);
+        } else {
+            setQuantity(1);
+        }
+    };
+
+    const handleUnitSelect = (productVariant: Product) => {
+        setSelectedProduct(productVariant);
+        setShowUnitDropdown(false);
+        if (productVariant.stockQuantity === 0) {
+            setQuantity(0);
+        } else {
+            setQuantity(1);
+        }
     };
 
     const handleAddToCart = () => {
@@ -80,99 +145,95 @@ export function ScannerTab({ shopId, addToCart }: ScannerTabProps) {
         setSearchQuery('');
         setQuantity(1);
         setSearchResults([]);
+        setGroupedProducts([]);
+        setCapturedImagePreview(null); // Clear out the thumbnail frame state layout cache string
         setScannerStep('camera');
     };
 
     const handleGoBackToCamera = () => {
+        clearTimeout(searchTimeoutId);
         setScannerStep('camera');
         setSearchQuery('');
         setSearchResults([]);
         setSelectedProduct(null);
+        setGroupedProducts([]);
+        setCapturedImagePreview(null); // Resets photo canvas wrapper references
         setShowDropdown(false);
+        setShowUnitDropdown(false);
+    };
+
+    const incrementQty = () => {
+        if (!selectedProduct) return;
+        setQuantity(prev => Math.min(selectedProduct.stockQuantity, prev + 1));
+    };
+
+    const decrementQty = () => {
+        setQuantity(prev => Math.max(1, prev - 1));
     };
 
     return (
-        <div className="flex flex-col flex-1 h-full w-full bg-bg-secondary min-h-0">
+        <div className="flex flex-col flex-1 h-full w-full bg-bg-primary min-h-0">
             {scannerStep === 'camera' && (
-                <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-bg-secondary">
+                <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-bg-primary">
                     <ProductScannerCamera onCaptureComplete={handleScannerCapture} />
                 </div>
             )}
 
             {scannerStep === 'search' && (
                 <div className="flex flex-col gap-4 p-5 w-full bg-bg-primary h-full overflow-auto">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-text-sub">
-                            {searchQuery ? `Search: "${searchQuery}"` : 'Search Products'}
-                        </h3>
-                        <button
-                            onClick={handleGoBackToCamera}
-                            className="px-3 py-1.5 text-xs bg-bg-secondary border border-border-main text-text-sub rounded-lg hover:bg-item-hover transition-colors"
-                        >
+
+                    {/* Navigation Context Row Header containing the new preview photo asset block */}
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            {/* 🚀 Renders the scanner's snapshot image reference to the left side of text */}
+                            {capturedImagePreview && (
+                                <img
+                                    src={capturedImagePreview}
+                                    alt="Captured scan item reference preview"
+                                    className="w-12 h-12 object-cover rounded-lg border border-border-main flex-shrink-0 shadow-sm"
+                                />
+                            )}
+                            <h3 className="text-sm font-semibold text-text-sub truncate">
+                                {searchQuery ? `Search: "${searchQuery}"` : 'Search Products'}
+                            </h3>
+                        </div>
+                        <button onClick={handleGoBackToCamera} className="px-3 py-1.5 text-xs bg-bg-secondary border border-border-main text-text-sub rounded-lg hover:bg-item-hover transition-colors cursor-pointer flex-shrink-0" >
                             ← Scan Again
                         </button>
                     </div>
 
-                    {/* Search Input */}
+                    {/* Search Input Box Frame Row */}
                     <div className="relative">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            onFocus={() => {
-                                if (searchResults.length > 0) {
-                                    setShowDropdown(true);
-                                }
-                            }}
-                            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                            placeholder="Type or search products..."
-                            className="w-full px-4 py-3 border border-border-main rounded-lg text-text-main bg-bg-primary focus:outline-none focus:border-brand-gold"
-                        />
+                        <input type="text" value={searchQuery} onChange={handleSearchChange} onFocus={() => { if (searchResults.length > 0 && !selectedProduct) { setShowDropdown(true); } }} onBlur={() => setTimeout(() => setShowDropdown(false), 200)} placeholder="Type or search products..." className="w-full px-4 py-3 border border-border-main rounded-lg text-text-main bg-bg-primary focus:outline-none focus:border-brand-gold" />
                         {isSearching && (
                             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-gold"></div>
                             </div>
                         )}
 
-                        {/* Dropdown Results */}
+                        {/* Dropdown Results Overlay Menu */}
                         {showDropdown && searchResults.length > 0 && (
                             <div className="absolute z-10 w-full mt-1 bg-bg-secondary border border-border-main rounded-lg shadow-lg max-h-64 overflow-y-auto">
                                 {searchResults.map((product) => (
-                                    <button
-                                        key={product.id}
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            handleSelectProduct(product);
-                                        }}
-                                        className="w-full text-left px-4 py-3 hover:bg-item-hover transition-colors border-b border-border-main last:border-b-0"
-                                    >
-                                        <div className="flex items-center gap-3">
+                                    <button key={product.id} onMouseDown={(e) => { e.preventDefault(); handleSelectProduct(product); }} className="w-full text-left px-4 py-3 hover:bg-item-hover transition-colors border-b border-border-main last:border-b-0 flex items-center justify-between gap-4 cursor-pointer" >
+                                        <div className="flex items-center gap-3 min-w-0">
                                             {product.photo ? (
-                                                <img
-                                                    src={product.photo}
-                                                    alt={product.itemName}
-                                                    className="w-8 h-8 object-cover rounded"
-                                                />
+                                                <img src={product.photo} alt={product.itemName} className="w-10 h-10 object-cover rounded" />
                                             ) : (
-                                                <div className="w-8 h-8 bg-item-hover rounded flex items-center justify-center">
-                                                    <ImageIcon size={14} className="text-text-sub" />
+                                                <div className="w-10 h-10 bg-item-hover rounded flex items-center justify-center flex-shrink-0">
+                                                    <ImageIcon size={16} className="text-text-sub" />
                                                 </div>
                                             )}
-                                            <div className="flex-1 min-w-0">
+                                            <div className="flex flex-col min-w-0">
                                                 <div className="font-medium text-text-main truncate">{product.itemName}</div>
-                                                {product.category && (
-                                                    <div className="text-xs text-text-sub mt-1 truncate">{product.category}</div>
-                                                )}
+                                                <span className="text-xs text-text-sub truncate">
+                                                    Qty: 1 {product.unitOfMeasure ? `| ${product.unitOfMeasure}` : ''}
+                                                </span>
                                             </div>
                                         </div>
-                                        <div className="flex justify-between items-center mt-2">
-                                            <span className="text-sm font-semibold text-brand-gold">
-                                                ₱{product.sellingPrice.toFixed(2)}
-                                            </span>
-                                            <span className="text-xs text-text-sub">
-                                                Stock: {product.stockQuantity}
-                                            </span>
-                                        </div>
+                                        <span className="text-sm font-semibold text-brand-gold text-right flex-shrink-0">
+                                            ₱{product.sellingPrice.toFixed(2)}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
@@ -181,96 +242,84 @@ export function ScannerTab({ shopId, addToCart }: ScannerTabProps) {
 
                     {/* Selected Product Form */}
                     {selectedProduct && (
-                        <div className="border border-border-main rounded-lg p-4 bg-bg-secondary">
-                            <h3 className="font-bold text-text-main mb-3">Selected Product</h3>
+                        <div className="border border-border-main rounded-lg p-4 bg-bg-secondary flex flex-col gap-4">
+                            {/* Selling Price */}
+                            <div className="flex flex-col gap-1">
+                                <label className="block text-xs font-semibold text-text-sub">Selling Price</label>
+                                <input type="text" value={`₱${selectedProduct.sellingPrice.toFixed(2)}`} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70" />
+                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Item Name</label>
-                                    <input
-                                        type="text"
-                                        value={selectedProduct.itemName}
-                                        readOnly
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70"
-                                    />
-                                </div>
+                            {/* Available Stock */}
+                            <div className="flex flex-col gap-1">
+                                <label className="block text-xs font-semibold text-text-sub">Available Stock</label>
+                                <input type="text" value={selectedProduct.stockQuantity} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70" />
+                            </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Selling Price</label>
-                                    <input
-                                        type="text"
-                                        value={`₱${selectedProduct.sellingPrice.toFixed(2)}`}
-                                        readOnly
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70"
-                                    />
-                                </div>
+                            {/* Clickable Unit of Measure Selector Menu */}
+                            <div className="relative flex flex-col gap-1 w-full">
+                                <label className="block text-xs font-semibold text-text-sub">Unit of Measure</label>
+                                <button type="button" disabled={groupedProducts.length <= 1} onClick={() => setShowUnitDropdown(!showUnitDropdown)} onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)} className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-70" >
+                                    <span className="truncate">
+                                        {selectedProduct.unitOfMeasure || 'Not specified'}
+                                    </span>
+                                    {groupedProducts.length > 1 && (
+                                        <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
+                                    )}
+                                </button>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Available Stock</label>
-                                    <input
-                                        type="text"
-                                        value={selectedProduct.stockQuantity}
-                                        readOnly
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Unit of Measure</label>
-                                    <input
-                                        type="text"
-                                        value={selectedProduct.unitOfMeasure || 'Not specified'}
-                                        readOnly
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Quantity to Buy</label>
-                                    <input
-                                        type="number"
-                                        value={quantity}
-                                        onChange={(e) => {
-                                            const value = parseInt(e.target.value) || 0;
-                                            setQuantity(Math.max(1, Math.min(selectedProduct.stockQuantity, value)));
-                                        }}
-                                        min="1"
-                                        max={selectedProduct.stockQuantity}
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary focus:outline-none focus:border-brand-gold"
-                                    />
-                                    <div className="text-xs text-text-sub mt-1">
-                                        Max: {selectedProduct.stockQuantity}
+                                {/* Alternative Variant units dropdown tray panel */}
+                                {showUnitDropdown && groupedProducts.length > 0 && (
+                                    <div className="absolute z-20 w-full top-full mt-1 border border-border-main rounded-lg bg-bg-secondary shadow-md max-h-40 overflow-y-auto">
+                                        {groupedProducts.map((variant) => (
+                                            <button key={variant.id} type="button" onMouseDown={(e) => { e.preventDefault(); handleUnitSelect(variant); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors text-text-main cursor-pointer ${selectedProduct.id === variant.id ? 'bg-item-hover font-semibold text-brand-gold' : ''}`} >
+                                                {variant.unitOfMeasure || 'Not specified'}
+                                                <span className="text-xs text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
+                                            </button>
+                                        ))}
                                     </div>
-                                </div>
+                                )}
+                            </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-sub mb-1">Subtotal</label>
-                                    <input
-                                        type="text"
-                                        value={`₱${(selectedProduct.sellingPrice * quantity).toFixed(2)}`}
-                                        readOnly
-                                        className="w-full px-3 py-2 border border-border-main rounded-lg text-brand-gold font-bold bg-bg-primary opacity-70"
-                                    />
+                            {/* Quantity to Buy Counter Block UI */}
+                            <div className="flex flex-col gap-1">
+                                <label className="block text-xs font-semibold text-text-sub">Quantity to Buy</label>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-full px-4 text-text-muted font-semibold py-2 border border-border-main rounded-lg bg-bg-primary">
+                                        {quantity}
+                                    </div>
+                                    <button type="button" onClick={decrementQty} disabled={quantity <= 1} className="p-2 h-full cursor-pointer border border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main" >
+                                        <Minus size={16} />
+                                    </button>
+                                    <button type="button" onClick={incrementQty} disabled={quantity >= selectedProduct.stockQuantity} className="p-2 border cursor-pointer h-full border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main" >
+                                        <Plus size={16} />
+                                    </button>
+                                </div>
+                                <div className="text-xs text-text-sub mt-1">
+                                    Max Available: {selectedProduct.stockQuantity}
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleAddToCart}
-                                className="w-full mt-4 py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors"
-                            >
-                                Add to Cart
-                            </button>
-                        </div>
-                    )}
+                            {/* Subtotal Calculation Field */}
+                            <div className="flex flex-col gap-1">
+                                <label className="block text-xs font-semibold text-text-sub">Subtotal</label>
+                                <input type="text" value={`₱${(selectedProduct.sellingPrice * quantity).toFixed(2)}`} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-brand-gold font-bold bg-bg-primary opacity-70" />
+                            </div>
 
-                    {/* Empty States */}
+                            {/* Add to Cart button */}
+
+                        </div>
+
+                    )}
+                    <button onClick={handleAddToCart} disabled={quantity <= 0} className="w-full mt-auto cursor-pointer mt-2 py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" >
+                        Add to Cart
+                    </button>
+                    {/* Empty States / Loading Panels */}
                     {isSearching && (
                         <div className="flex items-center justify-center py-8">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-gold"></div>
                             <span className="ml-3 text-text-sub">Searching for "{searchQuery}"...</span>
                         </div>
                     )}
-
                     {!selectedProduct && !isSearching && searchQuery && searchResults.length === 0 && (
                         <div className="text-center py-8 text-text-sub">
                             <p>No products found matching "{searchQuery}"</p>
@@ -282,3 +331,4 @@ export function ScannerTab({ shopId, addToCart }: ScannerTabProps) {
         </div>
     );
 }
+
