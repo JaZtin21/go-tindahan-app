@@ -382,7 +382,7 @@ export const ManualSearchTab = ({ shopId, updateCart }: ManualSearchTabProps) =>
                         type="text"
                         value={selectedProduct ? `₱${(selectedProduct.sellingPrice * Number(quantity)).toFixed(2)}` : '₱0.00'}
                         readOnly
-                        className="w-full px-3 py-2 border bg-bg-secondary border-border-main rounded-lg text-brand-gold font-bold bg-bg-primary opacity-70"
+                        className="w-full px-3 py-2 border  border-border-main rounded-lg text-brand-gold font-bold bg-bg-primary opacity-70"
                     />
                 </div>
 

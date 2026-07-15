@@ -115,26 +115,26 @@ export const CheckoutTab = ({ shopId, updateCart }: ManualSearchTabProps) => {
                                 if (!product) return null;
 
                                 return (
-                                    <div key={product.id} className="border border-border-main rounded-lg p-4 bg-bg-primary flex-shrink-0">
+                                    <div key={product.id} className="border border-border-sub rounded-lg p-4 bg-bg-primary flex-shrink-0">
                                         <div className="flex gap-3">
                                             {product.photo ? (
-                                                <img src={product.photo} alt={product.itemName} className="w-14 h-14 object-cover rounded-lg" />
+                                                <img src={product.photo} alt={product.itemName} className="w-14 h-full object-cover rounded-lg" />
                                             ) : (
                                                 <div className="w-14 h-14 bg-item-hover rounded-lg flex items-center justify-center">
                                                     <ImageIcon size={20} className="text-text-sub" />
                                                 </div>
                                             )}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-1">
+                                                <div className="flex justify-between items-start">
                                                     <h4 className="font-semibold text-text-main">{product.itemName}</h4>
                                                     <button onClick={() => removeFromCart(product.id)} className="p-1.5 hover:bg-item-hover rounded-lg text-text-sub hover:text-brand-red transition-colors cursor-pointer" >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                                 {product.unitOfMeasure && (
-                                                    <p className="text-xs text-text-sub mb-2">{product.unitOfMeasure}</p>
+                                                    <p className="text-xs text-text-sub">{product.unitOfMeasure}</p>
                                                 )}
-                                                <div className="flex justify-between items-center">
+                                                <div className="flex justify-between  ">
                                                     <div className="text-sm">
                                                         <span className="text-text-sub mr-2">Quantity:</span>
                                                         <span className="font-semibold text-text-main">{item.quantity}</span>
