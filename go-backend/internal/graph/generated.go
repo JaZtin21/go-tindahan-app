@@ -183,7 +183,7 @@ type ComplexityRoot struct {
 		GetPostByID        func(childComplexity int, id string) int
 		GetPosts           func(childComplexity int, limit int, offset int) int
 		GetShopByID        func(childComplexity int, shopID string) int
-		GetShopInventory   func(childComplexity int, shopID string, limit int, offset int) int
+		GetShopInventory   func(childComplexity int, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) int
 		Me                 func(childComplexity int) int
 		Ping               func(childComplexity int) int
 		SearchProduct      func(childComplexity int, query string, limit int, offset int) int
@@ -276,7 +276,7 @@ type QueryResolver interface {
 	GetPostByID(ctx context.Context, id string) (*model.Post, error)
 	GetMyShops(ctx context.Context, limit int, offset int) (*model.PaginatedOwnerShops, error)
 	GetShopByID(ctx context.Context, shopID string) (*model.OwnerShop, error)
-	GetShopInventory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedOwnerInventory, error)
+	GetShopInventory(ctx context.Context, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) (*model.PaginatedOwnerInventory, error)
 	SearchShop(ctx context.Context, query string, limit int, offset int) (*model.PaginatedShops, error)
 	SearchProduct(ctx context.Context, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
 	SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
@@ -983,7 +983,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.GetShopInventory(childComplexity, args["shopId"].(string), args["limit"].(int), args["offset"].(int)), true
+		return e.ComplexityRoot.Query.GetShopInventory(childComplexity, args["shopId"].(string), args["limit"].(int), args["offset"].(int), args["search"].(*string), args["sortBy"].(*string), args["sortOrder"].(*string)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -2135,6 +2135,30 @@ func (ec *executionContext) field_Query_getShopInventory_args(ctx context.Contex
 		return nil, err
 	}
 	args["offset"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "search",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["search"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sortBy"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "sortOrder",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sortOrder"] = arg5
 	return args, nil
 }
 
@@ -5195,7 +5219,7 @@ func (ec *executionContext) _Query_getShopInventory(ctx context.Context, field g
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().GetShopInventory(ctx, fc.Args["shopId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
+			return ec.Resolvers.Query().GetShopInventory(ctx, fc.Args["shopId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int), fc.Args["search"].(*string), fc.Args["sortBy"].(*string), fc.Args["sortOrder"].(*string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next

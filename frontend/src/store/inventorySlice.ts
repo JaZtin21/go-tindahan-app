@@ -1,24 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { Item } from '~/types';
 
-// Define the core entity interface matching your OwnerInventoryItem backend schema representation
-export interface OwnerInventoryItem {
-    id: string;
-    shopId: string;
-    itemName: string;
-    description?: string;
-    barcode?: string;
-    category?: string;
-    unitOfMeasure?: string;
-    photo?: string;
-    sellingPrice: number;
-    stockQuantity: number;
-    costPrice: number;
-    reorderLevel: number;
-    updatedAt: string;
-}
 
 interface InventoryState {
-    items: OwnerInventoryItem[];
+    items: Item[];
     totalCount: number;
     loading: boolean;
     error: string | null;
@@ -37,7 +22,7 @@ const inventorySlice = createSlice({
     initialState,
     reducers: {
         // Call this action when loading item data from your GraphQL query hook
-        setInventory: (state, action: PayloadAction<{ items: OwnerInventoryItem[]; totalCount: number }>) => {
+        setInventory: (state, action: PayloadAction<{ items: Item[]; totalCount: number }>) => {
             state.items = action.payload.items;
             state.totalCount = action.payload.totalCount;
             state.loading = false;
@@ -45,13 +30,13 @@ const inventorySlice = createSlice({
         },
 
         // Call this inside your AddInventoryItem mutation callback to push the new entry to cache
-        addInventoryItem: (state, action: PayloadAction<OwnerInventoryItem>) => {
+        addInventoryItem: (state, action: PayloadAction<Item>) => {
             state.items.unshift(action.payload); // Prepends the brand new item to the list view array
             state.totalCount += 1;
         },
 
         // Call this inside your UpdateInventoryItem mutation callback to update local tracking
-        updateInventoryItem: (state, action: PayloadAction<OwnerInventoryItem>) => {
+        updateInventoryItem: (state, action: PayloadAction<Item>) => {
             const index = state.items.findIndex(item => item.id === action.payload.id);
             if (index !== -1) {
                 state.items[index] = action.payload;

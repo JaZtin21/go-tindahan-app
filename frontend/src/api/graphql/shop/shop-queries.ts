@@ -146,7 +146,7 @@ export const UPDATE_INVENTORY_ITEM_MUTATION = gql`
 
 export const DELETE_INVENTORY_ITEM_MUTATION = gql`
   mutation DeleteInventoryItem($itemId: ID!) { 
-    deleteInventoryItem(itemID: $itemId)       
+    deleteInventoryItem(itemId: $itemId)       
   }
 `;
 
@@ -287,8 +287,8 @@ export const GET_SHOP_BY_ID_QUERY = gql`
   }
 `;
 export const GET_SHOP_INVENTORY_QUERY = gql`
-  query GetShopInventory($shopId: ID!, $limit: Int!, $offset: Int!) { # 👈 FIXED: Changed from String! to ID!
-    getShopInventory(shopId: $shopId, limit: $limit, offset: $offset) {
+  query GetShopInventory($shopId: ID!, $limit: Int!, $offset: Int!, $search: String, $sortBy: String, $sortOrder: String) {
+    getShopInventory(shopId: $shopId, limit: $limit, offset: $offset, search: $search, sortBy: $sortBy, sortOrder: $sortOrder) {
       items {
         id
         shopId

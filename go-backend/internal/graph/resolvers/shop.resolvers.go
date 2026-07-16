@@ -1077,7 +1077,7 @@ func (r *queryResolver) GetShopByID(ctx context.Context, shopID string) (*model.
 }
 
 // GetShopInventory is the resolver for the getShopInventory field.
-func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedOwnerInventory, error) {
+func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) (*model.PaginatedOwnerInventory, error) {
 	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
@@ -1110,10 +1110,26 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 		return nil, nil
 	}
 
-	// 1. Fetch total item count for the owner's pagination metrics
+	// Build WHERE clause with search filter
+	whereClause := "WHERE shop_id = $1"
+	args := []interface{}{shopID}
+	argIndex := 2
+
+	if search != nil && *search != "" {
+		// Keep using the same argIndex ($2) for all fields
+		whereClause += fmt.Sprintf(" AND (item_name ILIKE $%d OR description ILIKE $%d OR category ILIKE $%d OR barcode ILIKE $%d)", argIndex, argIndex, argIndex, argIndex)
+
+		// ✅ FIX: Only append the search pattern ONCE to match the single index
+		searchPattern := "%" + *search + "%"
+		args = append(args, searchPattern)
+
+		argIndex++ // Now argIndex moves to 3 for the LIMIT/OFFSET variables later
+	}
+
+	// 1. Fetch total item count with search applied
+	countQuery := "SELECT COUNT(*) FROM inventory_items " + whereClause
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE shop_id = $1"
-	err = r.Resolver.DB.QueryRow(ctx, countQuery, shopID).Scan(&totalCount)
+	err = r.Resolver.DB.QueryRow(ctx, countQuery, args...).Scan(&totalCount)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: analytical tracking aggregation failure",
@@ -1122,15 +1138,43 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 		return nil, nil
 	}
 
+	// Determine sort column and order
+	sortColumn := "item_name"
+	sortDirection := "ASC"
+
+	if sortBy != nil && *sortBy != "" {
+		// Whitelist valid columns to prevent SQL injection
+		validColumns := map[string]bool{
+			"item_name":      true,
+			"category":       true,
+			"selling_price":  true,
+			"stock_quantity": true,
+			"cost_price":     true,
+			"updated_at":     true,
+		}
+		if validColumns[*sortBy] {
+			sortColumn = *sortBy
+		}
+	}
+
+	if sortOrder != nil && *sortOrder != "" {
+		if *sortOrder == "DESC" {
+			sortDirection = "DESC"
+		}
+	}
+
 	// 2. Fetch complete list including sensitive details (cost_price, reorder_level)
-	selectQuery := `
+	selectQuery := fmt.Sprintf(`
 		SELECT id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, updated_at 
 		FROM inventory_items 
-		WHERE shop_id = $1
-		ORDER BY item_name ASC 
-		LIMIT $2 OFFSET $3
-	`
-	rows, err := r.Resolver.DB.Query(ctx, selectQuery, shopID, limit, offset)
+		%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, sortColumn, sortDirection, argIndex, argIndex+1)
+
+	args = append(args, limit, offset)
+
+	rows, err := r.Resolver.DB.Query(ctx, selectQuery, args...)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: collection retrieval failure",

@@ -272,7 +272,7 @@ extend type Query {
   # --- 🔐 OWNER INTERFACES (Full Data Access) ---
   getMyShops(limit: Int!, offset: Int!): PaginatedOwnerShops! @isAuthenticated
   getShopById(shopId: ID!): OwnerShop @isAuthenticated
-  getShopInventory(shopId: ID!, limit: Int!, offset: Int!): PaginatedOwnerInventory! @isAuthenticated
+  getShopInventory(shopId: ID!, limit: Int!, offset: Int!, search: String, sortBy: String, sortOrder: String): PaginatedOwnerInventory! @isAuthenticated
 
   # --- 🌐 CUSTOMER PUBLIC INTERFACES (Returns Public Types) ---
   searchShop(query: String!, limit: Int!, offset: Int!): PaginatedShops!
