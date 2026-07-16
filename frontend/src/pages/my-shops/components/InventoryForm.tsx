@@ -451,7 +451,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                 </div>
 
                                 {/* Bottom Window Choice Action Items */}
-                                <div className="flex justify-end gap-3 mt-4">
+                                <div className="flex justify-end gap-3 mt-auto">
                                     <button
                                         type="button"
                                         onClick={() => handleCloseInventoryModal(true)}
@@ -571,7 +571,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                         </div>
 
                                         {/* Bottom Window Choice Action Items */}
-                                        <div className="flex justify-between items-center mt-4">
+                                        <div className="flex justify-between items-center mt-auto">
                                             {/* Go Back Left Anchor: Re-triggers camera tab frame loops */}
                                             <button
                                                 type="button"

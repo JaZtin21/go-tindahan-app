@@ -216,7 +216,7 @@ export const InventoryPage = () => {
         return pages;
     };
 
-    const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedItem, setSelectedItem] = useState<Item | null>(null);
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
 
     const handleCloseInventoryModal = () => {
@@ -446,7 +446,7 @@ export const InventoryPage = () => {
                         <div className='p-6 flex gap-6 flex-col'>
                             <div className="text-3xl self-center"><TriangleAlert className="w-8 h-8 text-brand-red" /></div>
                             <p className="m-0 text-[15px] max-w-[400px] text-[var(--color-text-sub)] leading-relaxed">
-                                This action cannot be undone. Deleting this item will <strong>permanently remove it</strong>.
+                                This action cannot be undone. Deleting this item <strong>{inventoryItems.filter((item: Item) => item.id === selectedItemId)[0].itemName}</strong> will <strong>permanently remove it</strong>.
                             </p>
 
                             <div className="flex gap-3 w-full mt-4">

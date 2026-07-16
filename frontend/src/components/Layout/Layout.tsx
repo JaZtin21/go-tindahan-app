@@ -49,7 +49,7 @@ export const Layout: React.FC = () => {
                     {/* DYNAMIC CHILD INJECTION ROUTE PANEL */}
                     {!isMainMapPage && (
                         /* 💡 FIX: Keep overflow-y-auto but use full flex dimensions instead of absolute layouts */
-                        <div className="w-full h-full overflow-y-auto z-10 md:px-12 px-4 md:pt-18 pt-18 pb-8">
+                        <div className="w-full h-full overflow-y-auto z-10 md:px-12 px-2 md:pt-18 pt-18 pb-8">
                             <Outlet />
                         </div>
                     )}
