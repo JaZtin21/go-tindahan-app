@@ -1,16 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import { initScannerAssets, getCachedScannerAssets, clearScannerCache } from '~/utils/scannerModelManager';
-import { TriangleAlert, ImageIcon } from 'lucide-react';
+import { TriangleAlert, ImageIcon, RotateCcw } from 'lucide-react';
 
 interface ProductScannerCameraProps {
     onCaptureComplete: (file: File, previewUrl: string, matchedName: string, unitOfMeasure: string) => void;
+    // 🚀 NEW: when true, a result is currently showing over the live feed.
+    // Capture/gallery disable and a Retry button takes their place.
+    hasResult?: boolean;
+    // 🚀 NEW: fired when the Retry button is tapped — parent clears the result state.
+    onRetry?: () => void;
 }
 
 const IMG_SIZE = 224;
 const COLOR_WEIGHT = 1.5;
 
-export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCameraProps) => {
+export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onRetry }: ProductScannerCameraProps) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
@@ -151,7 +156,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
     };
 
     const handleCameraCapture = () => {
-        if (!videoRef.current || !isReady || isPredicting) return;
+        if (!videoRef.current || !isReady || isPredicting || hasResult) return;
 
         setIsPredicting(true);
 
@@ -207,7 +212,11 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
             tempImg.src = previewUrl;
             tempImg.onload = async () => {
                 const matchedName = await matchProductImage(tempImg);
-                stopCamera();
+
+                // 🚀 NOTE: camera is intentionally left running here.
+                // The live feed should keep going behind the AI Result card —
+                // it only stops when this component unmounts (e.g. moving to the manual form)
+                // or the user backs out of the scanner entirely.
 
                 let cleanName = matchedName;
                 let unitOfMeasure = '';
@@ -224,6 +233,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                     cleanName = cleanName.slice(0, -1).trim();
                 }
 
+                setIsPredicting(false); // 🚀 reset so buttons re-enable correctly once retry happens
                 onCaptureComplete(capturedFile, previewUrl, cleanName, unitOfMeasure);
             };
         }, 'image/jpeg', 0.85);
@@ -240,6 +250,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
     };
 
     const handleGalleryUploadClick = () => {
+        if (hasResult) return;
         if (fileInputRef.current) {
             fileInputRef.current.click();
         }
@@ -247,7 +258,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
 
     const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || isPredicting) return;
+        if (!file || isPredicting || hasResult) return;
 
         setIsPredicting(true);
         const previewUrl = URL.createObjectURL(file);
@@ -256,7 +267,8 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
         tempImg.src = previewUrl;
         tempImg.onload = async () => {
             const matchedName = await matchProductImage(tempImg);
-            stopCamera();
+
+            // 🚀 Camera intentionally left running — same as handleCameraCapture above.
 
             let cleanName = matchedName;
             let unitOfMeasure = '';
@@ -273,8 +285,17 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
                 cleanName = cleanName.slice(0, -1).trim();
             }
 
+            setIsPredicting(false); // 🚀 reset so buttons re-enable correctly once retry happens
             onCaptureComplete(file, previewUrl, cleanName, unitOfMeasure);
         };
+    };
+
+    const handleRetryTap = () => {
+        // Reset the file input so re-selecting the same gallery file later still fires onChange
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+        onRetry?.();
     };
 
 
@@ -362,7 +383,7 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
 
                             <button
                                 type="button"
-                                disabled={isPredicting}
+                                disabled={isPredicting || hasResult}
                                 onClick={handleGalleryUploadClick}
                                 className="absolute left-0 p-2.5 rounded-full bg-black/40 hover:bg-black/60 text-white/90 transition-all border border-white/10 cursor-pointer shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
@@ -371,10 +392,22 @@ export const ProductScannerCamera = ({ onCaptureComplete }: ProductScannerCamera
 
                             <button
                                 type="button"
-                                disabled={isPredicting}
+                                disabled={isPredicting || hasResult}
                                 onClick={handleCameraCapture}
                                 className="w-14 h-14 rounded-full bg-[#d9d9d9] hover:bg-white border-4 border-[#3f3f3f]/40 shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                             />
+
+                            {/* 🚀 NEW: Retry button — takes the place of the third (help) slot,
+                                only appears once a result is showing over the live feed. */}
+                            {hasResult && (
+                                <button
+                                    type="button"
+                                    onClick={handleRetryTap}
+                                    className="absolute right-0 p-2.5 rounded-full bg-brand-gold/90 hover:bg-brand-gold text-white transition-all border border-white/10 cursor-pointer shadow-md active:scale-95"
+                                >
+                                    <RotateCcw className="w-5 h-5" />
+                                </button>
+                            )}
 
                         </div>
                     </div>

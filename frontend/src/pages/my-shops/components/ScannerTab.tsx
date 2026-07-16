@@ -5,7 +5,7 @@ import { useLazyQuery } from '@apollo/client/react';
 import { SEARCH_SHOP_PRODUCTS_QUERY } from '~/api/graphql';
 import { Product } from '~/types/item';
 import { useDebounce } from '~/utils';
-import { ImageIcon, Minus, Plus, ChevronDown } from 'lucide-react';
+import { ImageIcon, Minus, Plus, ChevronDown, Pencil, Sparkles } from 'lucide-react';
 import { ProductScannerCamera } from './ProductScannerCamera';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
@@ -17,8 +17,10 @@ interface ScannerTabProps {
 let searchTimeoutId: ReturnType<typeof setTimeout>;
 export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
     // 🚀 Component States
-    // 🚀 Component States
-    const [scannerStep, setScannerStep] = useState<'camera' | 'search'>('camera');
+    // 'camera'  -> live camera / viewfinder
+    // 'result'  -> AI Result card shown over the captured image (NEW)
+    // 'search'  -> manual edit form (existing form UI)
+    const [scannerStep, setScannerStep] = useState<'camera' | 'result' | 'search'>('camera');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -28,6 +30,9 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
+
+    // 🚀 NEW: model's confidence score for the AI Result card (optional, only shown if provided)
+    const [predictionConfidence, setPredictionConfidence] = useState<number | null>(null);
 
     // Grouped alternative variants states
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
@@ -61,30 +66,51 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
             const products = result.data?.searchShopProducts?.products || [];
             setSearchResults(products);
 
-            if (isScannerCapture && products.length > 0) {
-                const firstProduct = products[0];
-                setSelectedProduct(firstProduct);
+            if (isScannerCapture) {
+                if (products.length > 0) {
+                    // 🚀 Match found in DB from the model's predicted name:
+                    // go to the AI Result preview instead of straight to the form.
+                    const firstProduct = products[0];
+                    setSelectedProduct(firstProduct);
 
-                const matchingItems = products.filter(
-                    (item: Product) => item.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
-                );
-                setGroupedProducts(matchingItems);
-                setQuantity(firstProduct.stockQuantity === 0 ? 0 : 1);
-                setShowDropdown(false);
+                    const matchingItems = products.filter(
+                        (item: Product) => item.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
+                    );
+                    setGroupedProducts(matchingItems);
+                    setQuantity(firstProduct.stockQuantity === 0 ? 0 : 1);
+                    setShowDropdown(false);
+                    setScannerStep('result');
+                } else {
+                    // 🚀 No DB match for the predicted name: fall back to the
+                    // existing manual search form so the user can search/edit themselves.
+                    setScannerStep('search');
+                }
             }
         }).catch(err => {
             setIsSearching(false);
             console.error("Search failed:", err);
+            if (isScannerCapture) {
+                // Search failed outright — don't strand the user on the camera view.
+                setScannerStep('search');
+            }
         });
     };
 
-    const handleScannerCapture = (file: File, previewUrl: string, matchedName: string, unitOfMeasure: string) => {
+    const handleScannerCapture = (
+        file: File,
+        previewUrl: string,
+        matchedName: string,
+        unitOfMeasure: string,
+        confidence?: number // 🚀 NEW optional param — pass through from ProductScannerCamera if available
+    ) => {
         setCapturedImagePreview(previewUrl); // 🚀 Saves the captured thumbnail link right into local component state
         setSearchQuery(matchedName);
-        setScannerStep('search');
         setGroupedProducts([]);
         setShowUnitDropdown(false);
+        setPredictionConfidence(confidence ?? null);
         clearTimeout(searchTimeoutId);
+        // 🚀 NOTE: scannerStep intentionally stays 'camera' here.
+        // runSearch decides whether to move to 'result' (match found) or 'search' (no match).
         runSearch(matchedName, true);
     };
 
@@ -203,6 +229,44 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setGroupedProducts([]);
     };
 
+    // 🚀 NEW: Add-to-cart action triggered from the AI Result card (not the form).
+    // Adds the currently-selected (model-matched) product, then resets back to camera
+    // so the user is ready to scan the next item.
+    const handleAddFromResult = () => {
+        if (!selectedProduct || !quantity) return;
+
+        const wasSuccessfulAdd = (() => {
+            const storageKey = `cart_items_${shopId}`;
+            const existingCartRaw = localStorage.getItem(storageKey);
+            let currentCart: Array<{ product: Product; quantity: number }> = [];
+            try {
+                if (existingCartRaw) currentCart = JSON.parse(existingCartRaw);
+            } catch (err) {
+                console.error("Failed to parse cart storage array:", err);
+            }
+            const existingItem = currentCart.find((item) => item.product.id === selectedProduct.id);
+            const alreadyInCartQty = existingItem ? existingItem.quantity : 0;
+            const allowedRemainingQty = selectedProduct.stockQuantity - alreadyInCartQty;
+            return Number(quantity) <= allowedRemainingQty;
+        })();
+
+        handleAddToCart();
+
+        // Only return to the camera view if the add actually succeeded
+        // (handleAddToCart opens the stock-limit error modal and bails otherwise).
+        if (wasSuccessfulAdd) {
+            setScannerStep('camera');
+            setCapturedImagePreview(null);
+            setPredictionConfidence(null);
+        }
+    };
+
+    // 🚀 NEW: Edit button on the AI Result card — this is the ONLY path from
+    // 'result' into the manual edit form.
+    const handleEditResult = () => {
+        setScannerStep('search');
+    };
+
     const handleGoBackToCamera = () => {
         clearTimeout(searchTimeoutId);
         setScannerStep('camera');
@@ -211,6 +275,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setSelectedProduct(null);
         setGroupedProducts([]);
         setCapturedImagePreview(null); // Resets photo canvas wrapper references
+        setPredictionConfidence(null);
         setShowDropdown(false);
         setShowUnitDropdown(false);
     };
@@ -251,9 +316,93 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
 
     return (
         <div className="flex flex-col flex-1 h-full w-full bg-bg-primary min-h-0">
-            {scannerStep === 'camera' && (
-                <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-bg-primary">
-                    <ProductScannerCamera onCaptureComplete={handleScannerCapture} />
+            {/* 🚀 Camera stays mounted (and the feed stays live) for BOTH 'camera' and 'result'
+                steps — the AI Result card floats on top of it, it never replaces it with a
+                frozen snapshot. hasResult/onRetry tell the camera to swap its third button
+                to Retry and disable capture/gallery while a result is showing. */}
+            {(scannerStep === 'camera' || scannerStep === 'result') && (
+                <div className="flex flex-col relative isolate flex-1 w-auto mx-0 md:mx-2 rounded-t-2xl md:rounded-[20px] my-0 md:my-2 overflow-hidden bg-bg-primary">
+                    <ProductScannerCamera
+                        onCaptureComplete={handleScannerCapture}
+                        hasResult={scannerStep === 'result'}
+                        onRetry={handleGoBackToCamera}
+                    />
+
+                    {/* AI Result card, docked above the capture button row so both stay visible */}
+                    {scannerStep === 'result' && selectedProduct && (
+                        <div className="absolute left-0 right-0 flex flex-col gap-5 bottom-28 mx-3 rounded-2xl bg-bg-primary shadow-lg border border-border-main overflow-hidden z-10">
+                            <div className="flex items-center justify-between px-4 pt-4 ">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-brand-gold">
+                                    <Sparkles size={16} />
+                                    <span>AI Result</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleEditResult}
+                                    className="flex items-center gap-1 text-xs font-bold text-text-sub hover:text-text-main transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-item-hover"
+                                >
+                                    <Pencil size={14} />
+                                    Edit
+                                </button>
+                            </div>
+
+                            <div className="flex items-start gap-3 px-4 ">
+                                {selectedProduct.photo ? (
+                                    <img src={selectedProduct.photo} alt={selectedProduct.itemName} className="w-14 h-full object-cover rounded-lg flex-shrink-0" />
+                                ) : (
+                                    <div className="w-14 h-14 bg-item-hover rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <ImageIcon size={20} className="text-text-sub" />
+                                    </div>
+                                )}
+                                <div className="flex flex-col min-w-0 flex-1">
+                                    <span className="font-semibold text-text-main line-clamp-2 break-words">
+                                        {selectedProduct.itemName}
+                                    </span>
+                                    {selectedProduct.unitOfMeasure && (
+                                        <span className="text-xs text-text-sub truncate">{selectedProduct.unitOfMeasure}</span>
+                                    )}
+                                    <span className="text-brand-gold font-bold">₱{selectedProduct.sellingPrice.toFixed(2)}</span>
+                                    {predictionConfidence !== null && (
+                                        <span className="text-xs text-green-600 font-medium">
+                                            Confidence: {Math.round(predictionConfidence * 100)}%
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* 🚀 NEW: quantity stepper on the result card itself */}
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={decrementQty}
+                                        disabled={Number(quantity) <= 1}
+                                        className="w-7 h-7 flex items-center justify-center cursor-pointer border border-border-main rounded-md hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main"
+                                    >
+                                        <Minus size={14} />
+                                    </button>
+                                    <span className="w-6 text-center text-sm font-semibold text-text-main">{quantity}</span>
+                                    <button
+                                        type="button"
+                                        onClick={incrementQty}
+                                        disabled={Number(quantity) >= selectedProduct.stockQuantity}
+                                        className="w-7 h-7 flex items-center justify-center cursor-pointer border border-border-main rounded-md hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="px-4 pb-4">
+                                <button
+                                    type="button"
+                                    onClick={handleAddFromResult}
+                                    disabled={Number(quantity) <= 0}
+                                    className="w-full cursor-pointer py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Add to Cart
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -453,4 +602,3 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         </div>
     );
 }
-
