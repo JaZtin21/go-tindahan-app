@@ -79,14 +79,14 @@ export const SalesHistoryPage: React.FC = () => {
   }, [activeTab, checkoutData, actionData]);
 
   return (
-    <div className="w-full min-h-screen text-text-main flex flex-col gap-4">
+    <div className="w-full min-h-screen text-text-main flex flex-col gap-2">
       <div className="flex justify-between items-center px-2">
         <button
           onClick={() => navigate(-1)}
           className="flex text-text-muted hover:text-text-main transition-colors duration-200 items-center gap-1.5 h-8 rounded-xl text-xs font-bold cursor-pointer active:scale-98"
         >
           <ArrowLeft size={16} strokeWidth={2.5} />
-          <span>Go Back</span>
+          <span>Go Back to My Shop</span>
         </button>
       </div>
 

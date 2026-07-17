@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from "@apollo/client/react";
-import { CHECKOUT_CART_MUTATION } from "~/api/graphql";
+import { CHECKOUT_CART_MUTATION, GET_SHOP_DASHBOARD_METRICS_QUERY } from "~/api/graphql";
 import { Modal } from "~/components";
 import { Check, X, ShoppingCart, Trash2, Image as ImageIcon } from 'lucide-react';
 
@@ -10,7 +10,26 @@ interface ManualSearchTabProps {
 }
 
 export const CheckoutTab = ({ shopId, updateCart }: ManualSearchTabProps) => {
-    const [checkoutCart] = useMutation(CHECKOUT_CART_MUTATION);
+
+    const [checkoutCart, { loading: checkoutLoading }] = useMutation(CHECKOUT_CART_MUTATION, {
+        // Tells Apollo to refetch these active dashboard datasets automatically upon mutation completion
+        refetchQueries: [
+            {
+                query: GET_SHOP_DASHBOARD_METRICS_QUERY,
+                variables: { shopId: shopId } // Pass the current shopId variable anchor context
+            }
+        ],
+        // Optional: Ensures your UI updates immediately on completion without waiting for cache syncing
+        awaitRefetchQueries: true,
+        onCompleted: (data) => {
+            // Drop your custom toast notification hook trigger here!
+            console.log('Checkout processed and dashboard charts updated successfully!', data);
+        },
+        onError: (err) => {
+            console.error('Checkout mutation failed:', err.message);
+        }
+    });
+
     const [cart, setCart] = useState<any[]>([]); // 🚀 Set to any[] to hold your nested localStorage data structure cleanly
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);

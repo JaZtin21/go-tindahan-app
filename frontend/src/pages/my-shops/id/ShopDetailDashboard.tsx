@@ -18,6 +18,7 @@ import {
     Tooltip,
     CartesianGrid,
     BarChart,
+    PieChart, Pie,
     Bar,
     RadialBarChart,
     RadialBar
@@ -147,10 +148,10 @@ export const ShopDetailDashboard = () => {
 
 
             {/* --- COMMAND IMPLEMENTED: GO BACK STRIP ON TOP OF CHART CONTAINER --- */}
-            <div className="flex justify-between items-center px-2 ">
+            <div className="flex justify-between items-center px-2 mb-2">
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex text-text-muted hover:text-text-main transition-colors duration-200 items-center gap-1.5 h-8  rounded-xl text-text-sub text-xs font-bold transition-all duration-200 cursor-pointer active:scale-98 border border-transparent"
+                    className="flex text-text-muted hover:text-text-main transition-colors duration-200 items-center gap-1.5 h-8  rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer active:scale-98 border border-transparent"
                 >
                     <ArrowLeft size={16} strokeWidth={2.5} />
                     <span className="">Go Back to My Shops</span>
@@ -159,12 +160,12 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="bg-bg-primary rounded-3xl p-10 shadow-xs border border-transparent mb-8 w-full overflow-x-auto min-h-[380px] flex items-center">
+            <div className="bg-bg-primary rounded-3xl p-5 shadow-xs mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
-                <div className="flex items-center justify-between gap-12 min-w-[1300px] w-full px-8 py-4">
+                <div className="flex items-center  justify-between gap-12 min-w-[1300px] w-full px-8 py-4 ">
 
                     {/* SECTION 1: MASTER RECHARTS RADIAL BAR (Today's Gross Sales) */}
-                    <div className="flex items-center gap-10 shrink-0 flex-1 max-w-md">
+                    <div className="flex items-center gap-6 shrink-0 flex-1 max-w-md">
                         <div className="w-80 h-80 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadialBarChart
@@ -199,7 +200,7 @@ export const ShopDetailDashboard = () => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-2xl font-black text-text-main tracking-tight">Today's Sales</span>
-                            <span className="text-sm font-semibold text-text-muted mt-1.5">Primary revenue scale</span>
+                            <span className="text-sm font-bold text-text-muted mt-1.5">Primary revenue scale</span>
                         </div>
                     </div>
 
@@ -222,22 +223,22 @@ export const ShopDetailDashboard = () => {
                         <div className="flex items-center gap-6">
                             <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: 100, fill: 'var(--color-brand-red)' }]} startAngle={90} endAngle={-270}>
+                                    <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: 100, fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270}>
                                         <RadialBar background={{ fill: 'var(--color-brand-red)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
                                     </RadialBarChart>
                                 </ResponsiveContainer>
-                                <span className="absolute text-xs font-black text-text-main">{averageTicketSize.toFixed(0)}</span>
+                                <span className="absolute text-xs font-black text-text-main">{formatCurrency(averageTicketSize)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-lg font-black text-text-sub tracking-tight">Avg Basket Ticket</span>
-                                <span className="text-xs text-text-muted font-bold">{formatCurrency(averageTicketSize)} avg</span>
+                                <span className="text-lg font-black text-text-sub tracking-tight">Customer spent avg. of</span>
+                                <span className="text-xs text-text-muted font-bold mt-1">{formatCurrency(averageTicketSize)} pesos</span>
                             </div>
                         </div>
                     </div>
 
                     {/* SECTION 3: RECHARTS UNIFIED 7-DAY VOLUME REVENUE TREND GRAPH (REPLACED OLD HOURLY BARS) */}
                     {/* SECTION 3: RECHARTS UNIFIED 7-DAY HYBRID REVENUE MATRIX (BARS + ZIGZAG TRENDLINE) */}
-                    <div className="flex flex-col flex-1 justify-center h-44 px-4 min-w-[280px] max-w-sm">
+                    <div className="flex flex-col flex-1 justify-center h-44 px-8 min-w-[280px] max-w-sm border-r-2 border-border-main/30">
                         <div className="w-full h-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 {/* 1. Swap BarChart out for ComposedChart to unlock multi-type drawing lanes */}
@@ -296,21 +297,48 @@ export const ShopDetailDashboard = () => {
                     </div>
 
 
-                    {/* SECTION 4: SECONDARY BALANCE RECHARTS RADIAL BAR (Stock Efficiency Realization Index) */}
-                    <div className="flex items-center gap-10 shrink-0 border-l-2 border-bg-secondary/60 flex-1 max-w-md justify-end">
-                        <div className="flex flex-col text-right">
-                            <span className="text-2xl font-black text-text-main tracking-tight">Capital Locked</span>
-                            <span className="text-sm font-semibold text-text-muted mt-1.5">Shelf Liquidity Ratio</span>
+                    {/* SECTION 4: INTEGRATED DOUBLE-SLICE OPERATIONAL PROFIT & COST WHEEL */}
+                    <div className="flex items-center gap-10 shrink-0  flex-1 max-w-md justify-end">
+                        <div className="flex flex-col text-right select-none">
+                            <span className="text-2xl font-black text-text-main tracking-tight">
+                                Expected Profit Yield
+                            </span>
+                            {/* Clean text explanation detailing your pocket value gains */}
+                            <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight">
+                                {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value
+                            </span>
                         </div>
+
                         <div className="w-52 h-52 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart cx="50%" cy="50%" innerRadius="80%" outerRadius="100%" barSize={16} data={[{ value: Math.min(inventoryCapitalRatio, 100), fill: 'var(--color-brand-gold)' }]} startAngle={90} endAngle={-270}>
-                                    <RadialBar background={{ fill: 'var(--color-brand-gold)', opacity: 0.1 }} dataKey="value" cornerRadius={8} />
-                                </RadialBarChart>
+                                {/* Switching over to a PieChart system lets us slice multiple data variables into one ring */}
+                                <PieChart>
+                                    <Pie
+                                        data={[
+                                            // SLICE 1: Your expected take-home markup (Gold / Green)
+                                            { value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' },
+                                            // SLICE 2: Your locked wholesale supplier buying costs (Red)
+                                            { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }
+                                        ]}
+                                        dataKey="value"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius="75%"
+                                        outerRadius="95%"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="none"
+                                    />
+                                </PieChart>
                             </ResponsiveContainer>
-                            <span className="absolute text-xl font-black text-text-main">{inventoryCapitalRatio.toFixed(0)}%</span>
+
+                            {/* Center Typography Absolute Readout */}
+                            <span className="absolute text-xl font-black text-text-main">
+                                {(100 - inventoryCapitalRatio).toFixed(0)}%
+                            </span>
                         </div>
                     </div>
+
 
                 </div>
             </div>

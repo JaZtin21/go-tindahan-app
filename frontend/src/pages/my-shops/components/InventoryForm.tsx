@@ -318,292 +318,294 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 title={isEdit ? 'Update Item' : 'Add Item'}
                 subtitle={isEdit ? 'Update Items in your inventory' : 'Add Item to your inventory'}
             >
-                <div className="flex flex-col w-full bg-bg-secondary h-full">
+                <div className="relative flex flex-col w-full h-full min-h-0 overflow-hidden text-text-main">
+                    <div className="flex-grow overflow-y-auto min-h-0 flex flex-col ">
 
-                    {/* --- TAB HEADERS --- */}
-                    <div className={`flex border-b bg-bg-primary border-[var(--color-border-main)] w-full ${isEdit ? 'hidden' : ''}`}>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('manual')}
-                            className={`flex-1 flex flex-row gap-2 items-center justify-center py-4 text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
+                        {/* --- TAB HEADERS --- */}
+                        <div className={`flex border-b bg-bg-primary border-[var(--color-border-main)] w-full ${isEdit ? 'hidden' : ''}`}>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('manual')}
+                                className={`flex-1 flex flex-row gap-2 items-center justify-center py-4 text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
                                 ${activeTab === 'manual'
-                                    ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
-                                    : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
-                                }`}
-                        >
-                            <Pencil className="h-4 w-4" /> Manual Input
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('scanner')}
-                            className={`flex-1  py-4 flex flex-row gap-2 items-center justify-center text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
+                                        ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
+                                        : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
+                                    }`}
+                            >
+                                <Pencil className="h-4 w-4" /> Manual Input
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('scanner')}
+                                className={`flex-1  py-4 flex flex-row gap-2 items-center justify-center text-sm font-semibold transition-colors duration-200 border-b-3 cursor-pointer
                                 ${activeTab === 'scanner'
-                                    ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
-                                    : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
-                                }`}
-                        >
-                            <Camera className="h-4 w-4" /> AI Image Scanner
-                        </button>
-                    </div>
+                                        ? 'border-[var(--color-brand-gold)] text-[var(--color-text-main)]'
+                                        : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-sub)]'
+                                    }`}
+                            >
+                                <Camera className="h-4 w-4" /> AI Image Scanner
+                            </button>
+                        </div>
 
-                    {/* --- INVENTORY CONTAINER DATA MATRIX --- */}
-                    <div className="w-full bg-bg-secondary h-full flex-1 flex">
-                        {activeTab === 'manual' ? (
-                            <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 p-6 w-full">
+                        {/* --- INVENTORY CONTAINER DATA MATRIX --- */}
+                        <div className="w-full bg-bg-secondary h-full flex-1 flex">
+                            {activeTab === 'manual' ? (
+                                <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 p-6 w-full">
 
-                                {/* Item Name Input */}
-                                <div className="flex flex-col gap-2 text-left">
-                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Item Name *</label>
-                                    <input
-                                        type="text"
-                                        value={formData.itemName}
-                                        onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                                        className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                        placeholder="e.g. Organic Milk"
-                                        required
-                                    />
-                                </div>
-
-                                {/* Financial Estimates Metrics Layout Row */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.costPrice}
-                                            onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                                            className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.sellingPrice}
-                                            onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                                            className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Quantities Operational Inventory Controls Row */}
-                                <div className="grid grid-cols-2 gap-4 items-end">
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
-                                        <input
-                                            type="number"
-                                            value={formData.stockQuantity}
-                                            onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                                            className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
+                                    {/* Item Name Input */}
+                                    <div className="flex flex-col gap-2 text-left">
+                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Item Name *</label>
                                         <input
                                             type="text"
-                                            value={formData.unitOfMeasure}
-                                            onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
+                                            value={formData.itemName}
+                                            onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                                             className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                            placeholder="1g, 1kg, 12pcs etc"
+                                            placeholder="e.g. Organic Milk"
+                                            required
                                         />
                                     </div>
-                                </div>
-                                <div className="flex flex-col gap-1 text-left w-full">
-                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Product Image (Optional)</label>
 
-                                    {!photoPreview ? (
-                                        /* Dropzone Upload UI Target State Area */
-                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-primary)] hover:bg-[var(--color-bg-primary-hover)] transition-colors cursor-pointer">
-                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                <span className="text-2xl mb-1"><Camera className="text-[var(--color-text-sub)]" /></span>
-                                                <p className="text-xs font-semibold text-[var(--color-text-sub)]">Click to browse image asset</p>
-                                                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">PNG or JPG variants accepted</p>
-                                            </div>
+                                    {/* Financial Estimates Metrics Layout Row */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-1 text-left">
+                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
                                             <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handlePhotoChange}
-                                                className="hidden"
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.costPrice}
+                                                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                                                className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
+                                                placeholder="0.00"
                                             />
-                                        </label>
-                                    ) : (
-                                        /* Active Local Preview Matrix Overlay Canvas */
-                                        <div className="relative w-full h-48 border border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-secondary)] overflow-hidden flex items-center justify-center">
-                                            <img
-                                                src={photoPreview || ''}
-                                                alt="Product preview grid reference"
-                                                className="h-full object-contain"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handleRemovePhoto}
-                                                className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
-                                            >
-                                                <XIcon className="w-4 h-4 text-white" />
-                                            </button>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Bottom Window Choice Action Items */}
-                                <div className="flex justify-end gap-3 mt-auto">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleCloseInventoryModal(true)}
-                                        className="px-5 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading}
-                                        className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                                    >
-                                        {isLoading ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                <span>{isEdit ? 'Updating...' : 'Adding...'}</span>
-                                            </>
-                                        ) : (
-                                            <span>{isEdit ? 'Update Item' : 'Add Item'}</span>
-                                        )}
-                                    </button>
-                                </div>
-
-                            </form>
-                        ) : activeTab === 'scanner' && (
-                            <div className="flex flex-col flex-1 w-full bg-[var(--color-bg-secondary)] ">
-
-                                {scannerStep === 'camera' && (
-                                    <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-[var(--color-bg-secondary)] ">
-                                        <ProductScannerCamera
-                                            onCaptureComplete={(file, previewUrl, matchedName, unitOfMeasure) => {
-                                                setPhoto(file);
-                                                setPhotoPreview(previewUrl);
-                                                setFormData({
-                                                    ...formData,
-                                                    unitOfMeasure: unitOfMeasure,
-                                                    itemName: matchedName,
-                                                });
-
-                                                setScannerStep('form');
-                                            }}
-                                        />
+                                        <div className="flex flex-col gap-1 text-left">
+                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.sellingPrice}
+                                                onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
+                                                className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
                                     </div>
-                                )}
 
-                                {scannerStep === 'form' && (
-                                    <form onSubmit={handleInventoryFormSubmit} className="flex flex-col gap-5 p-6  w-full bg-[var(--color-bg-secondary)]">
-                                        {/* Item Name Input */}
-                                        <div className="flex flex-col gap-2 text-left">
-                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Item Name *</label>
+                                    {/* Quantities Operational Inventory Controls Row */}
+                                    <div className="grid grid-cols-2 gap-4 items-end">
+                                        <div className="flex flex-col gap-1 text-left">
+                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
+                                            <input
+                                                type="number"
+                                                value={formData.stockQuantity}
+                                                onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                                                className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1 text-left">
+                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
                                             <input
                                                 type="text"
-                                                value={formData.itemName}
-                                                onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
+                                                value={formData.unitOfMeasure}
+                                                onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
                                                 className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                                placeholder="e.g. Organic Milk"
-                                                required
+                                                placeholder="1g, 1kg, 12pcs etc"
                                             />
                                         </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1 text-left w-full">
+                                        <label className="text-xs font-semibold text-[var(--color-text-sub)]">Product Image (Optional)</label>
 
-                                        {/* Financial Estimates Metrics Layout Row */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="flex flex-col gap-1 text-left">
-                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
+                                        {!photoPreview ? (
+                                            /* Dropzone Upload UI Target State Area */
+                                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-primary)] hover:bg-[var(--color-bg-primary-hover)] transition-colors cursor-pointer">
+                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                    <span className="text-2xl mb-1"><Camera className="text-[var(--color-text-sub)]" /></span>
+                                                    <p className="text-xs font-semibold text-[var(--color-text-sub)]">Click to browse image asset</p>
+                                                    <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">PNG or JPG variants accepted</p>
+                                                </div>
                                                 <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.costPrice}
-                                                    onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
-                                                    placeholder="0.00"
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handlePhotoChange}
+                                                    className="hidden"
                                                 />
-                                            </div>
-                                            <div className="flex flex-col gap-1 text-left">
-                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.sellingPrice}
-                                                    onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Quantities Operational Inventory Controls Row */}
-                                        <div className="grid grid-cols-2 gap-4 items-end">
-                                            <div className="flex flex-col gap-1 text-left">
-                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
-                                                <input
-                                                    type="number"
-                                                    value={formData.stockQuantity}
-                                                    onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1 text-left">
-                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.unitOfMeasure}
-                                                    onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
-                                                    placeholder="1g, 1kg, 12pcs etc"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Pre-Populated Snapshot Render Canvas Preview Container */}
-                                        <div className="flex flex-col gap-1 text-left w-full">
-                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Captured Scanner Snapshot</label>
+                                            </label>
+                                        ) : (
+                                            /* Active Local Preview Matrix Overlay Canvas */
                                             <div className="relative w-full h-48 border border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-secondary)] overflow-hidden flex items-center justify-center">
-                                                <img src={photoPreview || ''} alt="Product preview grid reference" className="h-full object-contain" />
-                                            </div>
-                                        </div>
-
-                                        {/* Bottom Window Choice Action Items */}
-                                        <div className="flex justify-between items-center mt-auto">
-                                            {/* Go Back Left Anchor: Re-triggers camera tab frame loops */}
-                                            <button
-                                                type="button"
-                                                onClick={handleGoBackToCamera}
-                                                className="px-4 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
-                                            >
-                                                ← Go Back to Camera
-                                            </button>
-
-                                            <div className="flex gap-3">
+                                                <img
+                                                    src={photoPreview || ''}
+                                                    alt="Product preview grid reference"
+                                                    className="h-full object-contain"
+                                                />
                                                 <button
-                                                    type="submit"
-                                                    disabled={isLoading}
-                                                    className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                                    type="button"
+                                                    onClick={handleRemovePhoto}
+                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
                                                 >
-                                                    {isLoading ? (
-                                                        <>
-                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                            <span>Adding Item...</span>
-                                                        </>
-                                                    ) : (
-                                                        <span>Add Item</span>
-                                                    )}
+                                                    <XIcon className="w-4 h-4 text-white" />
                                                 </button>
                                             </div>
-                                        </div>
-                                    </form>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                        )}
+                                    </div>
 
+                                    {/* Bottom Window Choice Action Items */}
+                                    <div className="flex justify-end gap-3 mt-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCloseInventoryModal(true)}
+                                            className="px-5 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg hover:bg- disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                        >
+                                            {isLoading ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                    <span>{isEdit ? 'Updating...' : 'Adding...'}</span>
+                                                </>
+                                            ) : (
+                                                <span>{isEdit ? 'Update Item' : 'Add Item'}</span>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                </form>
+                            ) : activeTab === 'scanner' && (
+                                <div className="flex flex-col flex-1 w-full bg-[var(--color-bg-secondary)] ">
+
+                                    {scannerStep === 'camera' && (
+                                        <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-[var(--color-bg-secondary)] ">
+                                            <ProductScannerCamera
+                                                onCaptureComplete={(file, previewUrl, matchedName, unitOfMeasure) => {
+                                                    setPhoto(file);
+                                                    setPhotoPreview(previewUrl);
+                                                    setFormData({
+                                                        ...formData,
+                                                        unitOfMeasure: unitOfMeasure,
+                                                        itemName: matchedName,
+                                                    });
+
+                                                    setScannerStep('form');
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {scannerStep === 'form' && (
+                                        <form onSubmit={handleInventoryFormSubmit} className="flex flex-col flex-1 gap-5 p-6  w-full bg-[var(--color-bg-secondary)]">
+                                            {/* Item Name Input */}
+                                            <div className="flex flex-col gap-2 text-left">
+                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Item Name *</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.itemName}
+                                                    onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                    placeholder="e.g. Organic Milk"
+                                                    required
+                                                />
+                                            </div>
+
+                                            {/* Financial Estimates Metrics Layout Row */}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="flex flex-col gap-1 text-left">
+                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.costPrice}
+                                                        onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1 text-left">
+                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.sellingPrice}
+                                                        onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Quantities Operational Inventory Controls Row */}
+                                            <div className="grid grid-cols-2 gap-4 items-end">
+                                                <div className="flex flex-col gap-1 text-left">
+                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
+                                                    <input
+                                                        type="number"
+                                                        value={formData.stockQuantity}
+                                                        onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1 text-left">
+                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.unitOfMeasure}
+                                                        onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                                                        placeholder="1g, 1kg, 12pcs etc"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Pre-Populated Snapshot Render Canvas Preview Container */}
+                                            <div className="flex flex-col gap-1 text-left w-full">
+                                                <label className="text-xs font-semibold text-[var(--color-text-sub)]">Captured Scanner Snapshot</label>
+                                                <div className="relative w-full h-48 border border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-secondary)] overflow-hidden flex items-center justify-center">
+                                                    <img src={photoPreview || ''} alt="Product preview grid reference" className="h-full object-contain" />
+                                                </div>
+                                            </div>
+
+                                            {/* Bottom Window Choice Action Items */}
+                                            <div className="flex justify-between items-center mt-auto">
+                                                {/* Go Back Left Anchor: Re-triggers camera tab frame loops */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGoBackToCamera}
+                                                    className="px-4 py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
+                                                >
+                                                    ← Go Back to Camera
+                                                </button>
+
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        type="submit"
+                                                        disabled={isLoading}
+                                                        className="px-6 py-2 bg-brand-gold hover:bg-brand-gold-hover text-text-white cursor-pointer rounded-lg disabled:bg-zinc-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                                    >
+                                                        {isLoading ? (
+                                                            <>
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                                <span>Adding Item...</span>
+                                                            </>
+                                                        ) : (
+                                                            <span>Add Item</span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                    </div>
                 </div>
             </Modal>
             <Modal
@@ -616,7 +618,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 isHeaderVisible={false}
                 unsetHeight
             >
-                <div className="flex flex-col items-center justify-center p-6 min-h-[200px]">
+                <div className="flex flex-col items-center justify-center  min-h-[200px]">
                     {/* Visual Success/Error Indicator Anchor (Optional styling) */}
                     <div className=''>
                         {isSuccess ? (

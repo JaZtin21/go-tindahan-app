@@ -259,7 +259,7 @@ export const InventoryPage = () => {
 
 
     return (
-        <div className="w-full min-h-screen text-text-main flex flex-col">
+        <div className="w-full min-h-screen text-text-main flex flex-col gap-2">
             {/* GO BACK STRIP */}
             <div className="flex justify-between items-center px-2">
                 <button
@@ -267,7 +267,7 @@ export const InventoryPage = () => {
                     className="flex text-text-muted hover:text-text-main transition-colors duration-200 items-center gap-1.5 h-8 rounded-xl text-xs font-bold cursor-pointer active:scale-98"
                 >
                     <ArrowLeft size={16} strokeWidth={2.5} />
-                    <span>Go Back to My Shops</span>
+                    <span>Go Back to My Shop</span>
                 </button>
             </div>
 
