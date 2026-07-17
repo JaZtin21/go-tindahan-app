@@ -165,7 +165,7 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
 
     const incrementQty = () => {
         if (!selectedProduct) return;
-        setQuantity(prev => Math.min(selectedProduct.stockQuantity, Number(prev) + 1));
+        setQuantity(prev => Number(prev) + 1);
     };
 
     const decrementQty = () => {
@@ -192,8 +192,7 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
         }
 
         // 🚀 MAX CEILING CHECK: Clamp the manual number strictly to the available database inventory limit
-        const validatedValue = Math.max(1, Math.min(selectedProduct.stockQuantity, parsedValue));
-        setQuantity(validatedValue);
+        setQuantity(parsedValue);
     };
 
     return (
@@ -272,7 +271,6 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
                             onChange={handleQuantityInputChange}
 
                             min={selectedProduct?.stockQuantity === 0 ? 0 : 1}
-                            max={selectedProduct?.stockQuantity || 0}
                             className="w-full px-4 py-2  border border-border-main rounded-lg bg-bg-primary text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <button
@@ -286,7 +284,7 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
                         <button
                             type="button"
                             onClick={incrementQty}
-                            disabled={!selectedProduct || Number(quantity) >= selectedProduct.stockQuantity}
+                            disabled={!selectedProduct}
                             className="p-2 border cursor-pointer h-full border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors"
                         >
                             <Plus size={16} />
