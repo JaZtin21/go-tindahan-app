@@ -138,6 +138,16 @@ type IncrementStockInput struct {
 	QuantityToAdd int    `json:"quantityToAdd"`
 }
 
+type ItemActionHistory struct {
+	ID              string  `json:"id"`
+	ShopID          string  `json:"shopId"`
+	InventoryItemID *string `json:"inventoryItemId,omitempty"`
+	ItemName        string  `json:"itemName"`
+	Action          string  `json:"action"`
+	Quantity        *int    `json:"quantity,omitempty"`
+	Date            string  `json:"date"`
+}
+
 type Mutation struct {
 }
 
@@ -175,6 +185,18 @@ type OwnerShop struct {
 	Photo          *string          `json:"photo,omitempty"`
 	Photos         []string         `json:"photos"`
 	CreatedAt      string           `json:"createdAt"`
+}
+
+type PaginatedCheckoutBatches struct {
+	Batches     []*CheckoutBatch `json:"batches"`
+	TotalCount  int              `json:"totalCount"`
+	HasNextPage bool             `json:"hasNextPage"`
+}
+
+type PaginatedItemActionHistory struct {
+	Records     []*ItemActionHistory `json:"records"`
+	TotalCount  int                  `json:"totalCount"`
+	HasNextPage bool                 `json:"hasNextPage"`
 }
 
 type PaginatedOwnerInventory struct {

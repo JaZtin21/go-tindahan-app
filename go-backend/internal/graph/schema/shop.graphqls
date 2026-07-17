@@ -178,6 +178,28 @@ type CheckoutBatchItem {
   lineSaleTotal: Float!
 }
 
+type ItemActionHistory {
+  id: ID!
+  shopId: ID!
+  inventoryItemId: ID
+  itemName: String!
+  action: String!
+  quantity: Int
+  date: String!
+}
+
+type PaginatedCheckoutBatches {
+  batches: [CheckoutBatch!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type PaginatedItemActionHistory {
+  records: [ItemActionHistory!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
 # --- INPUTS FOR MUTATIONS ---
 
 input CreateShopInput {
@@ -305,6 +327,8 @@ extend type Query {
   getMyShops(limit: Int!, offset: Int!): PaginatedOwnerShops! @isAuthenticated
   getShopById(shopId: ID!): OwnerShop @isAuthenticated
   getShopInventory(shopId: ID!, limit: Int!, offset: Int!, search: String, sortBy: String, sortOrder: String): PaginatedOwnerInventory! @isAuthenticated
+  getCheckoutHistory(shopId: ID!, limit: Int!, offset: Int!): PaginatedCheckoutBatches! @isAuthenticated
+  getItemActionHistory(shopId: ID!, limit: Int!, offset: Int!): PaginatedItemActionHistory! @isAuthenticated
 
   # --- 🌐 CUSTOMER PUBLIC INTERFACES (Returns Public Types) ---
   searchShop(query: String!, limit: Int!, offset: Int!): PaginatedShops!

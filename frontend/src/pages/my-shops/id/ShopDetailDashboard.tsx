@@ -20,7 +20,7 @@ import {
     RadialBarChart,
     RadialBar
 } from 'recharts';
-import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft, History } from 'lucide-react';
 import { setAddShopModalOpen } from '~/store/uiSlice';
 import InventoryForm from '../components/InventoryForm';
 import { GET_SHOP_BY_ID_QUERY } from '~/api/graphql';
@@ -259,7 +259,7 @@ export const ShopDetailDashboard = () => {
             {/* --- COMPLETE ACTIONS GRID SECTION (Matches 5 buttons layout structure) --- */}
             {/* --- ACTION GRID: 5 BUTTONS FROM IMAGE --- */}
             {/* --- ACTION GRID: 5 BUTTONS (Matches Shop Card Layout Styles) --- */}
-            <div className="grid grid-cols-2  md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2  md:grid-cols-4 lg:grid-cols-6 gap-6">
 
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
@@ -314,7 +314,20 @@ export const ShopDetailDashboard = () => {
                     </div>
                 </a>
 
-                {/* 5. Edit Shop Info (Modal Trigger) */}
+                {/* 5. Sales History */}
+                <a
+                    onClick={() => navigate(`/my-shops/${shopId}/sales-history`)}
+                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline border border-transparent"
+                >
+                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                        <History className="w-6 h-6 text-text-sub" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-sm font-bold text-text-main text-center">Sales History</h3>
+                    </div>
+                </a>
+
+                {/* 6. Edit Shop Info (Modal Trigger) */}
                 <div
                     onClick={() => triggerModalAction('Edit Shop Info')}
                     className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"

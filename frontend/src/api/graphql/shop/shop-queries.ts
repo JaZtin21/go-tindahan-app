@@ -334,6 +334,52 @@ export const GET_SHOP_INVENTORY_QUERY = gql`
   }
 `;
 
+export const GET_CHECKOUT_HISTORY_QUERY = gql`
+  query GetCheckoutHistory($shopId: ID!, $limit: Int!, $offset: Int!) {
+    getCheckoutHistory(shopId: $shopId, limit: $limit, offset: $offset) {
+      totalCount
+      hasNextPage
+      batches {
+        id
+        shopId
+        soldAt
+        totalItems
+        totalCost
+        grossSale
+        grossProfit
+        items {
+          id
+          inventoryItemId
+          itemName
+          quantity
+          costPrice
+          sellingPrice
+          lineCostTotal
+          lineSaleTotal
+        }
+      }
+    }
+  }
+`;
+
+export const GET_ITEM_ACTION_HISTORY_QUERY = gql`
+  query GetItemActionHistory($shopId: ID!, $limit: Int!, $offset: Int!) {
+    getItemActionHistory(shopId: $shopId, limit: $limit, offset: $offset) {
+      totalCount
+      hasNextPage
+      records {
+        id
+        shopId
+        inventoryItemId
+        itemName
+        action
+        quantity
+        date
+      }
+    }
+  }
+`;
+
 export const SEARCH_SHOP_QUERY = gql`
   query SearchShop($query: String!, $limit: Int!, $offset: Int!) {
     searchShop(query: $query, limit: $limit, offset: $offset) {

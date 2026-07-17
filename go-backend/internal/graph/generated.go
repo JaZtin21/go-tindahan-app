@@ -89,6 +89,16 @@ type ComplexityRoot struct {
 		Radius    func(childComplexity int) int
 	}
 
+	ItemActionHistory struct {
+		Action          func(childComplexity int) int
+		Date            func(childComplexity int) int
+		ID              func(childComplexity int) int
+		InventoryItemID func(childComplexity int) int
+		ItemName        func(childComplexity int) int
+		Quantity        func(childComplexity int) int
+		ShopID          func(childComplexity int) int
+	}
+
 	Mutation struct {
 		AddInventoryItem    func(childComplexity int, input model.AddInventoryItemInput) int
 		CheckoutCart        func(childComplexity int, input model.CheckoutCartInput) int
@@ -142,6 +152,18 @@ type ComplexityRoot struct {
 		SocialMedia    func(childComplexity int) int
 		Status         func(childComplexity int) int
 		Verification   func(childComplexity int) int
+	}
+
+	PaginatedCheckoutBatches struct {
+		Batches     func(childComplexity int) int
+		HasNextPage func(childComplexity int) int
+		TotalCount  func(childComplexity int) int
+	}
+
+	PaginatedItemActionHistory struct {
+		HasNextPage func(childComplexity int) int
+		Records     func(childComplexity int) int
+		TotalCount  func(childComplexity int) int
 	}
 
 	PaginatedOwnerInventory struct {
@@ -202,16 +224,18 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		GetMyShops         func(childComplexity int, limit int, offset int) int
-		GetPostByID        func(childComplexity int, id string) int
-		GetPosts           func(childComplexity int, limit int, offset int) int
-		GetShopByID        func(childComplexity int, shopID string) int
-		GetShopInventory   func(childComplexity int, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) int
-		Me                 func(childComplexity int) int
-		Ping               func(childComplexity int) int
-		SearchProduct      func(childComplexity int, query string, limit int, offset int) int
-		SearchShop         func(childComplexity int, query string, limit int, offset int) int
-		SearchShopProducts func(childComplexity int, shopID string, query string, limit int, offset int) int
+		GetCheckoutHistory   func(childComplexity int, shopID string, limit int, offset int) int
+		GetItemActionHistory func(childComplexity int, shopID string, limit int, offset int) int
+		GetMyShops           func(childComplexity int, limit int, offset int) int
+		GetPostByID          func(childComplexity int, id string) int
+		GetPosts             func(childComplexity int, limit int, offset int) int
+		GetShopByID          func(childComplexity int, shopID string) int
+		GetShopInventory     func(childComplexity int, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) int
+		Me                   func(childComplexity int) int
+		Ping                 func(childComplexity int) int
+		SearchProduct        func(childComplexity int, query string, limit int, offset int) int
+		SearchShop           func(childComplexity int, query string, limit int, offset int) int
+		SearchShopProducts   func(childComplexity int, shopID string, query string, limit int, offset int) int
 	}
 
 	RefreshResponse struct {
@@ -301,6 +325,8 @@ type QueryResolver interface {
 	GetMyShops(ctx context.Context, limit int, offset int) (*model.PaginatedOwnerShops, error)
 	GetShopByID(ctx context.Context, shopID string) (*model.OwnerShop, error)
 	GetShopInventory(ctx context.Context, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) (*model.PaginatedOwnerInventory, error)
+	GetCheckoutHistory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedCheckoutBatches, error)
+	GetItemActionHistory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedItemActionHistory, error)
 	SearchShop(ctx context.Context, query string, limit int, offset int) (*model.PaginatedShops, error)
 	SearchProduct(ctx context.Context, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
 	SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
@@ -511,6 +537,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.DeliveryOptions.Radius(childComplexity), true
+
+	case "ItemActionHistory.action":
+		if e.ComplexityRoot.ItemActionHistory.Action == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.Action(childComplexity), true
+	case "ItemActionHistory.date":
+		if e.ComplexityRoot.ItemActionHistory.Date == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.Date(childComplexity), true
+	case "ItemActionHistory.id":
+		if e.ComplexityRoot.ItemActionHistory.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.ID(childComplexity), true
+	case "ItemActionHistory.inventoryItemId":
+		if e.ComplexityRoot.ItemActionHistory.InventoryItemID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.InventoryItemID(childComplexity), true
+	case "ItemActionHistory.itemName":
+		if e.ComplexityRoot.ItemActionHistory.ItemName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.ItemName(childComplexity), true
+	case "ItemActionHistory.quantity":
+		if e.ComplexityRoot.ItemActionHistory.Quantity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.Quantity(childComplexity), true
+	case "ItemActionHistory.shopId":
+		if e.ComplexityRoot.ItemActionHistory.ShopID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ItemActionHistory.ShopID(childComplexity), true
 
 	case "Mutation.addInventoryItem":
 		if e.ComplexityRoot.Mutation.AddInventoryItem == nil {
@@ -856,6 +925,44 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.OwnerShop.Verification(childComplexity), true
 
+	case "PaginatedCheckoutBatches.batches":
+		if e.ComplexityRoot.PaginatedCheckoutBatches.Batches == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedCheckoutBatches.Batches(childComplexity), true
+	case "PaginatedCheckoutBatches.hasNextPage":
+		if e.ComplexityRoot.PaginatedCheckoutBatches.HasNextPage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedCheckoutBatches.HasNextPage(childComplexity), true
+	case "PaginatedCheckoutBatches.totalCount":
+		if e.ComplexityRoot.PaginatedCheckoutBatches.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedCheckoutBatches.TotalCount(childComplexity), true
+
+	case "PaginatedItemActionHistory.hasNextPage":
+		if e.ComplexityRoot.PaginatedItemActionHistory.HasNextPage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedItemActionHistory.HasNextPage(childComplexity), true
+	case "PaginatedItemActionHistory.records":
+		if e.ComplexityRoot.PaginatedItemActionHistory.Records == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedItemActionHistory.Records(childComplexity), true
+	case "PaginatedItemActionHistory.totalCount":
+		if e.ComplexityRoot.PaginatedItemActionHistory.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedItemActionHistory.TotalCount(childComplexity), true
+
 	case "PaginatedOwnerInventory.hasNextPage":
 		if e.ComplexityRoot.PaginatedOwnerInventory.HasNextPage == nil {
 			break
@@ -1062,6 +1169,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PublicProduct.UnitOfMeasure(childComplexity), true
 
+	case "Query.getCheckoutHistory":
+		if e.ComplexityRoot.Query.GetCheckoutHistory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getCheckoutHistory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.GetCheckoutHistory(childComplexity, args["shopId"].(string), args["limit"].(int), args["offset"].(int)), true
+	case "Query.getItemActionHistory":
+		if e.ComplexityRoot.Query.GetItemActionHistory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getItemActionHistory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.GetItemActionHistory(childComplexity, args["shopId"].(string), args["limit"].(int), args["offset"].(int)), true
 	case "Query.getMyShops":
 		if e.ComplexityRoot.Query.GetMyShops == nil {
 			break
@@ -1617,6 +1746,26 @@ func (ec *executionContext) childFields_DeliveryOptions(ctx context.Context, fie
 	return nil, fmt.Errorf("no field named %q was found under type DeliveryOptions", field.Name)
 }
 
+func (ec *executionContext) childFields_ItemActionHistory(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ItemActionHistory_id(ctx, field)
+	case "shopId":
+		return ec.fieldContext_ItemActionHistory_shopId(ctx, field)
+	case "inventoryItemId":
+		return ec.fieldContext_ItemActionHistory_inventoryItemId(ctx, field)
+	case "itemName":
+		return ec.fieldContext_ItemActionHistory_itemName(ctx, field)
+	case "action":
+		return ec.fieldContext_ItemActionHistory_action(ctx, field)
+	case "quantity":
+		return ec.fieldContext_ItemActionHistory_quantity(ctx, field)
+	case "date":
+		return ec.fieldContext_ItemActionHistory_date(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ItemActionHistory", field.Name)
+}
+
 func (ec *executionContext) childFields_OwnerInventoryItem(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -1687,6 +1836,30 @@ func (ec *executionContext) childFields_OwnerShop(ctx context.Context, field gra
 		return ec.fieldContext_OwnerShop_createdAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type OwnerShop", field.Name)
+}
+
+func (ec *executionContext) childFields_PaginatedCheckoutBatches(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "batches":
+		return ec.fieldContext_PaginatedCheckoutBatches_batches(ctx, field)
+	case "totalCount":
+		return ec.fieldContext_PaginatedCheckoutBatches_totalCount(ctx, field)
+	case "hasNextPage":
+		return ec.fieldContext_PaginatedCheckoutBatches_hasNextPage(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PaginatedCheckoutBatches", field.Name)
+}
+
+func (ec *executionContext) childFields_PaginatedItemActionHistory(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "records":
+		return ec.fieldContext_PaginatedItemActionHistory_records(ctx, field)
+	case "totalCount":
+		return ec.fieldContext_PaginatedItemActionHistory_totalCount(ctx, field)
+	case "hasNextPage":
+		return ec.fieldContext_PaginatedItemActionHistory_hasNextPage(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PaginatedItemActionHistory", field.Name)
 }
 
 func (ec *executionContext) childFields_PaginatedOwnerInventory(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2226,6 +2399,66 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getCheckoutHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "shopId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["shopId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "offset",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getItemActionHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "shopId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["shopId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "offset",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg2
 	return args, nil
 }
 
@@ -3241,6 +3474,167 @@ func (ec *executionContext) _DeliveryOptions_minOrder(ctx context.Context, field
 }
 func (ec *executionContext) fieldContext_DeliveryOptions_minOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("DeliveryOptions", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_id(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_shopId(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_shopId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ShopID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_shopId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_inventoryItemId(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_inventoryItemId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.InventoryItemID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_inventoryItemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_itemName(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_itemName(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ItemName, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_itemName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_action(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_action(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Action, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_action(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_quantity(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_quantity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Quantity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_quantity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ItemActionHistory_date(ctx context.Context, field graphql.CollectedField, obj *model.ItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ItemActionHistory_date(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Date, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ItemActionHistory_date(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ItemActionHistory", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _Mutation_ping(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -4807,6 +5201,162 @@ func (ec *executionContext) fieldContext_OwnerShop_createdAt(_ context.Context, 
 	return graphql.NewScalarFieldContext("OwnerShop", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _PaginatedCheckoutBatches_batches(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedCheckoutBatches) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedCheckoutBatches_batches(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Batches, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.CheckoutBatch) graphql.Marshaler {
+			return ec.marshalNCheckoutBatch2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedCheckoutBatches_batches(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedCheckoutBatches",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CheckoutBatch(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedCheckoutBatches_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedCheckoutBatches) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedCheckoutBatches_totalCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedCheckoutBatches_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PaginatedCheckoutBatches", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _PaginatedCheckoutBatches_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedCheckoutBatches) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedCheckoutBatches_hasNextPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedCheckoutBatches_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PaginatedCheckoutBatches", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _PaginatedItemActionHistory_records(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedItemActionHistory_records(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Records, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ItemActionHistory) graphql.Marshaler {
+			return ec.marshalNItemActionHistory2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistoryᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedItemActionHistory_records(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedItemActionHistory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ItemActionHistory(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedItemActionHistory_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedItemActionHistory_totalCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedItemActionHistory_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PaginatedItemActionHistory", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _PaginatedItemActionHistory_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedItemActionHistory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedItemActionHistory_hasNextPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedItemActionHistory_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PaginatedItemActionHistory", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
 func (ec *executionContext) _PaginatedOwnerInventory_items(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedOwnerInventory) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5887,6 +6437,120 @@ func (ec *executionContext) fieldContext_Query_getShopInventory(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_getShopInventory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getCheckoutHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_getCheckoutHistory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().GetCheckoutHistory(ctx, fc.Args["shopId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.PaginatedCheckoutBatches
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedCheckoutBatches) graphql.Marshaler {
+			return ec.marshalNPaginatedCheckoutBatches2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedCheckoutBatches(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_getCheckoutHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PaginatedCheckoutBatches(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getCheckoutHistory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getItemActionHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_getItemActionHistory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().GetItemActionHistory(ctx, fc.Args["shopId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.PaginatedItemActionHistory
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedItemActionHistory) graphql.Marshaler {
+			return ec.marshalNPaginatedItemActionHistory2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedItemActionHistory(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_getItemActionHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PaginatedItemActionHistory(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getItemActionHistory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9470,6 +10134,74 @@ func (ec *executionContext) _DeliveryOptions(ctx context.Context, sel ast.Select
 	return out
 }
 
+var itemActionHistoryImplementors = []string{"ItemActionHistory"}
+
+func (ec *executionContext) _ItemActionHistory(ctx context.Context, sel ast.SelectionSet, obj *model.ItemActionHistory) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, itemActionHistoryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ItemActionHistory")
+		case "id":
+			out.Values[i] = ec._ItemActionHistory_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "shopId":
+			out.Values[i] = ec._ItemActionHistory_shopId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inventoryItemId":
+			out.Values[i] = ec._ItemActionHistory_inventoryItemId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "itemName":
+			out.Values[i] = ec._ItemActionHistory_itemName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "action":
+			out.Values[i] = ec._ItemActionHistory_action(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "quantity":
+			out.Values[i] = ec._ItemActionHistory_quantity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "date":
+			out.Values[i] = ec._ItemActionHistory_date(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -9815,6 +10547,102 @@ func (ec *executionContext) _OwnerShop(ctx context.Context, sel ast.SelectionSet
 			}
 		case "createdAt":
 			out.Values[i] = ec._OwnerShop_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var paginatedCheckoutBatchesImplementors = []string{"PaginatedCheckoutBatches"}
+
+func (ec *executionContext) _PaginatedCheckoutBatches(ctx context.Context, sel ast.SelectionSet, obj *model.PaginatedCheckoutBatches) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, paginatedCheckoutBatchesImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PaginatedCheckoutBatches")
+		case "batches":
+			out.Values[i] = ec._PaginatedCheckoutBatches_batches(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._PaginatedCheckoutBatches_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hasNextPage":
+			out.Values[i] = ec._PaginatedCheckoutBatches_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var paginatedItemActionHistoryImplementors = []string{"PaginatedItemActionHistory"}
+
+func (ec *executionContext) _PaginatedItemActionHistory(ctx context.Context, sel ast.SelectionSet, obj *model.PaginatedItemActionHistory) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, paginatedItemActionHistoryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PaginatedItemActionHistory")
+		case "records":
+			out.Values[i] = ec._PaginatedItemActionHistory_records(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._PaginatedItemActionHistory_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hasNextPage":
+			out.Values[i] = ec._PaginatedItemActionHistory_hasNextPage(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -10408,6 +11236,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getShopInventory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getCheckoutHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getCheckoutHistory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getItemActionHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getItemActionHistory(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -11400,6 +12272,22 @@ func (ec *executionContext) marshalNCheckoutBatch2goᚑbackendᚋinternalᚋgrap
 	return ec._CheckoutBatch(ctx, sel, &v)
 }
 
+func (ec *executionContext) marshalNCheckoutBatch2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CheckoutBatch) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCheckoutBatch2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatch(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalNCheckoutBatch2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatch(ctx context.Context, sel ast.SelectionSet, v *model.CheckoutBatch) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -11578,6 +12466,32 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
+func (ec *executionContext) marshalNItemActionHistory2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ItemActionHistory) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNItemActionHistory2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistory(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNItemActionHistory2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistory(ctx context.Context, sel ast.SelectionSet, v *model.ItemActionHistory) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ItemActionHistory(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNOwnerInventoryItem2goᚑbackendᚋinternalᚋgraphᚋmodelᚐOwnerInventoryItem(ctx context.Context, sel ast.SelectionSet, v model.OwnerInventoryItem) graphql.Marshaler {
 	return ec._OwnerInventoryItem(ctx, sel, &v)
 }
@@ -11636,6 +12550,34 @@ func (ec *executionContext) marshalNOwnerShop2ᚖgoᚑbackendᚋinternalᚋgraph
 		return graphql.Null
 	}
 	return ec._OwnerShop(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPaginatedCheckoutBatches2goᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedCheckoutBatches(ctx context.Context, sel ast.SelectionSet, v model.PaginatedCheckoutBatches) graphql.Marshaler {
+	return ec._PaginatedCheckoutBatches(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPaginatedCheckoutBatches2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedCheckoutBatches(ctx context.Context, sel ast.SelectionSet, v *model.PaginatedCheckoutBatches) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PaginatedCheckoutBatches(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPaginatedItemActionHistory2goᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedItemActionHistory(ctx context.Context, sel ast.SelectionSet, v model.PaginatedItemActionHistory) graphql.Marshaler {
+	return ec._PaginatedItemActionHistory(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPaginatedItemActionHistory2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedItemActionHistory(ctx context.Context, sel ast.SelectionSet, v *model.PaginatedItemActionHistory) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PaginatedItemActionHistory(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPaginatedOwnerInventory2goᚑbackendᚋinternalᚋgraphᚋmodelᚐPaginatedOwnerInventory(ctx context.Context, sel ast.SelectionSet, v model.PaginatedOwnerInventory) graphql.Marshaler {
@@ -12157,6 +13099,24 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	_ = sel
 	res := graphql.MarshalFloatContext(*v)
 	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalID(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalID(*v)
+	return res
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

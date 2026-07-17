@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"go-backend/internal/graph/model"
 	"go-backend/internal/middleware"
-	imageutil "go-backend/internal/utils"
+	"go-backend/internal/utils"
 	"log"
 	"os"
 	"time"
@@ -28,7 +28,7 @@ func (r *mutationResolver) CreateShop(ctx context.Context, input model.CreateSho
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
 	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -218,7 +218,7 @@ func (r *mutationResolver) UpdateShop(ctx context.Context, input model.UpdateSho
 	}
 
 	// INITIALIZE THE CLOUDINARY UPLOADER UTILITY VIA REGULAR ENVS
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -267,7 +267,7 @@ func (r *mutationResolver) UpdateShop(ctx context.Context, input model.UpdateSho
 	// Diffs old database array against incoming retained slice to find deletions
 	var deletedGalleryPhotos []string
 	if input.Photos != nil {
-		deletedGalleryPhotos = imageutil.DiffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
+		deletedGalleryPhotos = utils.DiffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
 	}
 
 	// Stream and append any brand new image uploads into the gallery container slice
@@ -394,7 +394,7 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 	}
 
 	// 1. INITIALIZE THE CLOUDINARY UPLOADER UTILITY DIRECTLY VIA OS ENVS
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -469,7 +469,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	}
 
 	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -520,6 +520,17 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		input.ShopID, input.ItemName, input.Description, input.Barcode, input.Category,
 		input.UnitOfMeasure, finalProductPhoto, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel,
 	).Scan(&insertedID, &costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &updatedAt)
+
+	if err == nil {
+		initialQuantity := stockQuantity
+		_ = utils.RecordItemActionHistory(ctx, r.Resolver.DB, utils.ItemActionHistoryInput{
+			ShopID:          input.ShopID,
+			InventoryItemID: insertedID,
+			ItemName:        input.ItemName,
+			Action:          "added item",
+			Quantity:        &initialQuantity,
+		})
+	}
 
 	if err != nil {
 		log.Printf("🔴 DATABASE TRANSACTION FAILED IN ADDINVENTORYITEM: %v", err)
@@ -584,7 +595,7 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	}
 
 	// INITIALIZE THE CLOUDINARY UPLOADER UTILITY VIA REGULAR ENVS
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -649,6 +660,12 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	}
 
 	item.UpdatedAt = updatedAt.Format(time.RFC3339)
+	_ = utils.RecordItemActionHistory(ctx, r.Resolver.DB, utils.ItemActionHistoryInput{
+		ShopID:          item.ShopID,
+		InventoryItemID: item.ID,
+		ItemName:        item.ItemName,
+		Action:          "edited item",
+	})
 
 	// =========================================================================
 	// 3. SECURE CLOUDINARY CLEANUP SWEEPS (Best-effort execution pipeline)
@@ -670,13 +687,14 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 	var shopOwnerID string
 	var oldPhoto *string
 	var shopID string
+	var itemName string
 
 	checkQuery := `
-		SELECT s.owner_id, i.photo, i.shop_id FROM inventory_items i
+		SELECT s.owner_id, i.photo, i.shop_id, i.item_name FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID, &oldPhoto, &shopID)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID, &oldPhoto, &shopID, &itemName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -698,7 +716,7 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 	}
 
 	// 1. INITIALIZE THE CLOUDINARY UPLOADER UTILITY DIRECTLY VIA OS ENVS
-	uploader, err := imageutil.NewImageUploader(
+	uploader, err := utils.NewImageUploader(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
 		os.Getenv("CLOUDINARY_API_SECRET"),
@@ -728,6 +746,13 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		return false, err
 	}
 
+	_ = utils.RecordItemActionHistory(ctx, r.Resolver.DB, utils.ItemActionHistoryInput{
+		ShopID:          shopID,
+		InventoryItemID: itemID,
+		ItemName:        itemName,
+		Action:          "deleted item",
+	})
+
 	return true, nil
 }
 
@@ -738,12 +763,13 @@ func (r *mutationResolver) IncrementStock(ctx context.Context, input model.Incre
 
 	// SECURITY GUARD 2: Fetch the owner_id of the shop holding this item via a JOIN
 	var shopOwnerID string
+	var shopID string
 	checkQuery := `
-		SELECT s.owner_id FROM inventory_items i
+		SELECT s.owner_id, i.shop_id FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &shopID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -801,6 +827,14 @@ func (r *mutationResolver) IncrementStock(ctx context.Context, input model.Incre
 	}
 
 	item.UpdatedAt = updatedAt.Format(time.RFC3339)
+	quantityAdded := input.QuantityToAdd
+	_ = utils.RecordItemActionHistory(ctx, r.Resolver.DB, utils.ItemActionHistoryInput{
+		ShopID:          shopID,
+		InventoryItemID: item.ID,
+		ItemName:        item.ItemName,
+		Action:          "added stock",
+		Quantity:        &quantityAdded,
+	})
 	return &item, nil
 }
 
@@ -879,19 +913,9 @@ func (r *mutationResolver) DecrementStock(ctx context.Context, input model.Decre
 
 // CheckoutCart is the resolver for the checkoutCart field.
 func (r *mutationResolver) CheckoutCart(ctx context.Context, input model.CheckoutCartInput) (*model.CheckoutBatch, error) {
-	_, err := ensureCheckoutOwnership(ctx, r.Resolver.DB, input.ShopID)
-	if err != nil {
-		return nil, err
-	}
-	if len(graphql.GetErrors(ctx)) > 0 {
-		return nil, nil
-	}
-
-	if len(input.Items) == 0 {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "bad request: checkout cart cannot be empty",
-			Extensions: map[string]interface{}{"code": "BAD_USER_INPUT"},
-		})
+	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
+	if err := utils.EnsureShopOwnership(ctx, r.Resolver.DB, input.ShopID, currentUser.ID); err != nil {
+		utils.AddHistoryGraphQLError(ctx, err)
 		return nil, nil
 	}
 
@@ -905,136 +929,10 @@ func (r *mutationResolver) CheckoutCart(ctx context.Context, input model.Checkou
 	}
 	defer tx.Rollback(ctx)
 
-	seen := map[string]struct{}{}
-	inventoryByID := make(map[string]checkoutInventoryRow, len(input.Items))
-	for _, cartItem := range input.Items {
-		if cartItem == nil || cartItem.ItemID == "" || cartItem.Quantity <= 0 {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "bad request: each checkout item must have a valid itemId and quantity",
-				Extensions: map[string]interface{}{"code": "BAD_USER_INPUT"},
-			})
-			return nil, nil
-		}
-		if _, ok := seen[cartItem.ItemID]; ok {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    fmt.Sprintf("bad request: duplicate itemId %s in checkout payload", cartItem.ItemID),
-				Extensions: map[string]interface{}{"code": "BAD_USER_INPUT"},
-			})
-			return nil, nil
-		}
-		seen[cartItem.ItemID] = struct{}{}
-
-		var row checkoutInventoryRow
-		err = tx.QueryRow(ctx, `
-			SELECT id, item_name, cost_price, selling_price, stock_quantity
-			FROM inventory_items
-			WHERE id = $1 AND shop_id = $2
-			FOR UPDATE
-		`, cartItem.ItemID, input.ShopID).Scan(
-			&row.ID,
-			&row.ItemName,
-			&row.CostPrice,
-			&row.SellingPrice,
-			&row.StockQuantity,
-		)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				graphql.AddError(ctx, &gqlerror.Error{
-					Message:    fmt.Sprintf("not found: inventory item %s does not exist in this shop", cartItem.ItemID),
-					Extensions: map[string]interface{}{"code": "NOT_FOUND"},
-				})
-				return nil, nil
-			}
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "internal server error: checkout item verification failure",
-				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
-			})
-			return nil, nil
-		}
-
-		if row.StockQuantity < cartItem.Quantity {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    fmt.Sprintf("insufficient stock: %s only has %d remaining", row.ItemName, row.StockQuantity),
-				Extensions: map[string]interface{}{"code": "BAD_USER_INPUT"},
-			})
-			return nil, nil
-		}
-
-		inventoryByID[cartItem.ItemID] = row
-	}
-
-	var totalItems int
-	var totalCost float64
-	var grossSale float64
-	for _, cartItem := range input.Items {
-		row := inventoryByID[cartItem.ItemID]
-		totalItems += cartItem.Quantity
-		totalCost += row.CostPrice * float64(cartItem.Quantity)
-		grossSale += row.SellingPrice * float64(cartItem.Quantity)
-	}
-	grossProfit := grossSale - totalCost
-
-	var batchID string
-	var soldAt time.Time
-	err = tx.QueryRow(ctx, `
-		INSERT INTO checkout_batches (shop_id, sold_at, total_items, total_cost, gross_sale, gross_profit)
-		VALUES ($1, NOW(), $2, $3, $4, $5)
-		RETURNING id, sold_at
-	`, input.ShopID, totalItems, totalCost, grossSale, grossProfit).Scan(&batchID, &soldAt)
+	batch, err := utils.BuildCheckoutBatch(ctx, tx, input)
 	if err != nil {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to create checkout batch",
-			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
-		})
+		utils.AddHistoryGraphQLError(ctx, err)
 		return nil, nil
-	}
-
-	batchItems := make([]*model.CheckoutBatchItem, 0, len(input.Items))
-	for _, cartItem := range input.Items {
-		row := inventoryByID[cartItem.ItemID]
-		lineCostTotal := row.CostPrice * float64(cartItem.Quantity)
-		lineSaleTotal := row.SellingPrice * float64(cartItem.Quantity)
-
-		var batchItemID string
-		err = tx.QueryRow(ctx, `
-			INSERT INTO checkout_batch_items (
-				checkout_batch_id, inventory_item_id, item_name, quantity,
-				cost_price, selling_price, line_cost_total, line_sale_total
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			RETURNING id
-		`, batchID, row.ID, row.ItemName, cartItem.Quantity, row.CostPrice, row.SellingPrice, lineCostTotal, lineSaleTotal).Scan(&batchItemID)
-		if err != nil {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "internal server error: failed to record checkout batch item",
-				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
-			})
-			return nil, nil
-		}
-
-		_, err = tx.Exec(ctx, `
-			UPDATE inventory_items
-			SET stock_quantity = stock_quantity - $1, updated_at = NOW()
-			WHERE id = $2
-		`, cartItem.Quantity, row.ID)
-		if err != nil {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "internal server error: failed to update inventory stock",
-				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
-			})
-			return nil, nil
-		}
-
-		batchItems = append(batchItems, &model.CheckoutBatchItem{
-			ID:              batchItemID,
-			InventoryItemID: row.ID,
-			ItemName:        row.ItemName,
-			Quantity:        cartItem.Quantity,
-			CostPrice:       row.CostPrice,
-			SellingPrice:    row.SellingPrice,
-			LineCostTotal:   lineCostTotal,
-			LineSaleTotal:   lineSaleTotal,
-		})
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -1045,16 +943,7 @@ func (r *mutationResolver) CheckoutCart(ctx context.Context, input model.Checkou
 		return nil, nil
 	}
 
-	return &model.CheckoutBatch{
-		ID:          batchID,
-		ShopID:      input.ShopID,
-		SoldAt:      soldAt.Format(time.RFC3339),
-		TotalItems:  totalItems,
-		TotalCost:   totalCost,
-		GrossSale:   grossSale,
-		GrossProfit: grossProfit,
-		Items:       batchItems,
-	}, nil
+	return batch, nil
 }
 
 // GetMyShops is the resolver for the getMyShops field.
@@ -1394,6 +1283,126 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 		Items:       items,
 		TotalCount:  int(totalCount),
 		HasNextPage: hasNextPage,
+	}, nil
+}
+
+func (r *queryResolver) GetCheckoutHistory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedCheckoutBatches, error) {
+	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
+	if err := utils.EnsureShopOwnership(ctx, r.Resolver.DB, shopID, currentUser.ID); err != nil {
+		utils.AddHistoryGraphQLError(ctx, err)
+		return nil, nil
+	}
+
+	var totalCount int64
+	err := r.Resolver.DB.QueryRow(ctx, "SELECT COUNT(*) FROM checkout_batches WHERE shop_id = $1", shopID).Scan(&totalCount)
+	if err != nil {
+		graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: checkout history count failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+		return nil, nil
+	}
+
+	rows, err := r.Resolver.DB.Query(ctx, `
+		SELECT id, shop_id, sold_at, total_items, total_cost, gross_sale, gross_profit
+		FROM checkout_batches
+		WHERE shop_id = $1
+		ORDER BY sold_at DESC
+		LIMIT $2 OFFSET $3
+	`, shopID, limit, offset)
+	if err != nil {
+		graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: checkout history retrieval failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+		return nil, nil
+	}
+	defer rows.Close()
+
+	batches := []*model.CheckoutBatch{}
+	for rows.Next() {
+		var batch model.CheckoutBatch
+		var soldAt time.Time
+		if err := rows.Scan(&batch.ID, &batch.ShopID, &soldAt, &batch.TotalItems, &batch.TotalCost, &batch.GrossSale, &batch.GrossProfit); err != nil {
+			log.Printf("checkout history decode failure: %v", err)
+			graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: checkout history decode failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+			return nil, nil
+		}
+		batch.SoldAt = soldAt.Format(time.RFC3339)
+
+		itemRows, err := r.Resolver.DB.Query(ctx, `
+			SELECT id, inventory_item_id, item_name, quantity, cost_price, selling_price, line_cost_total, line_sale_total
+			FROM checkout_batch_items
+			WHERE checkout_batch_id = $1
+			ORDER BY item_name ASC
+		`, batch.ID)
+		if err != nil {
+			graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: checkout item history retrieval failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+			return nil, nil
+		}
+
+		items := []*model.CheckoutBatchItem{}
+		for itemRows.Next() {
+			var item model.CheckoutBatchItem
+			if err := itemRows.Scan(&item.ID, &item.InventoryItemID, &item.ItemName, &item.Quantity, &item.CostPrice, &item.SellingPrice, &item.LineCostTotal, &item.LineSaleTotal); err != nil {
+				itemRows.Close()
+				log.Printf("checkout item history decode failure: %v", err)
+				graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: checkout item history decode failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+				return nil, nil
+			}
+			items = append(items, &item)
+		}
+		itemRows.Close()
+		batch.Items = items
+		batches = append(batches, &batch)
+	}
+
+	return &model.PaginatedCheckoutBatches{
+		Batches:     batches,
+		TotalCount:  int(totalCount),
+		HasNextPage: int64(offset+limit) < totalCount,
+	}, nil
+}
+
+// GetItemActionHistory is the resolver for the getItemActionHistory field.
+func (r *queryResolver) GetItemActionHistory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedItemActionHistory, error) {
+	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
+	if err := utils.EnsureShopOwnership(ctx, r.Resolver.DB, shopID, currentUser.ID); err != nil {
+		utils.AddHistoryGraphQLError(ctx, err)
+		return nil, nil
+	}
+
+	var totalCount int64
+	err := r.Resolver.DB.QueryRow(ctx, "SELECT COUNT(*) FROM item_action_history WHERE shop_id = $1", shopID).Scan(&totalCount)
+	if err != nil {
+		graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: item history count failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+		return nil, nil
+	}
+
+	rows, err := r.Resolver.DB.Query(ctx, `
+		SELECT id, shop_id, inventory_item_id, item_name, action, quantity, created_at
+		FROM item_action_history
+		WHERE shop_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`, shopID, limit, offset)
+	if err != nil {
+		graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: item history retrieval failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+		return nil, nil
+	}
+	defer rows.Close()
+
+	records := []*model.ItemActionHistory{}
+	for rows.Next() {
+		var record model.ItemActionHistory
+		var createdAt time.Time
+		if err := rows.Scan(&record.ID, &record.ShopID, &record.InventoryItemID, &record.ItemName, &record.Action, &record.Quantity, &createdAt); err != nil {
+			log.Printf("item history decode failure: %v", err)
+			graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: item history decode failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
+			return nil, nil
+		}
+		record.Date = createdAt.Format(time.RFC3339)
+		records = append(records, &record)
+	}
+
+	return &model.PaginatedItemActionHistory{
+		Records:     records,
+		TotalCount:  int(totalCount),
+		HasNextPage: int64(offset+limit) < totalCount,
 	}, nil
 }
 

@@ -5,6 +5,7 @@ import { Login } from '../pages/Login';
 import { Layout } from './Layout/Layout';
 import { Home, MyShops, ProfilePage, ScanPage, ShopDetailDashboard } from '../pages';
 import { InventoryPage } from '~/pages/my-shops/id/Inventory';
+import { SalesHistoryPage } from '~/pages/my-shops/id/SalesHistory';
 
 const ProtectedRouteGuard = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -33,6 +34,7 @@ export const App = () => {
             {/* ADDED: Dynamic unprotected route for individual shop dashboards */}
             <Route path="/my-shops/:id" element={<ShopDetailDashboard />} />
             <Route path="/my-shops/:shopId/inventory" element={<InventoryPage />} />
+            <Route path="/my-shops/:shopId/sales-history" element={<SalesHistoryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/scan" element={<ScanPage />} />
           </Route>
