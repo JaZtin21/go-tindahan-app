@@ -14,6 +14,7 @@ import { useMutation } from '@apollo/client/react';
 import { DELETE_SHOP_MUTATION } from '~/api/graphql';
 import { Check, TriangleAlert, X } from 'lucide-react';
 import { deleteShop as deleteShopAction } from '~/store/myShopsSlice';
+import { useMyShops, useDeleteShop } from "~/api/queries";
 
 interface GetMyShopsResponse {
     getMyShops: {
@@ -28,16 +29,14 @@ export const MyShops: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const isAddShopModalOpen = useSelector((state: RootState) => state.ui.isAddShopModalOpen);
+    const isSubscribed = false
 
     // PAGINATION SETUP: 10 items per page limit matrix footprint
     const PAGE_LIMIT = 10;
     const [offset, setOffset] = useState<number>(0);
 
     // 1. RUN APOLLO FETCH QUERY (Types inferred automatically via type inference)
-    const { loading: isLoading, error, data } = useQuery(GET_MY_SHOPS_QUERY, {
-        variables: { limit: PAGE_LIMIT, offset: offset },
-        fetchPolicy: 'cache-and-network',
-    }) as { loading: boolean; error: any; data: GetMyShopsResponse | undefined };
+    const { loading: isLoading, error, data } = useMyShops({ limit: PAGE_LIMIT, offset, isSubscribed: false });
 
     // 2. READ DIRECTLY FROM REDUX STORAGE CACHE FOR VIEW TRANSFORMS
     const loadedShops = useSelector((state: RootState) => state.myShops.shops);
@@ -85,8 +84,9 @@ export const MyShops: React.FC = () => {
     const [modalMessage, setModalMessage] = useState('');
 
     // Import the Apollo client mutation hook
-    const [deleteShop, { loading: isDeleting }] = useMutation(DELETE_SHOP_MUTATION, {
+    const [deleteShop, { loading: isDeleting }] = useDeleteShop({
         // Optional: Refetch your shops list query or update Apollo cache here
+        isSubscribed: isSubscribed,
         refetchQueries: ['GetShops'],
         onCompleted: () => {
             // Reuse your existing modal helper to show success

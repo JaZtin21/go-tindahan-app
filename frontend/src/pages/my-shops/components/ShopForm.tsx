@@ -9,6 +9,7 @@ import { addShop, updateShop } from '~/store/myShopsSlice';
 import { setAddShopModalOpen } from '~/store/uiSlice';
 import { Modal } from "~/components";
 import { Check, X } from 'lucide-react';
+import { useCreateShop, useUpdateShop } from '~/api/queries';
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400';
 
@@ -37,6 +38,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const isSubscribed = false
 
 
     const openModal = ({ isSuccess, type, error }: { isSuccess: boolean, type: string, error?: string }) => {
@@ -80,7 +82,8 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     const dispatch = useDispatch();
 
     // CREATE MUTATION HANDLER
-    const [createShop, { loading: createLoading }] = useMutation(CREATE_SHOP_MUTATION, {
+    const [createShop, { loading: createLoading }] = useCreateShop({
+        isSubscribed: isSubscribed, // wherever this flag comes from in your component/context
         onCompleted: (res: any) => {
             console.log('res this shop', res);
             dispatch(addShop(res.createShop));
@@ -93,7 +96,8 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     });
 
     // UPDATE MUTATION HANDLER
-    const [updateShopMutation, { loading: isMutationLoading }] = useMutation(UPDATE_SHOP_MUTATION, {
+    const [updateShopMutation, { loading: isMutationLoading }] = useUpdateShop({
+        isSubscribed: isSubscribed,
         onCompleted: (res: any) => {
             if (res?.updateShop) {
                 dispatch(updateShop(res.updateShop));
@@ -265,6 +269,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
 
             updateShopMutation({
                 variables: {
+                    shopId: shop?.id || '',
                     input: updateInput
                 }
             });

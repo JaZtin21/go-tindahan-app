@@ -1,7 +1,4 @@
-export interface Discount {
-  percentage?: number;
-  validUntil?: string;
-}
+
 
 export interface Item {
   id: string;

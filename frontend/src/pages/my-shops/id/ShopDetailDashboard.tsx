@@ -30,6 +30,7 @@ import { GET_SHOP_BY_ID_QUERY, GET_SHOP_DASHBOARD_METRICS_QUERY } from '~/api/gr
 import { updateShop } from '~/store/myShopsSlice';
 import Checkout from './Checkout';
 import Restock from './Restock';
+import { useShopById, useShopDashboardMetrics } from "~/api/queries";
 
 
 // ... Keep SHOP_METRICS mock data exactly the same ...
@@ -64,11 +65,13 @@ const SHOP_METRICS = {
     ]
 };
 export const ShopDetailDashboard = () => {
+
     const { id } = useParams<{ id: string }>();
     const shopId = id || "1";
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const isAddShopModalOpen = useSelector((state: RootState) => state.ui.isAddShopModalOpen);
+    const isSubscribed = false
 
     const shop = useSelector((state: RootState) =>
         state.myShops.shops.find((s: Shop) => s.id === id)
@@ -77,16 +80,17 @@ export const ShopDetailDashboard = () => {
     console.log(shop, 'this is shop');
 
     // 2. RUN STANDALONE FALLBACK QUERY (Skips network roundtrips if shop is already cached in Redux)
-    const { loading: isLoading, data, error } = useQuery(GET_SHOP_BY_ID_QUERY, {
-        variables: { shopId: shopId },
-        skip: !id || !!shop, // 💡 True security guard optimization bypass
-        fetchPolicy: 'no-cache' // Pure utility strategy to directly mirror database states
-    }) as { loading: boolean; error: any; data: { getShopById: Shop } | undefined };
+    const { loading: isLoading, data, error } = useShopById(
+        shopId,
+        shop,
+        isSubscribed
+    )
 
-    const { data: metrics, loading: metricsLoading, error: metricsError } = useQuery(
-        GET_SHOP_DASHBOARD_METRICS_QUERY,
-        { variables: { shopId: shopId } }
-    ) as { data: { getShopDashboardMetrics: any }; loading: boolean; error: any; };
+    const { data: metrics, loading: metricsLoading, error: metricsError } = useShopDashboardMetrics(
+        shopId,
+        isSubscribed
+    )
+
 
     console.log(metrics, 'this is metrics');
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from "~/components";
 import { useParams } from 'react-router-dom';
-import { useLazyQuery, useMutation } from '@apollo/client/react';
 import { SEARCH_SHOP_PRODUCTS_QUERY, DECREMENT_STOCK_MUTATION } from '~/api/graphql';
 import { Check, X, ChevronLeft, Search, ShoppingCart, Trash2, Image as ImageIcon } from 'lucide-react';
 import { ManualRestockTab, RestockScannerTab } from '../components';
