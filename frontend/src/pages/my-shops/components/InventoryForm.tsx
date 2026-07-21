@@ -385,7 +385,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             />
                                         </div>
                                         <div className="flex flex-col gap-1 text-left">
-                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
+                                            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Measurement (1g,1kg, 12pcs etc)</label>
                                             <input
                                                 type="text"
                                                 value={formData.unitOfMeasure}
@@ -533,7 +533,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     />
                                                 </div>
                                                 <div className="flex flex-col gap-1 text-left">
-                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Unit of Measure (1g,1kg, 12pcs etc)</label>
+                                                    <label className="text-xs font-semibold text-[var(--color-text-sub)]">Measurement (1g,1kg, 12pcs etc)</label>
                                                     <input
                                                         type="text"
                                                         value={formData.unitOfMeasure}

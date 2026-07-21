@@ -6,6 +6,7 @@ import { ImageIcon, Plus, Minus, ChevronDown } from 'lucide-react';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSearchShopProducts } from '~/api/queries';
 
 
 interface ManualSearchTabProps {
@@ -23,13 +24,12 @@ export const ManualSearchTab = ({ shopId, updateCart }: ManualSearchTabProps) =>
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
 
+    const isSubscribed = true;
     // 🚀 Stores all alternative items sharing the exact same name
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
     const [showUnitDropdown, setShowUnitDropdown] = useState(false);
 
-    const [searchProducts] = useLazyQuery(SEARCH_SHOP_PRODUCTS_QUERY, {
-        fetchPolicy: 'network-only',
-    });
+    const [searchProducts] = useSearchShopProducts(isSubscribed);
 
     const runSearch = (text: string) => {
         if (!shopId || !text.trim()) {
@@ -304,7 +304,7 @@ export const ManualSearchTab = ({ shopId, updateCart }: ManualSearchTabProps) =>
 
                 {/* 🚀 Clickable Unit of Measure Dropdown Selection Component */}
                 <div className="relative flex flex-col gap-1.5 w-full">
-                    <label className="block text-sm font-semibold text-text-sub">Unit of Measure</label>
+                    <label className="block text-sm font-semibold text-text-sub">Measurement (1g,1kg, 12pcs etc)</label>
                     <button
                         type="button"
                         disabled={!selectedProduct || groupedProducts.length <= 1}

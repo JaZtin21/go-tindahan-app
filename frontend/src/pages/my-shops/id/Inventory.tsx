@@ -309,7 +309,7 @@ export const InventoryPage = () => {
                                 <th className="pb-3 text-right pr-4">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border-sub/20 text-sm font-medium">
+                        <tbody className=" text-sm font-medium">
                             {tableLoading && (
                                 <tr>
                                     <td colSpan={6} className="text-center py-8">
@@ -328,7 +328,7 @@ export const InventoryPage = () => {
                                 </tr>
                             )}
                             {!tableLoading && inventoryItems.map((item: Item) => (
-                                <tr key={item.id} className="hover:bg-item-hover/30 transition-colors h-14">
+                                <tr key={item.id} className="hover:bg-item-hover/50 transition-colors h-14">
                                     <td className="pl-2 font-bold text-text-main truncate max-w-[150px]">{item.itemName}</td>
                                     <td className="text-text-main font-semibold">{item.unitOfMeasure ? item.unitOfMeasure : '--'}</td>
 

@@ -406,20 +406,36 @@ export function useShopInventory(opts: {
 // ---- 3. useSearchShopProducts (SEARCH_SHOP_PRODUCTS_QUERY) ----
 export function useSearchShopProducts(isSubscribed: boolean) {
     const store = useStore() as Store;
-    const [result, setResult] = useState<{ loading: boolean; error: any; data?: any }>({ loading: false, error: null });
+    const [result, setResult] = useState<{ loading: boolean; error: any; data?: any }>({
+        loading: false,
+        error: null
+    });
 
     const search = useCallback(
-        async (options: { variables: { shopId: string; query: string } }) => {
-            const { shopId, query } = options.variables;
+        async (options: {
+            variables: {
+                shopId: string;
+                query: string;
+                limit: number;   // 🚀 1. ENFORCED IN TYPES
+                offset: number;  // 🚀 1. ENFORCED IN TYPES
+            }
+        }) => {
+            // 🚀 2. Extract limit and offset from variables
+            const { shopId, query, limit, offset } = options.variables;
 
             if (!isSubscribed) {
                 const re = new RegExp(query, 'i');
                 const inventoryTable = store.getTable('inventory');
-                const results = Object.entries(inventoryTable)
+
+                const allResults = Object.entries(inventoryTable)
                     .filter(([, row]: any) => !row._deleted)
                     .map(([id, row]) => fromItemRow(id, row))
                     .filter((i) => i.shopId === shopId && re.test(i.itemName));
-                const data = { searchShopProducts: results };
+
+                // 🚀 3. ENFORCED OFFLINE: Apply slice using offset and limit variables
+                const slicedResults = allResults.slice(offset, offset + limit);
+
+                const data = { searchShopProducts: slicedResults };
                 setResult({ loading: false, error: null, data });
                 return { data };
             }
@@ -428,7 +444,13 @@ export function useSearchShopProducts(isSubscribed: boolean) {
             try {
                 const { data } = await client.query({
                     query: SEARCH_SHOP_PRODUCTS_QUERY,
-                    variables: { shopId, query },
+                    // 🚀 4. ENFORCED ONLINE: Pass everything cleanly down to Go backend
+                    variables: {
+                        shopId,
+                        query,
+                        limit,
+                        offset
+                    },
                     fetchPolicy: 'no-cache',
                 });
                 setResult({ loading: false, error: null, data });
@@ -443,6 +465,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
 
     return [search, result] as const;
 }
+
 
 // ---- 4. useCheckoutHistory (GET_CHECKOUT_HISTORY_QUERY) ----
 export function useCheckoutHistory(opts: {

@@ -484,7 +484,7 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
 
                             {/* Clickable Unit of Measure Selector Menu */}
                             <div className="relative flex flex-col gap-1 w-full">
-                                <label className="block text-xs font-semibold text-text-sub">Unit of Measure</label>
+                                <label className="block text-xs font-semibold text-text-sub">Measurement (1g,1kg, 12pcs etc)</label>
                                 <button type="button" disabled={groupedProducts.length <= 1} onClick={() => setShowUnitDropdown(!showUnitDropdown)} onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)} className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-70" >
                                     <span className="truncate">
                                         {selectedProduct.unitOfMeasure || 'Not specified'}
