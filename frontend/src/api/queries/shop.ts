@@ -895,12 +895,19 @@ export function useUpdateShop(opts: MutationCallbacks) {
 }
 
 // ---- useAddInventoryItem ----
+// FIX: the offline branch used to pass options.variables.input straight into
+// toItemRow(), which only keeps `photo` when it's already a string
+// (`typeof item.photo === 'string' ? item.photo : ''`). A freshly-picked
+// File was silently discarded, so newly-added offline items always saved
+// with no photo — invisible until you looked at the edit form. Now we
+// convert the File to a storable base64 string first, same pattern as
+// useCreateShop.
 export function useAddInventoryItem(opts: MutationCallbacks) {
     const store = useStore() as Store;
     const { loading, setLoading } = useMutationState();
 
     const addInventoryItem = useCallback(
-        async (options: { variables: { input: Partial<Item> } }) => {
+        async (options: { variables: { input: Partial<Item> & { photo?: File | string | null } } }) => {
             setLoading(true);
             try {
                 if (opts.isSubscribed) {
@@ -917,7 +924,11 @@ export function useAddInventoryItem(opts: MutationCallbacks) {
                     opts.onCompleted?.(data);
                 } else {
                     const id = crypto.randomUUID();
-                    const row = { ...toItemRow(options.variables.input), _dirty: true, _serverSynced: false, _deleted: false };
+                    const input: any = { ...options.variables.input };
+                    if (input.photo instanceof File) {
+                        input.photo = await fileToStorableBase64(input.photo);
+                    }
+                    const row = { ...toItemRow(input), _dirty: true, _serverSynced: false, _deleted: false };
                     store.setRow('inventory', id, row);
                     opts.onCompleted?.({ addInventoryItem: fromItemRow(id, row) });
                 }
@@ -934,16 +945,29 @@ export function useAddInventoryItem(opts: MutationCallbacks) {
 }
 
 // ---- useUpdateInventoryItem ----
-// NOTE: if your inventory item form has the same photo/newPhoto split as
-// ShopForm, check it for the same bug that useUpdateShop had — this hook's
-// offline branch currently expects Partial<Item>, which per your types
-// only has a single `photo` field, so it may not apply here. Worth a look.
+// FIX (two bugs):
+//  1. Photo: same File-dropping issue as useAddInventoryItem — plus this
+//     hook now honors `newPhoto` (a File, sent when the user picks a new
+//     photo while editing) the same way useUpdateShop does. If neither
+//     `newPhoto` nor `photo` is present in the input (user didn't touch the
+//     photo field at all), we keep whatever the item already had instead of
+//     wiping it.
+//  2. shopId clobbering (the "item disappears after save" bug): toItemRow()
+//     defaults shopId to '' when it's not present on the input — and the
+//     edit form's payload never includes shopId. Since `{ ...existing,
+//     ...toItemRow(input) }` spreads toItemRow's result AFTER existing, that
+//     '' was overwriting the item's real shopId, so useShopInventory's
+//     `i.shopId === shopId` filter stopped matching and the item vanished
+//     from the list (it was never actually deleted). Fix: always resolve
+//     shopId from `existing` unless the input explicitly overrides it.
 export function useUpdateInventoryItem(opts: MutationCallbacks) {
     const store = useStore() as Store;
     const { loading, setLoading } = useMutationState();
 
     const updateInventoryItem = useCallback(
-        async (options: { variables: { itemId: string; input: Partial<Item> } }) => {
+        async (options: {
+            variables: { itemId: string; input: Partial<Item> & { photo?: File | string | null; newPhoto?: File | null } };
+        }) => {
             setLoading(true);
             try {
                 if (opts.isSubscribed) {
@@ -964,7 +988,29 @@ export function useUpdateInventoryItem(opts: MutationCallbacks) {
                 } else {
                     const existing = store.getRow('inventory', options.variables.itemId);
                     if (!existing || Object.keys(existing).length === 0) throw new Error('Item not found locally');
-                    const merged = { ...existing, ...toItemRow(options.variables.input), _dirty: true };
+
+                    const input: any = { ...options.variables.input };
+
+                    if (input.newPhoto instanceof File) {
+                        input.photo = await fileToStorableBase64(input.newPhoto);
+                    } else if (input.photo instanceof File) {
+                        input.photo = await fileToStorableBase64(input.photo);
+                    } else if (input.photo === undefined && input.newPhoto === undefined) {
+                        // Field genuinely absent from this call (caller didn't send it
+                        // at all) — keep the existing photo instead of letting
+                        // toItemRow() default it to ''.
+                        // IMPORTANT: this is NOT the same as input.photo === '' — an
+                        // explicit empty string means the user actively removed the
+                        // photo and it must be cleared, not restored.
+                        input.photo = existing.photo;
+                    }
+                    delete input.newPhoto;
+
+                    const merged = {
+                        ...existing,
+                        ...toItemRow({ ...input, shopId: input.shopId ?? (existing.shopId as string) }),
+                        _dirty: true,
+                    };
                     store.setRow('inventory', options.variables.itemId, merged);
                     opts.onCompleted?.({ updateInventoryItem: fromItemRow(options.variables.itemId, merged) });
                 }

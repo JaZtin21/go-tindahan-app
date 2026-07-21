@@ -43,6 +43,26 @@ function splitPhotoForUpdate(photo: string): { photo?: string; newPhoto?: File }
     return { photo: photo || undefined }; // already a real URL — keep it as-is
 }
 
+// -------------------------------------------------------------------------
+// ERROR CLASSIFICATION — "not found" / "lookup failure" errors mean the
+// server's truth permanently disagrees with our local copy (the parent
+// record was deleted server-side, possibly from another device/tab).
+// These are NOT transient — retrying forever just wedges the sync queue.
+// We detect them so the caller can drop the local row instead of leaving
+// it `_dirty` forever.
+// -------------------------------------------------------------------------
+function isNotFoundError(err: any): boolean {
+    const messages: string[] = [];
+    if (err?.message) messages.push(String(err.message));
+    if (Array.isArray(err?.errors)) {
+        for (const e of err.errors) if (e?.message) messages.push(String(e.message));
+    }
+    if (Array.isArray((err as any)?.graphQLErrors)) {
+        for (const e of (err as any).graphQLErrors) if (e?.message) messages.push(String(e.message));
+    }
+    return messages.some((m) => /not found/i.test(m) || /lookup failure/i.test(m) || /does not exist/i.test(m));
+}
+
 // Walks every page of a paginated query using the response's `totalCount`
 // to know exactly when to stop.
 async function fetchAllPages<T>(
@@ -68,8 +88,12 @@ async function fetchAllPages<T>(
 // SHOPS
 // =========================================================================
 
-export async function pushLocalShops(store: Store) {
+// Returns the set of shop ids that were found to no longer exist server-side
+// during this push, so pushLocalInventory can cascade-drop their items
+// instead of trying (and failing) to push them too.
+export async function pushLocalShops(store: Store): Promise<Set<string>> {
     const shops = store.getTable('shops');
+    const orphanedShopIds = new Set<string>();
 
     for (const [id, row] of Object.entries(shops) as [string, any][]) {
         if (!row._dirty) continue;
@@ -77,7 +101,12 @@ export async function pushLocalShops(store: Store) {
         try {
             if (row._deleted) {
                 if (row._serverSynced) {
-                    await client.mutate({ mutation: DELETE_SHOP_MUTATION, variables: { shopId: id } });
+                    try {
+                        await client.mutate({ mutation: DELETE_SHOP_MUTATION, variables: { shopId: id } });
+                    } catch (err) {
+                        if (!isNotFoundError(err)) throw err;
+                        // Already gone server-side — that's the outcome we wanted anyway.
+                    }
                 }
                 store.delRow('shops', id);
                 continue;
@@ -122,9 +151,21 @@ export async function pushLocalShops(store: Store) {
                 }
             }
         } catch (err) {
+            if (row._serverSynced && isNotFoundError(err)) {
+                // Server no longer has this shop (deleted elsewhere, e.g. another
+                // device). Server wins: stop retrying, remove locally, and record it
+                // so dependent inventory items get cleaned up too instead of failing
+                // forever with "shop lookup failure".
+                console.warn(`Shop ${id} no longer exists server-side — removing locally.`);
+                store.delRow('shops', id);
+                orphanedShopIds.add(id);
+                continue;
+            }
             console.error(`Failed to push shop ${id} — left dirty, will retry next sync:`, err);
         }
     }
+
+    return orphanedShopIds;
 }
 
 export async function pullCloudShops(store: Store) {
@@ -184,16 +225,35 @@ export async function pullCloudShops(store: Store) {
 // INVENTORY
 // =========================================================================
 
-export async function pushLocalInventory(store: Store) {
+// `orphanedShopIds` = shops we just discovered are gone server-side during
+// this same sync pass (from pushLocalShops above). We also independently
+// check each item's shop against the local `shops` table, since a shop can
+// be missing locally from an earlier sync too (e.g. pullCloudShops already
+// removed it) — either way, an item with no parent shop can never push
+// successfully, so there's no point trying.
+export async function pushLocalInventory(store: Store, orphanedShopIds: Set<string> = new Set()) {
     const inventory = store.getTable('inventory');
 
     for (const [id, row] of Object.entries(inventory) as [string, any][]) {
         if (!row._dirty) continue;
 
+        const shopRow = store.getRow('shops', row.shopId);
+        const shopMissing = orphanedShopIds.has(row.shopId) || !shopRow || Object.keys(shopRow).length === 0;
+        if (shopMissing) {
+            console.warn(`Inventory item ${id} belongs to a shop that no longer exists — removing locally.`);
+            store.delRow('inventory', id);
+            continue;
+        }
+
         try {
             if (row._deleted) {
                 if (row._serverSynced) {
-                    await client.mutate({ mutation: DELETE_INVENTORY_ITEM_MUTATION, variables: { itemId: id } });
+                    try {
+                        await client.mutate({ mutation: DELETE_INVENTORY_ITEM_MUTATION, variables: { itemId: id } });
+                    } catch (err) {
+                        if (!isNotFoundError(err)) throw err;
+                        // already gone server-side — fine, that's what we wanted
+                    }
                 }
                 store.delRow('inventory', id);
                 continue;
@@ -234,6 +294,14 @@ export async function pushLocalInventory(store: Store) {
                 }
             }
         } catch (err) {
+            if (row._serverSynced && isNotFoundError(err)) {
+                // Either the item itself, or (far more commonly, per your logs) its
+                // parent shop, was deleted server-side. Either way, retrying forever
+                // is pointless — drop the local row and move on.
+                console.warn(`Inventory item ${id} (or its shop) no longer exists server-side — removing locally.`);
+                store.delRow('inventory', id);
+                continue;
+            }
             console.error(`Failed to push inventory item ${id} — left dirty, will retry next sync:`, err);
         }
     }
@@ -333,6 +401,13 @@ export async function pushLocalCheckoutHistory(store: Store) {
                 });
             }
         } catch (err) {
+            if (isNotFoundError(err)) {
+                // Shop was deleted server-side — this sale can never be applied.
+                // Drop it rather than retrying forever.
+                console.warn(`Checkout batch ${id} references a shop that no longer exists — dropping it.`);
+                store.delRow('checkoutHistory', id);
+                continue;
+            }
             console.error(`Failed to push checkout ${id} — left dirty, will retry next sync:`, err);
             // NOTE: if this fails, stock was never decremented server-side for this
             // sale. It'll retry next sync. Don't re-queue it a second way in the
@@ -426,6 +501,11 @@ export async function pullCloudItemActionHistory(store: Store) {
 // marked dirty (see useCheckoutCart), specifically so pushLocalInventory
 // never re-sends a stock change that CheckoutCart is about to apply itself
 // — that would double-decrement.
+//
+// orphanedShopIds flows from pushLocalShops -> pushLocalInventory so that
+// inventory items belonging to a shop we just discovered is gone get
+// cascade-deleted locally instead of failing with "shop lookup failure"
+// and getting stuck _dirty forever.
 // =========================================================================
 let isSyncRunning = false;
 
@@ -436,9 +516,9 @@ export async function syncAll(store: Store): Promise<void> {
     }
     isSyncRunning = true;
     try {
-        await pushLocalShops(store);
+        const orphanedShopIds = await pushLocalShops(store);
         await pullCloudShops(store);
-        await pushLocalInventory(store);
+        await pushLocalInventory(store, orphanedShopIds);
         await pushLocalCheckoutHistory(store);
         await pullCloudInventory(store);
         await pullCloudCheckoutHistory(store);

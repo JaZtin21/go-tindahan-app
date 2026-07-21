@@ -203,23 +203,32 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
             sellingPrice: formData.sellingPrice,
             stockQuantity: formData.stockQuantity,
             reorderLevel: formData.reorderLevel,
-            photo: photo || null // 👈 FIXED: Passes down your native browser binary File object stream
         };
 
         try {
             if (isEdit) {
-                // 2. 🟢 EDIT BRANCH REFACTOR: Uses your specialized separate text/file fields
-                const updateInput: any = {
-                    ...mutationPayload,
-                    itemId: item.id, // Reads directly from your dynamic useParams parameter context
-                    photo: photoPreview?.startsWith('http') || photoPreview?.startsWith('res.cloudinary')
-                        ? photoPreview
-                        : "",
+                // 2. EDIT BRANCH: shopId intentionally NOT included here — it's
+                // resolved from the existing local row inside useUpdateInventoryItem
+                // (and from item.id -> server lookup when online), so we never risk
+                // clobbering it with an empty value.
+                //
+                // Photo handling, simplified:
+                //   - user picked a new file this session -> send it as `newPhoto`
+                //   - user didn't touch the photo, but one already exists -> pass
+                //     `photo` through unchanged (works whether it's a real URL or an
+                //     offline base64 data: URI — useUpdateInventoryItem/syncEngine
+                //     both already know how to handle either case)
+                //   - user explicitly removed the photo -> send '' to clear it
+                const updateInput: any = { ...mutationPayload, itemId: item.id };
 
-                    // 💡 Pass your native browser binary File object stream here as the upload scalar
-                    newPhoto: photo || null
-                    // Pass existing strings back normally (Pass null if cleared out to trigger cleanup!)
-                };
+                if (photo) {
+                    updateInput.newPhoto = photo;
+                } else if (photoPreview) {
+                    updateInput.photo = photoPreview;
+                } else {
+                    updateInput.photo = '';
+                }
+
                 updateInventoryItem({
                     variables: {
                         itemId: item.id,
@@ -228,7 +237,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 });
             } else {
                 await addInventoryItem({
-                    variables: { input: { ...mutationPayload, shopId: shopId } }
+                    variables: { input: { ...mutationPayload, shopId: shopId, photo: photo || null } }
                 });
             }
             // 👇 EXECUTE APOLLO MUTATION LAYER PIPELINE
