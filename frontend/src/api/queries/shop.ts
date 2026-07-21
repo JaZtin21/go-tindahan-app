@@ -350,9 +350,46 @@ export function useShopInventory(opts: {
             result = result.filter((i) => re.test(i.itemName));
         }
         if (sortBy) {
+            // Callers (e.g. InventoryPage's sortableColumns) pass snake_case keys
+            // like 'item_name' / 'cost_price' to match the backend's column naming,
+            // but Item/fromItemRow use camelCase (itemName, costPrice, ...). Map
+            // between the two here so a[key] actually resolves to a real field —
+            // without this, a[sortBy] is always undefined and the sort silently
+            // no-ops for every column.
+            const fieldMap: Record<string, keyof Item> = {
+                item_name: 'itemName',
+                itemName: 'itemName',
+                unit_of_measure: 'unitOfMeasure',
+                unitOfMeasure: 'unitOfMeasure',
+                category: 'category',
+                cost_price: 'costPrice',
+                costPrice: 'costPrice',
+                selling_price: 'sellingPrice',
+                sellingPrice: 'sellingPrice',
+                stock_quantity: 'stockQuantity',
+                stockQuantity: 'stockQuantity',
+                reorder_level: 'reorderLevel',
+                reorderLevel: 'reorderLevel',
+                updated_at: 'updatedAt',
+                updatedAt: 'updatedAt',
+            };
+            const field = fieldMap[sortBy] ?? (sortBy as keyof Item);
+
+            // Accept 'ASC'/'DESC' (what InventoryPage tracks) as well as
+            // lowercase, so direction actually flips instead of always
+            // evaluating to ascending.
+            const dir = String(sortOrder).toUpperCase() === 'DESC' ? -1 : 1;
+
             result = [...result].sort((a: any, b: any) => {
-                const dir = sortOrder === 'desc' ? -1 : 1;
-                return a[sortBy] > b[sortBy] ? dir : a[sortBy] < b[sortBy] ? -dir : 0;
+                const av = a[field];
+                const bv = b[field];
+                if (av == null && bv == null) return 0;
+                if (av == null) return 1; // nulls last, regardless of direction
+                if (bv == null) return -1;
+                if (typeof av === 'string' && typeof bv === 'string') {
+                    return dir * av.localeCompare(bv);
+                }
+                return av > bv ? dir : av < bv ? -dir : 0;
             });
         }
         return result;
