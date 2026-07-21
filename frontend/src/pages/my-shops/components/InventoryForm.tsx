@@ -199,10 +199,10 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
             barcode: formData.barcode,
             category: formData.category,
             unitOfMeasure: formData.unitOfMeasure,
-            costPrice: formData.costPrice,
-            sellingPrice: formData.sellingPrice,
-            stockQuantity: formData.stockQuantity,
-            reorderLevel: formData.reorderLevel,
+            costPrice: formData.costPrice ? Number(formData.costPrice) : 0,
+            sellingPrice: formData.sellingPrice ? Number(formData.sellingPrice) : 0,
+            stockQuantity: formData.stockQuantity ? Number(formData.stockQuantity) : 0,
+            reorderLevel: formData.reorderLevel ? Number(formData.reorderLevel) : 0,
         };
 
         try {
@@ -229,7 +229,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                     updateInput.photo = '';
                 }
 
-                updateInventoryItem({
+                await updateInventoryItem({
                     variables: {
                         itemId: item.id,
                         input: updateInput
