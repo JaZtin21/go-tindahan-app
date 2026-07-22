@@ -5,29 +5,29 @@ import { Product } from '~/types/item';
 import { ImageIcon, Plus, Minus, ChevronDown } from 'lucide-react';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
-import { on } from 'events';
+import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
+
+
 interface ManualSearchTabProps {
     shopId: string;
-    updateCart: () => void
 }
 
 let searchTimeoutId: ReturnType<typeof setTimeout>;
 
-export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) => {
+export const ManualRestockTab = ({ shopId }: ManualSearchTabProps) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const isSubscribed = false;
 
     // 🚀 Stores all alternative items sharing the exact same name
-    //const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
-    //const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+    const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
+    const [showUnitDropdown, setShowUnitDropdown] = useState(false);
 
-    const [searchProducts] = useLazyQuery(SEARCH_SHOP_PRODUCTS_QUERY, {
-        fetchPolicy: 'network-only',
-    });
+    const [searchProducts] = useSearchShopProducts(isSubscribed);
 
     const runSearch = (text: string) => {
         if (!shopId || !text.trim()) {
@@ -65,8 +65,8 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
         }
 
         // 🚀 Typing resets both grouping states completely
-        //setGroupedProducts([]);
-        //setShowUnitDropdown(false);
+        setGroupedProducts([]);
+        setShowUnitDropdown(false);
 
         clearTimeout(searchTimeoutId);
 
@@ -91,7 +91,7 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
         const matchingItems = searchResults.filter(
             (item) => item.itemName.toLowerCase() === product.itemName.toLowerCase()
         );
-        //setGroupedProducts(matchingItems);
+        setGroupedProducts(matchingItems);
 
         if (product.stockQuantity === 0) {
             setQuantity(0);
@@ -112,14 +112,40 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
     };
 
 
-    const [incrementStock, { loading: isIncrementing }] = useMutation(INCREMENT_STOCK_MUTATION, {
-        // Automatically refetch your dashboard charts so your "Capital Locked" ring updates live!
+    const [incrementStock, { loading: isIncrementing }] = useIncrementStock({
+        isSubscribed: isSubscribed,
         onCompleted: () => {
             setIsModalOpen(true);
             setIsSuccess(true);
-            setModalMessage('Stock updated successfully for' + ' ' + selectedProduct?.itemName);
+            setModalMessage(`Stock updated successfully for ${selectedProduct?.itemName}`);
+
+            console.log('why is this not logging ')
+            console.log('selectedProduct', selectedProduct);
+            // 2. Clear everything out only on a SUCCESSFUL network completion response
+            //setSelectedProduct(null);
+            //setSearchQuery('');
+            if (selectedProduct && quantity) {
+                const amountAdded = parseInt(quantity.toString(), 10);
+
+                setGroupedProducts((prevGrouped) =>
+                    prevGrouped.map((product) =>
+                        product.id === selectedProduct.id
+                            ? { ...product, stockQuantity: product.stockQuantity + amountAdded }
+                            : product
+                    )
+                );
+
+                // 🚀 OPTIONAL: Also update your primary selected product state 
+                // so the UI numbers change immediately on the screen!
+                setSelectedProduct((prevSelected) =>
+                    prevSelected
+                        ? { ...prevSelected, stockQuantity: prevSelected.stockQuantity + amountAdded }
+                        : null
+                );
+            }
+            setQuantity(1);
+            //setSearchResults([]);
         },
-        awaitRefetchQueries: true,
         onError: (err) => {
             setIsModalOpen(true);
             setIsSuccess(false);
@@ -128,6 +154,7 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
         }
     });
 
+    console.log('isLioading', isIncrementing, selectedProduct);
 
     const handleAddToCart = async () => {
         if (!selectedProduct || !quantity) return;
@@ -138,19 +165,10 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
             // 1. Fire the GraphQL mutation to update PostgreSQL stock rows
             await incrementStock({
                 variables: {
-                    input: {
-                        itemId: selectedProduct.id,
-                        quantityToAdd: parseInt(quantity.toString(), 10) // Force strict integer parsing
-                    }
+                    itemId: selectedProduct.id,
+                    amount: parseInt(quantity.toString(), 10)
                 }
             });
-
-            // 2. Clear everything out only on a SUCCESSFUL network completion response
-            setSelectedProduct(null);
-            setSearchQuery('');
-            setQuantity(1);
-            setSearchResults([]);
-            //setGroupedProducts([]);
 
             // Optional: Trigger your clean global toast success notification here!
             // toast.success(`Successfully added ${quantity} units to ${selectedProduct.itemName}`);
@@ -161,6 +179,10 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
         }
     };
 
+    const handleUnitSelect = (productVariant: Product) => {
+        setSelectedProduct(productVariant);
+        setShowUnitDropdown(false);
+    };
 
 
     const incrementQty = () => {
@@ -231,6 +253,8 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
                                     key={product.id}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
+
+                                        console.log('product selected', product);
                                         handleSelectProduct(product);
                                     }}
                                     className="w-full cursor-pointer text-left px-4 py-3 hover:bg-item-hover transition-colors border-b border-border-main last:border-b-0 flex items-center justify-between gap-4"
@@ -260,7 +284,44 @@ export const ManualRestockTab = ({ shopId, updateCart }: ManualSearchTabProps) =
                     )}
                 </div>
 
+                <div className="relative flex flex-col gap-1.5 w-full">
+                    <label className="block text-sm font-semibold text-text-sub">Measurement (1g,1kg, 12pcs etc)</label>
+                    <button
+                        type="button"
+                        disabled={!selectedProduct || groupedProducts.length <= 1}
+                        onClick={() => setShowUnitDropdown(!showUnitDropdown)}
+                        onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)}
+                        className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left focus:outline-none focus:border-brand-gold disabled:opacity-70"
+                    >
+                        <span className="truncate">
+                            {selectedProduct ? (selectedProduct.unitOfMeasure || 'Not specified') : '—'}
+                        </span>
+                        {selectedProduct && groupedProducts.length > 1 && (
+                            <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
+                        )}
+                    </button>
 
+                    {/* Unit Options Panel overlay */}
+                    {showUnitDropdown && groupedProducts.length > 0 && (
+                        <div className="absolute z-20 w-full top-full mt-1 border border-border-main rounded-lg shadow-md max-h-40 overflow-y-auto">
+                            {groupedProducts.map((variant) => (
+                                <button
+                                    key={variant.id}
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleUnitSelect(variant);
+                                    }}
+                                    className={`w-full bg-bg-primary text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors ${selectedProduct?.id === variant.id ? 'bg-item-hover font-semibold text-brand-gold' : ''
+                                        }`}
+                                >
+                                    {variant.unitOfMeasure || 'Not specified'}
+                                    <span className="text-sm text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 {/* Quantity to Buy Stepper Counter */}
                 <div className="flex flex-col gap-1.5">
                     <label className="block text-sm font-semibold text-text-sub">Quantity to Add</label>

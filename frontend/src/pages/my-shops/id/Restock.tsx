@@ -56,7 +56,7 @@ export default function Restock({ isOpen, onClose }: { isOpen: boolean, onClose:
                         </button>
                         <div className="flex-1 flex min-w-0  text-center self-center justify-center">
                             <h2 className="text-lg font-bold text-text-main leading-tight truncate">
-                                {activeTab === 'manual' ? 'Add Item' : 'Scan Product'}
+                                {activeTab === 'manual' ? 'Add Item Stock' : 'Scan Product'}
                             </h2>
                         </div>
                     </div>
@@ -78,11 +78,11 @@ export default function Restock({ isOpen, onClose }: { isOpen: boolean, onClose:
                     <div className="w-full bg-bg-primary flex-1 flex min-h-0 overflow-hidden relative">
                         {/* MANUAL SEARCH TAB */}
                         {activeTab === 'manual' && (
-                            <ManualRestockTab shopId={shopId || ""} updateCart={() => getCartItems(shopId || "")} />
+                            <ManualRestockTab shopId={shopId || ""} />
                         )}
                         {/* AI SCANNER TAB */}
                         {activeTab === 'scanner' && (
-                            <RestockScannerTab shopId={shopId || ""} updateCart={() => getCartItems(shopId || "")} />
+                            <RestockScannerTab shopId={shopId || ""} />
                         )}
 
                     </div>

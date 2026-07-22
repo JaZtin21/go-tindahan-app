@@ -1129,7 +1129,7 @@ export function useIncrementStock(opts: MutationCallbacks) {
                 setLoading(false);
             }
         },
-        [opts.isSubscribed, store]
+        [opts.isSubscribed, store, opts.onCompleted, opts.onError]
     );
 
     return [incrementStock, { loading }] as const;

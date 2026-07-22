@@ -1,21 +1,19 @@
 // Scanner Tab Component
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useLazyQuery } from '@apollo/client/react';
-import { SEARCH_SHOP_PRODUCTS_QUERY } from '~/api/graphql';
 import { Product } from '~/types/item';
 import { useDebounce } from '~/utils';
 import { ImageIcon, Minus, Plus, ChevronDown, Pencil, Sparkles } from 'lucide-react';
 import { ProductScannerCamera } from './ProductScannerCamera';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
+import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
 
 interface ScannerTabProps {
     shopId: string
-    updateCart: () => void
 }
 let searchTimeoutId: ReturnType<typeof setTimeout>;
-export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
+export function RestockScannerTab({ shopId }: ScannerTabProps) {
     // 🚀 Component States
     // 'camera'  -> live camera / viewfinder
     // 'result'  -> AI Result card shown over the captured image (NEW)
@@ -27,6 +25,7 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const isSubscribed = true;
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
@@ -38,9 +37,7 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
     const [showUnitDropdown, setShowUnitDropdown] = useState(false);
 
-    const [searchProducts] = useLazyQuery(SEARCH_SHOP_PRODUCTS_QUERY, {
-        fetchPolicy: 'network-only',
-    });
+    const [searchProducts] = useSearchShopProducts(isSubscribed);
 
     const runSearch = (text: string, isScannerCapture = false) => {
         if (!shopId || !text.trim()) {
@@ -174,91 +171,76 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setIsModalOpen(false);
     };
 
+    // 🚀 Same incrementStock mutation as ManualRestockTab. onCompleted branches on
+    // which step triggered it: the AI Result card resets straight back to the
+    // camera (ready for the next scan), the manual search form just clears itself.
+    const [incrementStock, { loading: isIncrementing }] = useIncrementStock({
+        isSubscribed: isSubscribed,
+        onCompleted: () => {
+            setIsModalOpen(true);
+            setIsSuccess(true);
+            setModalMessage(`Stock updated successfully for ${selectedProduct?.itemName}`);
 
-    const handleAddToCart = () => {
+            if (selectedProduct && quantity) {
+                const amountAdded = parseInt(quantity.toString(), 10);
+
+                setGroupedProducts((prevGrouped) =>
+                    prevGrouped.map((product) =>
+                        product.id === selectedProduct.id
+                            ? { ...product, stockQuantity: product.stockQuantity + amountAdded }
+                            : product
+                    )
+                );
+
+                // 🚀 OPTIONAL: Also update your primary selected product state 
+                // so the UI numbers change immediately on the screen!
+                setSelectedProduct((prevSelected) =>
+                    prevSelected
+                        ? { ...prevSelected, stockQuantity: prevSelected.stockQuantity + amountAdded }
+                        : null
+                );
+            }
+
+            /*if (scannerStep === 'result') {
+                setScannerStep('camera');
+                setCapturedImagePreview(null);
+                setPredictionConfidence(null);
+            }*/
+
+            //setSelectedProduct(null);
+            //setSearchQuery('');
+            setQuantity(1);
+            //setSearchResults([]);
+            //setGroupedProducts([]);
+        },
+        onError: (err) => {
+            setIsModalOpen(true);
+            setIsSuccess(false);
+            setModalMessage('Failed to update stock. Please try again.');
+            setErrorMessage(err.message);
+        }
+    });
+
+    // 🚀 Shared by both the manual search form's button and the AI Result card's
+    // button — both just fire the increment-stock mutation now.
+    const handleAddToCart = async () => {
         if (!selectedProduct || !quantity) return;
-
-        const storageKey = `cart_items_${shopId}`;
-        const existingCartRaw = localStorage.getItem(storageKey);
-        let currentCart: Array<{ product: Product; quantity: number }> = [];
 
         try {
-            if (existingCartRaw) {
-                currentCart = JSON.parse(existingCartRaw);
-            }
-        } catch (err) {
-            console.error("Failed to parse cart storage array:", err);
-        }
-
-        // Identify if the product asset is already added in local storage cache registers
-        const existingItem = currentCart.find((item) => item.product.id === selectedProduct.id);
-        const alreadyInCartQty = existingItem ? existingItem.quantity : 0;
-
-        // Calculate how many more items can safely be added before exceeding limits
-        const allowedRemainingQty = selectedProduct.stockQuantity - alreadyInCartQty;
-
-        // 🚀 STAGE LIMIT VALIDATION THROW: If the new amount exceeds what is left, trigger your exact modal parameters
-        if (Number(quantity) > allowedRemainingQty) {
-            setIsSuccess(false); // Triggers red X asset and drops title to "Error"
-            setModalMessage("Stock Limit Exceeded");
-            setErrorMessage(
-                `You cannot add ${quantity} units. You already have some in your cart, meaning there are only ${Math.max(0, allowedRemainingQty)} units remaining available to add.`
-            );
-            setIsModalOpen(true);
-            return; // ⚡ Bails immediately! Leaves form inputs, counters, and dropdown states completely un-wiped
-        }
-
-        // Proceed normally if validation criteria passes smoothly
-        const existingItemIndex = currentCart.findIndex((item) => item.product.id === selectedProduct.id);
-        if (existingItemIndex > -1) {
-            currentCart[existingItemIndex].quantity += Number(quantity);
-        } else {
-            currentCart.push({
-                product: selectedProduct,
-                quantity: Number(quantity)
+            await incrementStock({
+                variables: {
+                    itemId: selectedProduct.id,
+                    amount: parseInt(quantity.toString(), 10)
+                }
             });
+        } catch (err: any) {
+            console.error("Failed to execute inventory increment:", err.message);
         }
-
-        localStorage.setItem(storageKey, JSON.stringify(currentCart));
-        updateCart()
-        // Clear everything out only on a successful cart addition
-        setSelectedProduct(null);
-        setSearchQuery('');
-        setQuantity(1);
-        setSearchResults([]);
-        setGroupedProducts([]);
     };
 
-    // 🚀 NEW: Add-to-cart action triggered from the AI Result card (not the form).
-    // Adds the currently-selected (model-matched) product, then resets back to camera
-    // so the user is ready to scan the next item.
-    const handleAddFromResult = () => {
-        if (!selectedProduct || !quantity) return;
-
-        const wasSuccessfulAdd = (() => {
-            const storageKey = `cart_items_${shopId}`;
-            const existingCartRaw = localStorage.getItem(storageKey);
-            let currentCart: Array<{ product: Product; quantity: number }> = [];
-            try {
-                if (existingCartRaw) currentCart = JSON.parse(existingCartRaw);
-            } catch (err) {
-                console.error("Failed to parse cart storage array:", err);
-            }
-            const existingItem = currentCart.find((item) => item.product.id === selectedProduct.id);
-            const alreadyInCartQty = existingItem ? existingItem.quantity : 0;
-            const allowedRemainingQty = selectedProduct.stockQuantity - alreadyInCartQty;
-            return Number(quantity) <= allowedRemainingQty;
-        })();
-
-        handleAddToCart();
-
-        // Only return to the camera view if the add actually succeeded
-        // (handleAddToCart opens the stock-limit error modal and bails otherwise).
-        if (wasSuccessfulAdd) {
-            setScannerStep('camera');
-            setCapturedImagePreview(null);
-            setPredictionConfidence(null);
-        }
+    // 🚀 Add-to-stock action triggered from the AI Result card (not the form).
+    const handleAddFromResult = async () => {
+        await handleAddToCart();
     };
 
     // 🚀 NEW: Edit button on the AI Result card — this is the ONLY path from
@@ -280,7 +262,6 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setShowUnitDropdown(false);
     };
 
-
     const handleQuantityInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!selectedProduct) return;
 
@@ -300,14 +281,12 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
             return;
         }
 
-        // 🚀 MAX CEILING CHECK: Clamp the manual number strictly to the available database inventory limit
-        const validatedValue = Math.max(1, Math.min(selectedProduct.stockQuantity, parsedValue));
-        setQuantity(validatedValue);
+        setQuantity(parsedValue);
     };
 
     const incrementQty = () => {
         if (!selectedProduct) return;
-        setQuantity(prev => Math.min(selectedProduct.stockQuantity, Number(prev) + 1));
+        setQuantity(prev => Number(prev) + 1);
     };
 
     const decrementQty = () => {
@@ -361,24 +340,18 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                     {selectedProduct.unitOfMeasure && (
                                         <div className="flex flex-wrap gap-2 mt-1.5 mb-2 items-center">
                                             {groupedProducts.map((variant) => {
-                                                // Check if this capsule is the currently selected product variant
                                                 const isSelected = variant.id === selectedProduct.id;
-                                                // Check stock so users can't click dead stock variants
-                                                const isOutOfStock = variant.stockQuantity <= 0;
 
                                                 return (
                                                     <button
                                                         key={variant.id}
                                                         type="button"
-                                                        // Prevent clicking out-of-stock items unless it's somehow already selected
-                                                        disabled={isOutOfStock && !isSelected}
                                                         onClick={() => handleUnitSelect(variant)}
                                                         className={`px-3 py-1 text-xs tracking-wider font-semibold rounded-sm border transition-all cursor-pointer select-none
-                                                           ${isSelected && !isOutOfStock
+                                                           ${isSelected
                                                                 ? ' text-brand-gold border-brand-gold shadow-sm'
                                                                 : 'bg-bg-primary text-text-sub border-border-sub hover:border-brand-gold hover:text-text-main'
                                                             }
-                                                           ${isOutOfStock ? 'opacity-40 cursor-not-allowed line-through bg-item-hover' : ''}
                                                      `}
                                                     >
                                                         {variant.unitOfMeasure || 'Not specified'}
@@ -388,15 +361,19 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                         </div>
 
                                     )}
-                                    <span className="text-brand-green font-bold">₱{selectedProduct.sellingPrice.toFixed(2)}</span>
-                                    {/*predictionConfidence !== null && (
+                                    <span className="text-brand-green font-semibold text-sm">Current Stock: {selectedProduct.stockQuantity}</span>
+                                    {
+
+                                    /*
+                                    
+                                    predictionConfidence !== null && (
                                         <span className="text-xs text-green-600 font-medium">
                                             Confidence: {Math.round(predictionConfidence * 100)}%
                                         </span>
                                     )*/}
                                 </div>
 
-                                {/* 🚀 NEW: quantity stepper on the result card itself */}
+                                {/* 🚀 quantity stepper on the result card itself */}
                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                     <button
                                         type="button"
@@ -410,7 +387,6 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                     <button
                                         type="button"
                                         onClick={incrementQty}
-                                        disabled={Number(quantity) >= selectedProduct.stockQuantity}
                                         className="w-7 h-7 flex items-center justify-center cursor-pointer border border-border-main rounded-md hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main"
                                     >
                                         <Plus size={14} />
@@ -422,10 +398,10 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                 <button
                                     type="button"
                                     onClick={handleAddFromResult}
-                                    disabled={Number(quantity) <= 0 || showUnitDropdown}
+                                    disabled={Number(quantity) <= 0 || showUnitDropdown || isIncrementing}
                                     className="w-full cursor-pointer py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Add to Cart
+                                    {isIncrementing ? 'Adding...' : 'Add Stock'}
                                 </button>
                             </div>
                         </div>
@@ -481,7 +457,7 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                             <div className="flex flex-col min-w-0">
                                                 <div className="font-medium text-text-main truncate">{product.itemName}</div>
                                                 <span className="text-xs text-text-sub truncate">
-                                                    Qty: 1 {product.unitOfMeasure ? `| ${product.unitOfMeasure}` : ''}
+                                                    Stock: {product.stockQuantity} {product.unitOfMeasure ? `| ${product.unitOfMeasure}` : ''}
                                                 </span>
                                             </div>
                                         </div>
@@ -496,88 +472,74 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
 
                     {/* Selected Product Form */}
                     {selectedProduct && (
-                        <div className="border border-border-main rounded-lg p-4 bg-bg-secondary flex flex-col gap-4">
-                            {/* Selling Price */}
-                            <div className="flex flex-col gap-1">
-                                <label className="block text-xs font-semibold text-text-sub">Selling Price</label>
-                                <input type="text" value={`₱${selectedProduct.sellingPrice.toFixed(2)}`} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70" />
-                            </div>
-
-                            {/* Available Stock */}
-                            <div className="flex flex-col gap-1">
-                                <label className="block text-xs font-semibold text-text-sub">Available Stock</label>
-                                <input type="text" value={selectedProduct.stockQuantity} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-text-main bg-bg-primary opacity-70" />
-                            </div>
-
+                        <div className="border border-border-main rounded-lg p-4 h-full bg-bg-secondary flex flex-col gap-4">
                             {/* Clickable Unit of Measure Selector Menu */}
                             <div className="relative flex flex-col gap-1 w-full">
                                 <label className="block text-xs font-semibold text-text-sub">Measurement (1g,1kg, 12pcs etc)</label>
-                                <button type="button" disabled={groupedProducts.length <= 1} onClick={() => setShowUnitDropdown(!showUnitDropdown)} onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)} className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-70" >
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUnitDropdown(!showUnitDropdown)}
+                                    onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)}
+                                    className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold"
+                                >
                                     <span className="truncate">
                                         {selectedProduct.unitOfMeasure || 'Not specified'}
                                     </span>
-                                    {groupedProducts.length > 1 && (
-                                        <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
-                                    )}
+                                    <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
                                 </button>
 
                                 {/* Alternative Variant units dropdown tray panel */}
-                                {showUnitDropdown && groupedProducts.length > 0 && (
+                                {showUnitDropdown && (
                                     <div className="absolute z-20 w-full top-full mt-1 border border-border-main rounded-lg bg-bg-primary shadow-md max-h-40 overflow-y-auto">
-                                        {groupedProducts.map((variant) => (
-                                            <button key={variant.id} type="button" onMouseDown={(e) => { e.preventDefault(); handleUnitSelect(variant); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors text-text-main cursor-pointer ${selectedProduct.id === variant.id ? 'bg-bg-secondary font-semibold text-brand-gold' : ''}`} >
-                                                {variant.unitOfMeasure || 'Not specified'}
-                                                <span className="text-xs text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
-                                            </button>
-                                        ))}
+                                        {groupedProducts.length > 0 ? (
+                                            groupedProducts.map((variant) => (
+                                                <button
+                                                    key={variant.id}
+                                                    type="button"
+                                                    onMouseDown={(e) => { e.preventDefault(); handleUnitSelect(variant); }}
+                                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors text-text-main cursor-pointer ${selectedProduct.id === variant.id ? 'bg-bg-secondary font-semibold text-brand-gold' : ''}`}
+                                                >
+                                                    {variant.unitOfMeasure || 'Not specified'}
+                                                    <span className="text-xs text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2 text-sm text-text-sub">
+                                                {selectedProduct.unitOfMeasure || 'Not specified'} <span className="text-xs">(Stock: {selectedProduct.stockQuantity})</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
 
                             {/* Quantity to Buy Counter Block UI */}
                             <div className="flex flex-col gap-1">
-                                <label className="block text-xs font-semibold text-text-sub">Quantity to Buy</label>
+                                <label className="block text-xs font-semibold text-text-sub">Quantity to Add</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
                                         value={quantity}
                                         onChange={handleQuantityInputChange}
-                                        disabled={!selectedProduct || selectedProduct.stockQuantity === 0}
                                         min={selectedProduct?.stockQuantity === 0 ? 0 : 1}
-                                        max={selectedProduct?.stockQuantity || 0}
                                         className="w-full px-4 py-2  border border-border-main rounded-lg bg-bg-primary text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <button type="button" onClick={decrementQty} disabled={Number(quantity) <= 1} className="p-2 h-full cursor-pointer border border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main" >
                                         <Minus size={16} />
                                     </button>
-                                    <button type="button" onClick={incrementQty} disabled={Number(quantity) >= selectedProduct.stockQuantity} className="p-2 border cursor-pointer h-full border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main" >
+                                    <button type="button" onClick={incrementQty} className="p-2 border cursor-pointer h-full border-border-main rounded-lg hover:bg-item-hover disabled:opacity-50 transition-colors text-text-main" >
                                         <Plus size={16} />
                                     </button>
                                 </div>
                                 <div className="text-xs text-text-sub mt-1">
-                                    Max Available: {selectedProduct.stockQuantity}
+                                    Current Available: {selectedProduct.stockQuantity}
                                 </div>
                             </div>
 
-
+                            <button onClick={handleAddToCart} disabled={Number(quantity) <= 0 || isIncrementing} className="w-full mt-auto cursor-pointer py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" >
+                                {isIncrementing ? 'Adding...' : 'Add Item Stock'}
+                            </button>
                         </div>
-
                     )}
-                    {
-                        selectedProduct && (
-                            <>
-                                <div className="flex flex-col mt-auto gap-1">
-                                    <label className="block text-xs font-semibold text-text-sub">Subtotal</label>
-                                    <input type="text" value={`₱${(selectedProduct.sellingPrice * Number(quantity)).toFixed(2)}`} readOnly className="w-full px-3 py-2 border border-border-main rounded-lg text-brand-gold font-bold bg-bg-primary opacity-70" />
-                                </div>
-
-                                <button onClick={handleAddToCart} disabled={Number(quantity) <= 0} className="w-full cursor-pointer mt-2 py-3 bg-brand-gold hover:bg-brand-gold-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" >
-                                    Add to Cart
-                                </button>
-                            </>
-                        )
-                    }
-                    {/* Subtotal Calculation Field */}
 
                     {/* Empty States / Loading Panels */}
                     {isSearching && (
@@ -614,7 +576,7 @@ export function RestockScannerTab({ shopId, updateCart }: ScannerTabProps) {
                             <X className="w-8 h-8 text-brand-red" />
                         )}
                     </div>
-                    <p className="mt-2 text-lg font-bold text-text-main">{modalMessage}</p>
+                    <p className="mt-2 text-lg font-bold text-text-main text-center">{modalMessage}</p>
                     {errorMessage && (
                         <p className="mt-2 text-sm text-text-sub text-center">{errorMessage}</p>
                     )}

@@ -513,24 +513,38 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
                             {/* Clickable Unit of Measure Selector Menu */}
                             <div className="relative flex flex-col gap-1 w-full">
                                 <label className="block text-xs font-semibold text-text-sub">Measurement (1g,1kg, 12pcs etc)</label>
-                                <button type="button" disabled={groupedProducts.length <= 1} onClick={() => setShowUnitDropdown(!showUnitDropdown)} onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)} className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-70" >
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUnitDropdown(!showUnitDropdown)}
+                                    onBlur={() => setTimeout(() => setShowUnitDropdown(false), 200)}
+                                    className="w-full px-3 py-2 flex items-center justify-between border border-border-main rounded-lg bg-bg-primary text-left text-text-main focus:outline-none focus:border-brand-gold"
+                                >
                                     <span className="truncate">
                                         {selectedProduct.unitOfMeasure || 'Not specified'}
                                     </span>
-                                    {groupedProducts.length > 1 && (
-                                        <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
-                                    )}
+                                    <ChevronDown size={16} className="text-text-sub flex-shrink-0 ml-2" />
                                 </button>
 
                                 {/* Alternative Variant units dropdown tray panel */}
-                                {showUnitDropdown && groupedProducts.length > 0 && (
+                                {showUnitDropdown && (
                                     <div className="absolute z-20 w-full top-full mt-1 border border-border-main rounded-lg bg-bg-primary shadow-md max-h-40 overflow-y-auto">
-                                        {groupedProducts.map((variant) => (
-                                            <button key={variant.id} type="button" onMouseDown={(e) => { e.preventDefault(); handleUnitSelect(variant); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors text-text-main cursor-pointer ${selectedProduct.id === variant.id ? 'bg-bg-secondary font-semibold text-brand-gold' : ''}`} >
-                                                {variant.unitOfMeasure || 'Not specified'}
-                                                <span className="text-xs text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
-                                            </button>
-                                        ))}
+                                        {groupedProducts.length > 0 ? (
+                                            groupedProducts.map((variant) => (
+                                                <button
+                                                    key={variant.id}
+                                                    type="button"
+                                                    onMouseDown={(e) => { e.preventDefault(); handleUnitSelect(variant); }}
+                                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-item-hover transition-colors text-text-main cursor-pointer ${selectedProduct.id === variant.id ? 'bg-bg-secondary font-semibold text-brand-gold' : ''}`}
+                                                >
+                                                    {variant.unitOfMeasure || 'Not specified'}
+                                                    <span className="text-xs text-text-sub ml-2">(Stock: {variant.stockQuantity})</span>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2 text-sm text-text-sub">
+                                                {selectedProduct.unitOfMeasure || 'Not specified'} <span className="text-xs">(Stock: {selectedProduct.stockQuantity})</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
