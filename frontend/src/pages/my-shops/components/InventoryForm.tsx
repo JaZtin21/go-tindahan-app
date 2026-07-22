@@ -13,6 +13,7 @@ import {
 import { Check, X, XIcon } from 'lucide-react';
 import { ProductScannerCamera } from './ProductScannerCamera';
 import { useAddInventoryItem, useUpdateInventoryItem } from '~/api/queries';
+import { resizeAndConvertToWebPFile } from '~/utils/imageUtils';
 
 export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
 
@@ -25,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = false;
+    const isSubscribed = true;
 
 
 
@@ -99,15 +100,25 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
             onClose();
     };
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         // 1. Save the actual native File object for the GraphQL mutation
-        setPhoto(file);
+        try {
+            const optimizedWebpFile = await resizeAndConvertToWebPFile(file, 400, 0.7);
 
-        // 2. Optional: Generate a quick, lightweight preview URL for your <img> tag
-        setPhotoPreview(URL.createObjectURL(file));
+            console.log("--- FRONTEND IMAGE VERIFICATION ---");
+            console.log("File Name:", optimizedWebpFile.name);        // Should end in .webp
+            console.log("Mime Type:", optimizedWebpFile.type);        // MUST be "image/webp"
+            console.log("Size on Wire:", (optimizedWebpFile.size / 1024).toFixed(2), "KB");
+
+            setPhoto(optimizedWebpFile);
+            setPhotoPreview(URL.createObjectURL(optimizedWebpFile));
+        } catch (err: any) {
+            // 🚀 Catch the type validation error here!
+            console.error("Image processing error:", err.message);
+        }
     };
 
     const handleRemovePhoto = () => {

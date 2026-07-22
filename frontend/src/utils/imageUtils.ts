@@ -46,3 +46,87 @@ export function base64ToFile(dataUrl: string, filename: string): File {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new File([bytes], filename, { type: mime });
 }
+
+
+
+/**
+ * Validates, resizes, and converts any input file strictly into a WebP File object.
+ * @param file The original native File object from the input element
+ * @param maxDimension The strict maximum width or height (default 400px)
+ * @param quality The compression factor from 0.0 to 1.0 (default 0.7)
+ */
+export const resizeAndConvertToWebPFile = (
+    file: File,
+    maxDimension = 400,
+    quality = 0.7
+): Promise<File> => {
+    return new Promise((resolve, reject) => {
+
+        // 🚀 1. FILE TYPE VALIDATION CHECK
+        // Ensure the file's mime type starts with 'image/' (e.g., image/jpeg, image/png, image/webp)
+        if (!file.type.startsWith('image/')) {
+            reject(new Error("Invalid file type. Please upload a valid image file (PNG, JPG, WebP)."));
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Force strict maximum dimension constraints while keeping the aspect ratio
+                if (width > height) {
+                    if (width > maxDimension) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    }
+                } else {
+                    if (height > maxDimension) {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                // Forces the canvas to output an image/webp binary blob
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            reject(new Error("Canvas to WebP Blob conversion failed"));
+                            return;
+                        }
+
+                        // Swap the original extension in the filename to .webp
+                        const originalNameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                        const webpFilename = `${originalNameWithoutExt}.webp`;
+
+                        // Build the new clean WebP File object to pass back
+                        const webpFile = new File([blob], webpFilename, {
+                            type: 'image/webp',
+                            lastModified: Date.now(),
+                        });
+
+                        resolve(webpFile);
+                    },
+                    'image/webp',
+                    quality
+                );
+            };
+            img.onerror = () => reject(new Error("The selected file is corrupted or cannot be read as an image."));
+        };
+        reader.onerror = () => reject(new Error("Failed to read binary file data."));
+    });
+};
+

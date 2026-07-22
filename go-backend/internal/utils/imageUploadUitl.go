@@ -73,7 +73,8 @@ func (u *ImageUploader) UploadImage(ctx context.Context, reader io.Reader, filen
 		PublicID:       publicID,
 		Folder:         u.folder,
 		ResourceType:   "image",
-		Transformation: "f_auto,q_auto", // Auto format and quality optimization
+		Transformation: "q_auto",
+		Format:         "webp",
 	}
 
 	result, err := u.cloudinary.Upload.Upload(ctx, reader, uploadParams)

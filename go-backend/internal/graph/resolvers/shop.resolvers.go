@@ -442,8 +442,9 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 
 	// SECURITY GUARD 2: Verify the caller is the actual owner of the target shop
 	var shopOwnerID string
-	checkQuery := "SELECT owner_id FROM shops WHERE id = $1 LIMIT 1"
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ShopID).Scan(&shopOwnerID)
+	var shopName string
+	checkQuery := "SELECT owner_id, shop_name FROM shops WHERE id = $1 LIMIT 1"
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ShopID).Scan(&shopOwnerID, &shopName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -485,12 +486,16 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	}
 
 	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, input.ShopID)
+	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory/%s", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopName, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
 	// 2. UPLOAD PRODUCT PHOTO TO CLOUDINARY IF PROVIDED
 	finalProductPhoto := ""
 	if input.Photo != nil && input.Photo.File != nil {
+		// 👇 SAFE LOG BEFORE: Only reads the incoming payload properties
+		log.Printf("[BEFORE CLOUDINARY] Upload Add Item Filename: %s | ContentType: %s | Size: %d bytes",
+			input.Photo.Filename, input.Photo.ContentType, input.Photo.Size)
+
 		result, err := inventoryUploader.UploadImage(ctx, input.Photo.File, input.Photo.Filename)
 		if err == nil {
 			finalProductPhoto = result.URL
@@ -566,14 +571,13 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	// SECURITY GUARD 2: Fetch current database values to evaluate owner and grab old photo
 	var shopOwnerID string
 	var oldPhoto *string
-	var shopID string
-
+	var shopName string // 🚀 Rename variable to capture name
 	checkQuery := `
-		SELECT s.owner_id, i.photo, i.shop_id FROM inventory_items i
+		SELECT s.owner_id, i.photo, s.shop_name FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &oldPhoto, &shopID)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &oldPhoto, &shopName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -607,7 +611,7 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	}
 
 	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopID)
+	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory/%s", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopName, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
 	// =========================================================================
@@ -626,6 +630,10 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 
 	// Process the new binary upload stream if sent by the client input layer
 	if input.NewPhoto != nil && input.NewPhoto.File != nil {
+		// 👇 SAFE LOG BEFORE: Only reads the incoming payload properties
+		log.Printf("[BEFORE CLOUDINARY] Filename: %s | ContentType: %s | Size: %d bytes",
+			input.NewPhoto.Filename, input.NewPhoto.ContentType, input.NewPhoto.Size)
+
 		result, uploadErr := inventoryUploader.UploadImage(ctx, input.NewPhoto.File, input.NewPhoto.Filename)
 		if uploadErr == nil {
 			finalPhoto = result.URL

@@ -225,7 +225,7 @@ export const MyShops: React.FC = () => {
                                 </button>
 
                                 {/* 3. Dark Bottom Gradient Shadow Vignette */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
+                                <div className="absolute -inset-1 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
 
                                 {/* 4. Bottom Content Card Layout Wrap */}
                                 <div className="absolute bottom-0 inset-x-0 p-8 z-20 flex flex-col gap-3">
