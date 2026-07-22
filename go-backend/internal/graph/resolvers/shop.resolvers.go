@@ -492,9 +492,6 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	// 2. UPLOAD PRODUCT PHOTO TO CLOUDINARY IF PROVIDED
 	finalProductPhoto := ""
 	if input.Photo != nil && input.Photo.File != nil {
-		// 👇 SAFE LOG BEFORE: Only reads the incoming payload properties
-		log.Printf("[BEFORE CLOUDINARY] Upload Add Item Filename: %s | ContentType: %s | Size: %d bytes",
-			input.Photo.Filename, input.Photo.ContentType, input.Photo.Size)
 
 		result, err := inventoryUploader.UploadImage(ctx, input.Photo.File, input.Photo.Filename)
 		if err == nil {
@@ -630,9 +627,6 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 
 	// Process the new binary upload stream if sent by the client input layer
 	if input.NewPhoto != nil && input.NewPhoto.File != nil {
-		// 👇 SAFE LOG BEFORE: Only reads the incoming payload properties
-		log.Printf("[BEFORE CLOUDINARY] Filename: %s | ContentType: %s | Size: %d bytes",
-			input.NewPhoto.Filename, input.NewPhoto.ContentType, input.NewPhoto.Size)
 
 		result, uploadErr := inventoryUploader.UploadImage(ctx, input.NewPhoto.File, input.NewPhoto.Filename)
 		if uploadErr == nil {
