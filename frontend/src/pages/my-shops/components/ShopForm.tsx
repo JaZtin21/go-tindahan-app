@@ -38,7 +38,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const isSubscribed = true
+    const isSubscribed = false
 
 
     const openModal = ({ isSuccess, type, error }: { isSuccess: boolean, type: string, error?: string }) => {
@@ -106,7 +106,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
         },
         onError: (err) => {
             console.error("GraphQL Save Failure:", err);
-            openModal({ isSuccess: false, type: 'update', error: err.message });
+            openModal({ isSuccess: false, type: 'update', error: err.message.toLowerCase().includes('not found') ? "Shop not found. Please Try to Sync your data first" : err.message });
         }
     });
 
@@ -542,11 +542,11 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
                     </div>
 
                     {/* Dynamic Text Content */}
-                    <p className="mt-2 text-lg font-bold text-text-main dark:text-zinc-400">
+                    <p className="mt-2 text-lg font-bold text-center text-text-main dark:text-zinc-400">
                         {modalMessage}
                     </p>
 
-                    <p className={`mt-2 ${isSuccess ? 'hidden' : ''} text-sm text-text-main dark:text-zinc-400`}>
+                    <p className={`mt-2 ${isSuccess ? 'hidden' : ''} text-sm text-center text-text-main dark:text-zinc-400`}>
                         {errorMessage}
                     </p>
 

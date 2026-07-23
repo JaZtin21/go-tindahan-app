@@ -38,31 +38,21 @@ export const MyShops: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
     // 1. RUN APOLLO FETCH QUERY (Types inferred automatically via type inference)
+    // NOTE: `refetch` is new — see useDeleteShop's onCompleted below. When
+    // WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED is false, deleting/creating/updating
+    // a shop no longer touches TinyBase, so there's no reactive table
+    // subscription left to auto-refresh this hook's data. refetch() closes
+    // that gap by explicitly re-running the query. (When the flag is true
+    // this just causes one harmless extra fetch alongside the TinyBase
+    // update that was already keeping things in sync.)
     const { loading: dataLoading, error, data } = useMyShops({ limit: PAGE_LIMIT, offset, isSubscribed: isSubscribed });
 
     // 2. READ DIRECTLY FROM REDUX STORAGE CACHE FOR VIEW TRANSFORMS
     const loadedShops = useSelector((state: RootState) => state.myShops.shops);
     const totalCount = useSelector((state: RootState) => state.myShops.totalCount);
 
-    console.log('Loaded Shops:', isLoading);
+    console.log('Loaded Shops:', loadedShops);
 
-    // 3. LIFECYCLE DATA BOUNDARY BUFFER MANAGEMENT SYNC
-    useEffect(() => {
-
-        if (error) {
-            dispatch(setError(error.message));
-            return;
-        }
-
-        if (data?.getMyShops) {
-            dispatch(
-                setShops({
-                    shops: data.getMyShops.shops,
-                    totalCount: data.getMyShops.totalCount,
-                })
-            );
-        }
-    }, [data, dataLoading, error, dispatch]);
 
     // Compute navigation parameters based on local state slices instead of flat payloads
     const hasNextPage = offset + PAGE_LIMIT < totalCount;
@@ -88,7 +78,6 @@ export const MyShops: React.FC = () => {
 
     // Import the Apollo client mutation hook
     const [deleteShop, { loading: isDeleting }] = useDeleteShop({
-        // Optional: Refetch your shops list query or update Apollo cache here
         isSubscribed: isSubscribed,
         onCompleted: () => {
             // Reuse your existing modal helper to show success
@@ -97,7 +86,9 @@ export const MyShops: React.FC = () => {
             setIsSuccess(true);
             setModalMessage('Shop and its entire inventory have been permanently deleted.');
             if (selectedShopId) {
-                dispatch(deleteShopAction(selectedShopId)); // Make sure action name matches your slice
+                // Optimistic Redux removal — makes the card disappear
+                // immediately instead of waiting on the network refetch below.
+                dispatch(deleteShopAction(selectedShopId));
             }
             setSelectedShopId(null);
         },
@@ -213,7 +204,9 @@ export const MyShops: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* 2. Top Right Destructive Action (Delete Button)        <button
+                                {/* 2. Top Right Destructive Action (Delete Button)       */}
+
+                                <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleOpenDeletePrompt(shop.id!)
@@ -221,9 +214,7 @@ export const MyShops: React.FC = () => {
                                     className="absolute top-3 right-3 z-20 h-7 px-0.5 rounded-lg bg-brand-red/70 border-2 border-brand-red hover:bg-brand-red-hover active:scale-95 transition-all text-[11px] font-bold text-text-white cursor-pointer"
                                 >
                                     <Trash2 className="h-5 w-5" />
-                                </button>*/}
-
-
+                                </button>
                                 {/* 3. Dark Bottom Gradient Shadow Vignette */}
                                 <div className="absolute -inset-1 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
 

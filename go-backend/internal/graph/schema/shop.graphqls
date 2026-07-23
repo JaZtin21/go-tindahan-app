@@ -1,4 +1,5 @@
 scalar Upload
+scalar JSON
 
 # --- TYPES ---
 
@@ -89,6 +90,8 @@ type OwnerShop {
   photo: String          
   photos: [String!]!     
   createdAt: String!
+  deletedAt: String       
+  serverUpdatedAt: String
 }
 
 type ShopReview {
@@ -128,6 +131,8 @@ type OwnerInventoryItem {
   costPrice: Float       
   reorderLevel: Int      
   updatedAt: String!
+  deletedAt: String       
+  serverUpdatedAt: String 
 }
 
 # --- PAGINATION WRAPPERS ---
@@ -352,6 +357,87 @@ type ShopDashboardMetrics {
   weeklySalesTrend: [DailySalesMetric!]!
 }
 
+# New Core Sync Input Types
+input ShopSyncInput {
+  localId: ID!
+  isDeleted: Boolean!
+  isServerSynced: Boolean!
+  clientCreatedAt: String
+  
+  shopName: String
+  address: String
+  description: String
+  coordinates: CoordinatesInput
+  businessHours: BusinessHoursInput
+  paymentMethods: PaymentMethodsInput
+  delivery: DeliveryOptionsInput
+  socialMedia: SocialMediaInput
+  contactDetails: ContactDetailsInput
+  photo: String
+  photos: [String!]
+}
+
+input InventorySyncInput {
+  localId: ID!
+  shopId: ID!           # Could be a real server ID or a localId string
+  isDeleted: Boolean!
+  isServerSynced: Boolean!
+  clientCreatedAt: String
+
+  itemName: String
+  description: String
+  barcode: String
+  category: String
+  unitOfMeasure: String
+  costPrice: Float
+  sellingPrice: Float
+  stockQuantity: Int
+  reorderLevel: Int
+  photo: String
+}
+
+input CheckoutBatchSyncInput {
+  localId: ID!
+  shopId: ID!           # Could be a real server ID or a localId string
+  clientCreatedAt: String # True historical time transaction took place
+  items: [CheckoutBatchItemInput!]!
+}
+
+input ItemActionHistorySyncInput {
+  localId: ID!
+  shopId: ID!           # Can be localId or real database ID
+  inventoryItemId: ID   # Can be localId or real database ID
+  itemName: String!
+  action: String!
+  quantity: Int
+  clientCreatedAt: String! # True historical time when action was logged
+}
+
+# Expand Master Sync Input Payload
+input UnifiedBatchSyncInput {
+  lastSyncedAt: String! 
+  shops: [ShopSyncInput!]!
+  inventory: [InventorySyncInput!]!
+  checkouts: [CheckoutBatchSyncInput!]!
+  actionHistories: [ItemActionHistorySyncInput!]! # Added
+}
+
+
+
+# Master Sync Response Structure
+type DeltaResponse {
+  upserted: [JSON!]!  # Raw parsed backend structures including their assigned localId
+  deletedIds: [ID!]!  # Database IDs deleted globally that the client needs to purge
+}
+
+type UnifiedBatchSyncPayload {
+  shopsDelta: DeltaResponse!
+  inventoryDelta: DeltaResponse!
+  checkoutsDelta: DeltaResponse!
+  actionHistoriesDelta: DeltaResponse! # Added (Will return any records created by other devices)
+  serverTime: String! 
+}
+
 # --- EXTENSIONS ---
 
 extend type Query {
@@ -380,4 +466,5 @@ extend type Mutation {
   incrementStock(input: IncrementStockInput!): OwnerInventoryItem! @isAuthenticated
   decrementStock(input: DecrementStockInput!): OwnerInventoryItem! @isAuthenticated
   checkoutCart(input: CheckoutCartInput!): CheckoutBatch! @isAuthenticated
+  unifiedBatchSync(input: UnifiedBatchSyncInput!): UnifiedBatchSyncPayload! @isAuthenticated
 }

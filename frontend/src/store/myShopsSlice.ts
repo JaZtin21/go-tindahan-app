@@ -68,7 +68,18 @@ const myShopsSlice = createSlice({
             state.shops = [];
             state.totalCount = 0;
             state.error = null;
-        }
+        },
+        replaceLocalShop(state, action: PayloadAction<{ localId: string; shop: Shop }>) {
+            const idx = state.shops.findIndex(s => s.id === action.payload.localId);
+            if (idx !== -1) {
+                state.shops[idx] = action.payload.shop; // swap in place — count never changes
+            } else {
+                // temp entry already gone (e.g. page changed) — fall back to upsert by real id
+                const existing = state.shops.findIndex(s => s.id === action.payload.shop.id);
+                if (existing !== -1) state.shops[existing] = action.payload.shop;
+                else state.shops.unshift(action.payload.shop);
+            }
+        },
     },
 });
 
@@ -80,7 +91,8 @@ export const {
     deleteShop,
     setLoading,
     setError,
-    clearShopsCache
+    clearShopsCache,
+    replaceLocalShop
 } = myShopsSlice.actions;
 
 export default myShopsSlice.reducer;

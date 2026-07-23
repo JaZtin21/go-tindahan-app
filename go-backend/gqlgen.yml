@@ -21,3 +21,5 @@ resolver:
 models:
   Upload:
     model: github.com/99designs/gqlgen/graphql.Upload
+  JSON:
+    model: github.com/99designs/gqlgen/graphql.Map

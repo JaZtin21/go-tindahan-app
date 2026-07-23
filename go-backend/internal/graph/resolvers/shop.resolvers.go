@@ -948,6 +948,425 @@ func (r *mutationResolver) CheckoutCart(ctx context.Context, input model.Checkou
 	return batch, nil
 }
 
+// UnifiedBatchSync is the resolver for the unifiedBatchSync field.
+func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.UnifiedBatchSyncInput) (*model.UnifiedBatchSyncPayload, error) {
+	// 1. SECURITY GUARD: Validate active user context
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "Unauthorized access",
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
+		})
+		return nil, nil
+	}
+
+	// 2. BEGIN ACQUIRING ATOMIC TRANSACTION PIPE
+	tx, err := r.Resolver.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("🔴 FAILED TO ACQUIRE POSTGRES TRANSACTION: %v", err)
+		return nil, errors.New("internal server error")
+	}
+	defer tx.Rollback(ctx) // Safe fallback rollback if execution fails halfway
+
+	// Caches to map temporary localIds to genuine server database UUIDs
+	shopIDMap := make(map[string]string)
+	itemIDMap := make(map[string]string)
+
+	// Arrays to keep track of confirmations returning down to this client
+	var upsertedShops []map[string]any
+	var upsertedInventory []map[string]any
+	var upsertedCheckouts []map[string]any
+	var upsertedHistories []map[string]any
+
+	// =========================================================================
+	// PHASE 1: PROCESS SHOPS BATCH ARRAY
+	// =========================================================================
+	for _, s := range input.Shops {
+		if s.IsDeleted {
+			// Process Soft Delete State Anchor
+			_, err = tx.Exec(ctx, `UPDATE shops SET deleted_at = NOW() WHERE id = $1 AND owner_id = $2`, s.LocalID, currentUser.ID)
+			if err != nil {
+				log.Printf("🔴 BATCH SYNC: Failed to soft-delete shop %s: %v", s.LocalID, err)
+				return nil, err
+			}
+
+			// Append a confirmation map so the frontend knows the delete succeeded!
+			upsertedShops = append(upsertedShops, map[string]any{
+				"id":        s.LocalID,
+				"localId":   s.LocalID,
+				"isDeleted": true,
+			})
+			continue
+		}
+
+		hoursJSON, _ := json.Marshal(s.BusinessHours)
+		paymentsJSON, _ := json.Marshal(s.PaymentMethods)
+		deliveryJSON, _ := json.Marshal(s.Delivery)
+		socialJSON, _ := json.Marshal(s.SocialMedia)
+		contactJSON, _ := json.Marshal(s.ContactDetails)
+		coordinatesJSON, _ := json.Marshal(s.Coordinates)
+
+		var finalServerID string
+		var finalCreatedAt time.Time
+
+		if s.IsServerSynced {
+			// UPDATE Existing Record
+			query := `
+				UPDATE shops SET 
+					shop_name = $1, address = $2, description = $3, photo = $4, photos = $5,
+					business_hours = $6, payment_methods = $7, delivery = $8, social_media = $9, contact_details = $10, coordinates = $11
+				WHERE id = $12 AND owner_id = $13
+				RETURNING id, created_at
+			`
+			err = tx.QueryRow(ctx, query,
+				s.ShopName, s.Address, s.Description, s.Photo, s.Photos,
+				hoursJSON, paymentsJSON, deliveryJSON, socialJSON, contactJSON, coordinatesJSON,
+				s.LocalID, currentUser.ID,
+			).Scan(&finalServerID, &finalCreatedAt)
+		} else {
+			// INSERT New Record (Preserving true offline history via client_created_at if passed)
+			createdAtAnchor := time.Now()
+			if s.ClientCreatedAt != nil {
+				if parsedTime, parseErr := time.Parse(time.RFC3339, *s.ClientCreatedAt); parseErr == nil {
+					createdAtAnchor = parsedTime
+				}
+			}
+
+			statusJSON, _ := json.Marshal(map[string]any{"isActive": true})
+			verificationJSON, _ := json.Marshal(map[string]any{"isVerified": false})
+
+			query := `
+				INSERT INTO shops (
+					shop_name, address, description, photo, photos, owner_id, created_at, 
+					business_hours, payment_methods, delivery, social_media, contact_details, coordinates, status, verification
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+				RETURNING id, created_at
+			`
+			err = tx.QueryRow(ctx, query,
+				s.ShopName, s.Address, s.Description, s.Photo, s.Photos, currentUser.ID, createdAtAnchor,
+				hoursJSON, paymentsJSON, deliveryJSON, socialJSON, contactJSON, coordinatesJSON, statusJSON, verificationJSON,
+			).Scan(&finalServerID, &finalCreatedAt)
+		}
+
+		if err != nil {
+			log.Printf("🔴 BATCH SYNC: Shop processing collapsed on ID %s: %v", s.LocalID, err)
+			return nil, err
+		}
+
+		// Hydrate ID Translation Table
+		shopIDMap[s.LocalID] = finalServerID
+
+		// FIX: Map the full properties manually to match what your frontend sync engine expects.
+		// This keeps your UI fully populated without throwing undefined helper errors.
+		upsertedShops = append(upsertedShops, map[string]any{
+			"id":             finalServerID,
+			"localId":        s.LocalID,
+			"shopName":       s.ShopName,
+			"address":        s.Address,
+			"description":    s.Description,
+			"photo":          s.Photo,
+			"photos":         s.Photos,
+			"coordinates":    s.Coordinates,
+			"businessHours":  s.BusinessHours,
+			"paymentMethods": s.PaymentMethods,
+			"delivery":       s.Delivery,
+			"socialMedia":    s.SocialMedia,
+			"contactDetails": s.ContactDetails,
+			"createdAt":      finalCreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	// =========================================================================
+	// PHASE 2: PROCESS INVENTORY ITEMS BATCH ARRAY
+	// =========================================================================
+	for _, item := range input.Inventory {
+		// Resolve dynamic parent foreign key using translation tables
+		targetShopID := item.ShopID
+		if realShopID, exists := shopIDMap[item.ShopID]; exists {
+			targetShopID = realShopID
+		}
+
+		if item.IsDeleted {
+			_, err = tx.Exec(ctx, `UPDATE inventory_items SET deleted_at = NOW() WHERE id = $1 AND shop_id = $2`, item.LocalID, targetShopID)
+			if err != nil {
+				log.Printf("🔴 BATCH SYNC: Failed to soft-delete item %s: %v", item.LocalID, err)
+				return nil, err
+			}
+
+			// Append deletion confirmation back down to the frontend
+			upsertedInventory = append(upsertedInventory, map[string]any{
+				"id":        item.LocalID,
+				"localId":   item.LocalID,
+				"isDeleted": true,
+			})
+			continue
+		}
+
+		var finalItemID string
+		if item.IsServerSynced {
+			query := `
+				UPDATE inventory_items SET 
+					item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5,
+					cost_price = $6, selling_price = $7, stock_quantity = $8, reorder_level = $9, photo = $10
+				WHERE id = $11 AND shop_id = $12
+				RETURNING id
+			`
+			err = tx.QueryRow(ctx, query,
+				item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, item.Photo,
+				item.LocalID, targetShopID,
+			).Scan(&finalItemID)
+		} else {
+			query := `
+				INSERT INTO inventory_items (
+					shop_id, item_name, description, barcode, category, unit_of_measure, 
+					cost_price, selling_price, stock_quantity, reorder_level, photo
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				RETURNING id
+			`
+			err = tx.QueryRow(ctx, query,
+				targetShopID, item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, item.Photo,
+			).Scan(&finalItemID)
+		}
+
+		if err != nil {
+			log.Printf("🔴 BATCH SYNC: Inventory item collapsed on local ID %s: %v", item.LocalID, err)
+			return nil, err
+		}
+
+		itemIDMap[item.LocalID] = finalItemID
+
+		// FIX: Map the full item properties back down to the response slice manually
+		// using your exact incoming input values to completely satisfy your frontend fields.
+		upsertedInventory = append(upsertedInventory, map[string]any{
+			"id":            finalItemID,
+			"localId":       item.LocalID,
+			"shopId":        targetShopID,
+			"itemName":      item.ItemName,
+			"description":   item.Description,
+			"barcode":       item.Barcode,
+			"category":      item.Category,
+			"unitOfMeasure": item.UnitOfMeasure,
+			"costPrice":     item.CostPrice,
+			"sellingPrice":  item.SellingPrice,
+			"stockQuantity": item.StockQuantity,
+			"reorderLevel":  item.ReorderLevel,
+			"photo":         item.Photo,
+			"updatedAt":     time.Now().Format(time.RFC3339),
+		})
+	}
+
+	// =========================================================================
+	// PHASE 3: PROCESS CHECKOUT TRANSACTIONS BATCH ARRAY (Append-Only)
+	// =========================================================================
+	for _, c := range input.Checkouts {
+		targetShopID := c.ShopID
+		if realShopID, exists := shopIDMap[c.ShopID]; exists {
+			targetShopID = realShopID
+		}
+
+		soldAtAnchor := time.Now()
+		if c.ClientCreatedAt != nil {
+			if parsedTime, parseErr := time.Parse(time.RFC3339, *c.ClientCreatedAt); parseErr == nil {
+				soldAtAnchor = parsedTime
+			}
+		}
+
+		// We will temporarily initialize counters to zero and compute sums during internal calculations
+		var batchID string
+		err = tx.QueryRow(ctx, `
+			INSERT INTO checkout_batches (shop_id, sold_at, total_items, total_cost, gross_sale, gross_profit) 
+			VALUES ($1, $2, 0, 0, 0, 0) RETURNING id`, targetShopID, soldAtAnchor).Scan(&batchID)
+		if err != nil {
+			return nil, err
+		}
+
+		var runningTotalItems int
+		var runningTotalCost, runningGrossSale float64
+
+		for _, itemInput := range c.Items {
+			resolvedItemID := itemInput.ItemID
+			if realItemID, exists := itemIDMap[itemInput.ItemID]; exists {
+				resolvedItemID = realItemID
+			}
+
+			// Gather pricing reality directly inside database bounds to prevent spoofing variables
+			var itemName string
+			var costPrice, sellingPrice float64
+			err = tx.QueryRow(ctx, `SELECT item_name, cost_price, selling_price FROM inventory_items WHERE id = $1`, resolvedItemID).Scan(&itemName, &costPrice, &sellingPrice)
+			if err != nil {
+				log.Printf("🔴 BATCH SYNC: Internal item validation lookup failure for checkout match: %v", err)
+				return nil, err
+			}
+
+			lineCostTotal := costPrice * float64(itemInput.Quantity)
+			lineSaleTotal := sellingPrice * float64(itemInput.Quantity)
+
+			_, err = tx.Exec(ctx, `
+				INSERT INTO checkout_batch_items (id, inventory_item_id, item_name, quantity, cost_price, selling_price, line_cost_total, line_sale_total)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, batchID, resolvedItemID, itemName, itemInput.Quantity, costPrice, sellingPrice, lineCostTotal, lineSaleTotal)
+			if err != nil {
+				return nil, err
+			}
+
+			// Atomically decrement live stock balances
+			_, err = tx.Exec(ctx, `UPDATE inventory_items SET stock_quantity = stock_quantity - $1 WHERE id = $2`, itemInput.Quantity, resolvedItemID)
+			if err != nil {
+				return nil, err
+			}
+
+			runningTotalItems += itemInput.Quantity
+			runningTotalCost += lineCostTotal
+			runningGrossSale += lineSaleTotal
+		}
+
+		// Update batch header aggregations with final totals
+		grossProfit := runningGrossSale - runningTotalCost
+		_, err = tx.Exec(ctx, `
+			UPDATE checkout_batches 
+			SET total_items = $1, total_cost = $2, gross_sale = $3, gross_profit = $4 
+			WHERE id = $5`, runningTotalItems, runningTotalCost, runningGrossSale, grossProfit, batchID)
+		if err != nil {
+			return nil, err
+		}
+
+		upsertedCheckouts = append(upsertedCheckouts, map[string]any{
+			"id":      batchID,
+			"localId": c.LocalID,
+			"shopId":  targetShopID,
+		})
+	}
+	// =========================================================================
+	// PHASE 4: PROCESS ITEM ACTION HISTORIES ARRAY (Append-Only)
+	// =========================================================================
+	for _, h := range input.ActionHistories {
+		targetShopID := h.ShopID
+		if realShopID, exists := shopIDMap[h.ShopID]; exists {
+			targetShopID = realShopID
+		}
+
+		// Resolve dynamic inventory item foreign key using translation tables
+		var resolvedItemID *string
+		if h.InventoryItemID != nil {
+			if realItemID, exists := itemIDMap[*h.InventoryItemID]; exists {
+				// The item was newly created in this batch; use its real database ID
+				realIDCopy := realItemID
+				resolvedItemID = &realIDCopy
+			} else {
+				// The item already existed server-side; keep its provided ID
+				providedIDCopy := *h.InventoryItemID
+				resolvedItemID = &providedIDCopy
+			}
+		}
+
+		// Parse the true offline historical time when the action was logged
+		createdAtAnchor := time.Now()
+		if parsedTime, parseErr := time.Parse(time.RFC3339, h.ClientCreatedAt); parseErr == nil {
+			createdAtAnchor = parsedTime
+		}
+
+		var historyID string
+		query := `
+			INSERT INTO item_action_history (shop_id, inventory_item_id, item_name, action, quantity, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id
+		`
+		err = tx.QueryRow(ctx, query, targetShopID, resolvedItemID, h.ItemName, h.Action, h.Quantity, createdAtAnchor).Scan(&historyID)
+		if err != nil {
+			log.Printf("🔴 BATCH SYNC: Failed appending history log for local ID %s: %v", h.LocalID, err)
+			return nil, err
+		}
+
+		// FIX: Use accurate key formatting matching your target data models
+		upsertedHistories = append(upsertedHistories, map[string]any{
+			"id":              historyID,
+			"localId":         h.LocalID,
+			"shopId":          targetShopID,
+			"inventoryItemId": resolvedItemID,
+			"itemName":        h.ItemName,
+			"action":          h.Action,
+			"quantity":        h.Quantity,
+			"date":            createdAtAnchor.Format(time.RFC3339),
+		})
+	}
+
+	// =========================================================================
+	// PHASE 5: FETCH GLOBAL DELTAS FROM PULL ANCHORS
+	// =========================================================================
+	// Capture the current authoritative backend clock time to send back as the next sync checkpoint
+	serverCheckpointTime := time.Now().Format(time.RFC3339)
+
+	lastSyncedAnchor, parseErr := time.Parse(time.RFC3339, input.LastSyncedAt)
+	if parseErr != nil {
+		// Fallback to Unix epoch baseline if the frontend sends an empty or invalid format
+		lastSyncedAnchor = time.Unix(0, 0)
+	}
+
+	// 1. Fetch IDs of shops owned by this user that were deleted on other devices since last sync
+	var deletedShops []string
+	shopRows, err := tx.Query(ctx, `SELECT id FROM shops WHERE owner_id = $1 AND deleted_at > $2`, currentUser.ID, lastSyncedAnchor)
+	if err == nil {
+		for shopRows.Next() {
+			var id string
+			if errScan := shopRows.Scan(&id); errScan == nil {
+				deletedShops = append(deletedShops, id)
+			}
+		}
+		shopRows.Close()
+	}
+
+	// 2. Fetch IDs of inventory items in this user's shops that were deleted on other devices since last sync
+	var deletedItems []string
+	itemRows, err := tx.Query(ctx, `
+		SELECT i.id 
+		FROM inventory_items i 
+		JOIN shops s ON i.shop_id = s.id 
+		WHERE s.owner_id = $1 AND i.deleted_at > $2`,
+		currentUser.ID, lastSyncedAnchor,
+	)
+	if err == nil {
+		for itemRows.Next() {
+			var id string
+			if errScan := itemRows.Scan(&id); errScan == nil {
+				deletedItems = append(deletedItems, id)
+			}
+		}
+		itemRows.Close()
+	}
+
+	// =========================================================================
+	// PHASE 6: TRANSACTION COMMIT AND PAYLOAD DISPATCH
+	// =========================================================================
+	// Everything succeeded atomically! Safely save all batch mutations to disk
+	if errCommit := tx.Commit(ctx); errCommit != nil {
+		log.Printf("🔴 BATCH SYNC: Transaction commit collision: %v", errCommit)
+		return nil, fmt.Errorf("transaction commit collision: %w", errCommit)
+	}
+
+	// Package up all confirmation data and remote deltas for the frontend client
+	return &model.UnifiedBatchSyncPayload{
+		ShopsDelta: &model.DeltaResponse{
+			Upserted:   upsertedShops,
+			DeletedIds: deletedShops,
+		},
+		InventoryDelta: &model.DeltaResponse{
+			Upserted:   upsertedInventory,
+			DeletedIds: deletedItems,
+		},
+		CheckoutsDelta: &model.DeltaResponse{
+			Upserted:   upsertedCheckouts,
+			DeletedIds: []string{},
+		},
+		ActionHistoriesDelta: &model.DeltaResponse{
+			Upserted:   upsertedHistories,
+			DeletedIds: []string{},
+		},
+		ServerTime: serverCheckpointTime,
+	}, nil
+
+}
+
 // GetMyShops is the resolver for the getMyShops field.
 func (r *queryResolver) GetMyShops(ctx context.Context, limit int, offset int) (*model.PaginatedOwnerShops, error) {
 	// SECURITY GUARD: Enforce valid user identity state from Redis session
@@ -955,7 +1374,7 @@ func (r *queryResolver) GetMyShops(ctx context.Context, limit int, offset int) (
 
 	// 1. Get total record count for metadata pagination calculation based on current owner
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM shops WHERE owner_id = $1"
+	countQuery := "SELECT COUNT(*) FROM shops WHERE owner_id = $1 AND deleted_at IS NULL "
 	err := r.Resolver.DB.QueryRow(ctx, countQuery, currentUser.ID).Scan(&totalCount)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
@@ -973,6 +1392,7 @@ func (r *queryResolver) GetMyShops(ctx context.Context, limit int, offset int) (
 		       verification, contact_details, status, coordinates, business_hours, payment_methods, delivery, social_media
 		FROM shops 
 		WHERE owner_id = $1
+		 AND deleted_at IS NULL
 		ORDER BY created_at DESC 
 		LIMIT $2 OFFSET $3
 	`
@@ -1076,7 +1496,7 @@ func (r *queryResolver) GetShopByID(ctx context.Context, shopID string) (*model.
 		SELECT id, shop_name, address, description, photo, photos, owner_id, created_at, 
 		       verification, contact_details, status, coordinates, business_hours, payment_methods, delivery, social_media
 		FROM shops 
-		WHERE id = $1 LIMIT 1
+		WHERE id = $1 AND deleted_at IS NULL LIMIT 1
 	`
 	row := r.Resolver.DB.QueryRow(ctx, selectQuery, shopID)
 
@@ -1154,7 +1574,7 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 
 	// SECURITY GUARD 2: Verify the caller is the actual owner of the shop before pulling internal records
 	var shopOwnerID string
-	checkQuery := "SELECT owner_id FROM shops WHERE id = $1 LIMIT 1"
+	checkQuery := "SELECT owner_id FROM shops WHERE id = $1 AND deleted_at IS NULL LIMIT 1"
 	err := r.Resolver.DB.QueryRow(ctx, checkQuery, shopID).Scan(&shopOwnerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1181,19 +1601,17 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 		return nil, nil
 	}
 
-	// Build WHERE clause with search filter
-	whereClause := "WHERE shop_id = $1"
+	// Build WHERE clause with search filter - 🚀 ADDED AND deleted_at IS NULL
+	whereClause := "WHERE shop_id = $1 AND deleted_at IS NULL"
 	args := []interface{}{shopID}
 	argIndex := 2
 
 	if search != nil && *search != "" {
 		// Keep using the same argIndex ($2) for all fields
 		whereClause += fmt.Sprintf(" AND (item_name ILIKE $%d OR description ILIKE $%d OR category ILIKE $%d OR barcode ILIKE $%d)", argIndex, argIndex, argIndex, argIndex)
-
 		// ✅ FIX: Only append the search pattern ONCE to match the single index
 		searchPattern := "%" + *search + "%"
 		args = append(args, searchPattern)
-
 		argIndex++ // Now argIndex moves to 3 for the LIMIT/OFFSET variables later
 	}
 
@@ -1212,7 +1630,6 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 	// Determine sort column and order
 	sortColumn := "item_name"
 	sortDirection := "ASC"
-
 	if sortBy != nil && *sortBy != "" {
 		// Whitelist valid columns to prevent SQL injection
 		validColumns := map[string]bool{
@@ -1227,7 +1644,6 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 			sortColumn = *sortBy
 		}
 	}
-
 	if sortOrder != nil && *sortOrder != "" {
 		if *sortOrder == "DESC" {
 			sortDirection = "DESC"
@@ -1236,15 +1652,14 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 
 	// 2. Fetch complete list including sensitive details (cost_price, reorder_level)
 	selectQuery := fmt.Sprintf(`
-		SELECT id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, updated_at 
-		FROM inventory_items 
+		SELECT id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, updated_at
+		FROM inventory_items
 		%s
 		ORDER BY %s %s
 		LIMIT $%d OFFSET $%d
 	`, whereClause, sortColumn, sortDirection, argIndex, argIndex+1)
 
 	args = append(args, limit, offset)
-
 	rows, err := r.Resolver.DB.Query(ctx, selectQuery, args...)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
@@ -1259,10 +1674,9 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 	for rows.Next() {
 		var item model.OwnerInventoryItem
 		var updatedAt time.Time
-
 		err := rows.Scan(
-			&item.ID, &item.ShopID, &item.ItemName, &item.Description, &item.Barcode, &item.Category,
-			&item.UnitOfMeasure, &item.Photo, &item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &updatedAt,
+			&item.ID, &item.ShopID, &item.ItemName, &item.Description, &item.Barcode, &item.Category, &item.UnitOfMeasure, &item.Photo,
+			&item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &updatedAt,
 		)
 		if err != nil {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -1280,7 +1694,6 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 	}
 
 	hasNextPage := int64(offset+limit) < totalCount
-
 	return &model.PaginatedOwnerInventory{
 		Items:       items,
 		TotalCount:  int(totalCount),
@@ -1411,11 +1824,10 @@ func (r *queryResolver) GetItemActionHistory(ctx context.Context, shopID string,
 
 // SearchShop is the resolver for the searchShop field.
 func (r *queryResolver) SearchShop(ctx context.Context, query string, limit int, offset int) (*model.PaginatedShops, error) {
-	// 1. Get total record count matching search parameter
+	// 1. Get total record count matching search parameter - 🚀 ADDED AND deleted_at IS NULL
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM shops WHERE shop_name ILIKE $1 OR address ILIKE $1"
+	countQuery := "SELECT COUNT(*) FROM shops WHERE (shop_name ILIKE $1 OR address ILIKE $1) AND deleted_at IS NULL"
 	searchPattern := "%" + query + "%"
-
 	err := r.Resolver.DB.QueryRow(ctx, countQuery, searchPattern).Scan(&totalCount)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
@@ -1425,13 +1837,13 @@ func (r *queryResolver) SearchShop(ctx context.Context, query string, limit int,
 		return nil, nil
 	}
 
-	// 2. Fetch the paginated public subset (No ownerId column requested)
+	// 2. Fetch the paginated public subset (No ownerId column requested) - 🚀 ADDED AND deleted_at IS NULL
 	selectQuery := `
 		SELECT id, shop_name, address, description, photo, photos, created_at, 
 		       verification, contact_details, status, coordinates, business_hours, payment_methods, delivery, social_media
-		FROM shops 
-		WHERE shop_name ILIKE $1 OR address ILIKE $1
-		ORDER BY shop_name ASC 
+		FROM shops
+		WHERE (shop_name ILIKE $1 OR address ILIKE $1) AND deleted_at IS NULL
+		ORDER BY shop_name ASC
 		LIMIT $2 OFFSET $3
 	`
 	rows, err := r.Resolver.DB.Query(ctx, selectQuery, searchPattern, limit, offset)
@@ -1459,11 +1871,10 @@ func (r *queryResolver) SearchShop(ctx context.Context, query string, limit int,
 		var deliveryBytes []byte
 		var socialBytes []byte
 
-		// FIXED: Scan all 15 columns perfectly 1-to-1 matching position order
+		// Scan all 15 columns perfectly 1-to-1 matching position order
 		err := rows.Scan(
 			&shop.ID, &shop.ShopName, &shop.Address, &shop.Description, &shop.Photo, &shop.Photos, &createdAt,
-			&verificationBytes, &contactBytes, &statusBytes, &coordinatesBytes,
-			&hoursBytes, &paymentsBytes, &deliveryBytes, &socialBytes,
+			&verificationBytes, &contactBytes, &statusBytes, &coordinatesBytes, &hoursBytes, &paymentsBytes, &deliveryBytes, &socialBytes,
 		)
 		if err != nil {
 			log.Printf("🔴 Public search rows scan decoding anomaly details: %v", err)
@@ -1505,7 +1916,6 @@ func (r *queryResolver) SearchShop(ctx context.Context, query string, limit int,
 	}
 
 	hasNextPage := int64(offset+limit) < totalCount
-
 	return &model.PaginatedShops{
 		Shops:       shops,
 		TotalCount:  int(totalCount),
@@ -1515,11 +1925,10 @@ func (r *queryResolver) SearchShop(ctx context.Context, query string, limit int,
 
 // SearchProduct is the resolver for the searchProduct field.
 func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit int, offset int) (*model.PaginatedPublicProducts, error) {
-	// 1. Get total items matching item name or category string
+	// 1. Get total items matching item name or category string - 🚀 ADDED AND deleted_at IS NULL
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE item_name ILIKE $1 OR category ILIKE $1"
+	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE (item_name ILIKE $1 OR category ILIKE $1) AND deleted_at IS NULL"
 	searchPattern := "%" + query + "%"
-
 	err := r.Resolver.DB.QueryRow(ctx, countQuery, searchPattern).Scan(&totalCount)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
@@ -1529,11 +1938,11 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 		return nil, nil
 	}
 
-	// 2. Fetch public fields only. cost_price and reorder_level are completely skipped.
+	// 2. Fetch public fields only - 🚀 ADDED AND deleted_at IS NULL
 	selectQuery := `
-		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity
+		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity 
 		FROM inventory_items 
-		WHERE item_name ILIKE $1 OR category ILIKE $1
+		WHERE (item_name ILIKE $1 OR category ILIKE $1) AND deleted_at IS NULL
 		ORDER BY item_name ASC 
 		LIMIT $2 OFFSET $3
 	`
@@ -1550,10 +1959,16 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 	var products []*model.PublicProduct
 	for rows.Next() {
 		var prod model.PublicProduct
-
 		err := rows.Scan(
-			&prod.ID, &prod.ShopID, &prod.ItemName, &prod.Description,
-			&prod.Category, &prod.UnitOfMeasure, &prod.Photo, &prod.SellingPrice, &prod.StockQuantity,
+			&prod.ID,
+			&prod.ShopID,
+			&prod.ItemName,
+			&prod.Description,
+			&prod.Category,
+			&prod.UnitOfMeasure,
+			&prod.Photo,
+			&prod.SellingPrice,
+			&prod.StockQuantity,
 		)
 		if err != nil {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -1570,7 +1985,6 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 	}
 
 	hasNextPage := int64(offset+limit) < totalCount
-
 	return &model.PaginatedPublicProducts{
 		Products:    products,
 		TotalCount:  int(totalCount),
@@ -1580,11 +1994,10 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 
 // SearchShopProducts is the resolver for the searchShopProducts field.
 func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int) (*model.PaginatedPublicProducts, error) {
-	// 1. Get total items matching item name or category string within a specific shop
+	// 1. Get total items matching item name or category string within a specific shop - 🚀 ADDED AND deleted_at IS NULL
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2)"
+	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2) AND deleted_at IS NULL"
 	searchPattern := "%" + query + "%"
-
 	err := r.Resolver.DB.QueryRow(ctx, countQuery, shopID, searchPattern).Scan(&totalCount)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
@@ -1594,11 +2007,11 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 		return nil, nil
 	}
 
-	// 2. Fetch public fields only from the specific shop. cost_price and reorder_level are completely skipped.
+	// 2. Fetch public fields only from the specific shop - 🚀 ADDED AND deleted_at IS NULL
 	selectQuery := `
-		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity
+		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity 
 		FROM inventory_items 
-		WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2)
+		WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2) AND deleted_at IS NULL
 		ORDER BY item_name ASC 
 		LIMIT $3 OFFSET $4
 	`
@@ -1615,10 +2028,16 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 	var products []*model.PublicProduct
 	for rows.Next() {
 		var prod model.PublicProduct
-
 		err := rows.Scan(
-			&prod.ID, &prod.ShopID, &prod.ItemName, &prod.Description,
-			&prod.Category, &prod.UnitOfMeasure, &prod.Photo, &prod.SellingPrice, &prod.StockQuantity,
+			&prod.ID,
+			&prod.ShopID,
+			&prod.ItemName,
+			&prod.Description,
+			&prod.Category,
+			&prod.UnitOfMeasure,
+			&prod.Photo,
+			&prod.SellingPrice,
+			&prod.StockQuantity,
 		)
 		if err != nil {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -1635,7 +2054,6 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 	}
 
 	hasNextPage := int64(offset+limit) < totalCount
-
 	return &model.PaginatedPublicProducts{
 		Products:    products,
 		TotalCount:  int(totalCount),

@@ -461,3 +461,27 @@ export const GET_SHOP_DASHBOARD_METRICS_QUERY = gql`
     }
   }
 `;
+
+export const UNIFIED_BATCH_SYNC_MUTATION = gql`
+  mutation UnifiedBatchSync($input: UnifiedBatchSyncInput!) {
+    unifiedBatchSync(input: $input) {
+      serverTime
+      shopsDelta {
+        deletedIds
+        upserted
+      }
+      inventoryDelta {
+        deletedIds
+        upserted
+      }
+      checkoutsDelta {
+        deletedIds
+        upserted
+      }
+      actionHistoriesDelta {
+        deletedIds
+        upserted
+      }
+    }
+  }
+`;

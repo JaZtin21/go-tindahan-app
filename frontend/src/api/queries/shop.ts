@@ -1,32 +1,54 @@
 // shopHooks.ts (TinyBase — complete, all queries + mutations)
 //
 // ============================================================================
-// READ MODEL: TinyBase is the ONLY thing components read from. Full stop.
+// READ MODEL
 // ============================================================================
-// Every query hook below follows the same shape:
-//   1. If isSubscribed, imperatively fetch from the backend (client.query,
-//      fetchPolicy: 'no-cache' so Apollo's own cache is never consulted).
-//   2. Write whatever comes back into TinyBase via upsertServerRow(), which
-//      refuses to clobber any row that's still _dirty (unsynced local edit).
-//   3. Read the result for rendering from TinyBase itself — the exact same
-//      read path whether isSubscribed is true or false.
+// Two distinct regimes, chosen by shouldPersistLocally(isSubscribed):
 //
-// This is what actually "merges" server + local data: the merge happens at
-// WRITE time (step 2), not at read time. There is no separate merge pass to
-// maintain, no duplicated logic, and no fragile totalCount arithmetic.
+// Condition 1/2 (persistLocally === true — offline, or online with
+// WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED on): TinyBase IS the read model.
+// Components read from it via useTable/useRow, and a single reconcile
+// effect mirrors whatever TinyBase currently holds into Redux. Any dirty
+// local edit is visible immediately because it's *in* the table that's
+// being watched.
+//
+// Condition 3 (isSubscribed === true && persistLocally === false): TinyBase
+// is WRITE-ONLY here — a queue of _dirty rows for syncEngine.ts to drain.
+// It is never read from for display, and nothing in this hook subscribes
+// to it for the purpose of deciding what Redux shows. The only writer of
+// Redux in this mode is:
+//   (a) this hook's own fetch effect, when a server response comes back, or
+//   (b) the mutation hook that created/changed the dirty row (optimistic
+//       dispatch, done once, at the moment of the write), or
+//   (c) syncEngine.ts, when a dirty row is confirmed by the server — it
+//       swaps the optimistic entry in place (see replaceLocalShop) rather
+//       than appending, so the count never drifts.
+//
+// This is the fix for the "shop count goes 5 -> 6 -> 4" bug: previously a
+// live useTable('shops') subscription in Condition 3 ALSO drove a
+// dispatch(setShops(...)) any time TinyBase changed for any reason
+// (including syncEngine just clearing a dirty row as bookkeeping), and that
+// dispatch raced with — and stomped — whatever syncEngine or the mutation
+// hook had just written. Condition 3 now has exactly one writer per event:
+// no two things ever disagree about what the list is.
 //
 // ============================================================================
-// WRITE MODEL: dual-write when isSubscribed
+// WRITE MODEL: dual-write when isSubscribed (configurable)
 // ============================================================================
-// isSubscribed true  -> hit the backend AND upsert the server's authoritative
-//                        response into TinyBase (_dirty:false, _serverSynced:true)
-//                        so offline reads work immediately, no manual sync needed.
+// isSubscribed true  -> hit the backend AND (if WRITE_TO_OFFLINE_DB_WHEN_
+//                        SUBSCRIBED is true) upsert the server's authoritative
+//                        response into TinyBase (_dirty:false, _serverSynced:true).
 // isSubscribed false -> write to TinyBase only, marked _dirty:true, so
 //                        syncEngine.ts picks it up on the next "Sync now".
+//                        This path is UNCONDITIONAL — it's the only way an
+//                        offline change can ever reach the server.
 //
-// syncEngine.ts (unchanged) is what reconciles _dirty rows on manual sync,
-// pushing local changes first and then pulling the server's state back down
-// — see that file for the push-then-pull ordering rationale.
+// Additionally, any branch that writes a _dirty row now ALSO dispatches an
+// optimistic Redux update immediately (addShop / updateShop-style), because
+// in Condition 3 nothing else is watching TinyBase to notice that write.
+//
+// syncEngine.ts is what reconciles _dirty rows on manual sync, pushing
+// local changes first and then pulling the server's state back down.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStore, useTable, useRow, useValue } from 'tinybase/ui-react';
@@ -52,6 +74,33 @@ import {
     DELETE_INVENTORY_ITEM_MUTATION,
 } from '../graphql';
 import { fileToStorableBase64 } from '~/utils';
+import { useDispatch } from 'react-redux';
+import {
+    setError as setErrorMyShops,
+    setShops,
+} from '~/store/myShopsSlice';
+
+// ============================================================================
+// OFFLINE PERSISTENCE TOGGLE
+// ============================================================================
+// true  (default, original behavior): every hook dual-writes into TinyBase
+//        even while isSubscribed is true. The local DB is always a full
+//        mirror of the server, so it stays useful the instant connectivity
+//        drops, but it also grows even when you're online the whole time.
+//
+// false: while isSubscribed is true, hooks/mutations skip writing to
+//        TinyBase — only the online (server) copy of the data exists.
+//        Changes made while OFFLINE still write locally as normal (that's
+//        the only way they can ever reach the server), so flipping this
+//        flag never affects the offline path, only the online one.
+export const WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED = true;
+
+// Central gate every hook below calls before touching TinyBase. Offline
+// writes (isSubscribed === false) are never gated — see the toggle comment
+// above for why.
+function shouldPersistLocally(isSubscribed: boolean): boolean {
+    return !isSubscribed || WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED;
+}
 
 export function upsertServerRow(
     store: Store,
@@ -186,58 +235,77 @@ function fromCheckoutRow(id: string, row: any) {
 // ---- 1. useMyShops (GET_MY_SHOPS_QUERY) ----
 export function useMyShops(opts: { limit: number; offset: number; isSubscribed: boolean }) {
     const { limit, offset, isSubscribed } = opts;
+    const dispatch = useDispatch();
+
     const store = useStore() as Store;
     const shopsTable = useTable('shops', store);
     const serverTotalCount = (useValue('shopsTotalCount', store) as number) ?? 0;
-    const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: false, error: null });
 
+    const [state, setState] = useState<{ loading: boolean; error: any }>({
+        loading: false,
+        error: null,
+    });
+
+    const [remoteOnly, setRemoteOnly] = useState<{ shops: Shop[]; totalCount: number } | null>(null);
+
+    const persistLocally = shouldPersistLocally(isSubscribed);
+
+    // 1. NETWORK FETCH EFFECT.
+    // In Condition 3 this is the ONLY place a fetch result reaches Redux —
+    // dispatched inline, once, right here. It is never re-derived from a
+    // TinyBase subscription, so it can't be raced by syncEngine or a
+    // mutation hook's optimistic dispatch.
     useEffect(() => {
         if (!isSubscribed) return;
+
         let cancelled = false;
         setState({ loading: true, error: null });
 
-        // Snapshot which local shop ids currently occupy THIS page window,
-        // before the fetch resolves. This is our orphan-candidate set: if a
-        // shop that used to sit in this exact page doesn't come back in the
-        // fresh response, it was deleted server-side (by this tab or another
-        // tab/session) and the stale local row needs to go too — otherwise
-        // it sits in TinyBase forever, since upsertServerRow only ever
-        // adds/updates rows, it never removes ones the server stopped
-        // returning. Scoped to this page (not "delete anything missing from
-        // the response") so shops that are simply on a different page don't
-        // get wrongly wiped.
-        const priorPageIds = Object.entries(store.getTable('shops'))
-            .filter(([, row]: any) => !row._deleted)
-            .map(([id, row]) => ({ id, row }))
-            .sort((a, b) => new Date((b.row as any).createdAt).getTime() - new Date((a.row as any).createdAt).getTime())
-            .slice(offset, offset + limit)
-            .map(({ id }) => id);
+        const priorPageIds = persistLocally
+            ? Object.entries(store.getTable('shops'))
+                .filter(([, row]: any) => !row._deleted)
+                .map(([id, row]) => ({ id, row }))
+                .sort((a, b) => new Date((b.row as any).createdAt).getTime() - new Date((a.row as any).createdAt).getTime())
+                .slice(offset, offset + limit)
+                .map(({ id }) => id)
+            : [];
 
         client
             .query({
                 query: GET_MY_SHOPS_QUERY,
                 variables: { limit, offset },
-                fetchPolicy: 'no-cache', // never read Apollo's own cache — TinyBase is the source of truth
+                fetchPolicy: 'no-cache',
             })
             .then(({ data }: any) => {
                 if (cancelled) return;
                 const fetchedShops = data?.getMyShops?.shops ?? [];
-                const fetchedIds = new Set(fetchedShops.map((s: any) => s.id));
+                const totalCount = data?.getMyShops?.totalCount ?? 0;
 
-                fetchedShops.forEach((shop: any) => {
-                    upsertServerRow(store, 'shops', shop.id, toShopRow(shop));
-                });
+                if (persistLocally) {
+                    // Condition 1/2: TinyBase is the read model. Mirror the
+                    // server response into it; Redux is kept in sync by the
+                    // reconcile effect below, which watches this same table.
+                    const fetchedIds = new Set(fetchedShops.map((s: any) => s.id));
 
-                // Orphan cleanup, scoped to priorPageIds only (see comment above).
-                priorPageIds.forEach((id) => {
-                    if (fetchedIds.has(id)) return;
-                    const row = store.getRow('shops', id);
-                    if (row && Object.keys(row).length > 0 && !(row as any)._dirty && (row as any)._serverSynced) {
-                        store.delRow('shops', id);
-                    }
-                });
+                    fetchedShops.forEach((shop: any) => {
+                        upsertServerRow(store, 'shops', shop.id, toShopRow(shop));
+                    });
 
-                store.setValue('shopsTotalCount', data?.getMyShops?.totalCount ?? 0);
+                    priorPageIds.forEach((id) => {
+                        if (fetchedIds.has(id)) return;
+                        const row = store.getRow('shops', id);
+                        if (row && Object.keys(row).length > 0 && !(row as any)._dirty && (row as any)._serverSynced) {
+                            store.delRow('shops', id);
+                        }
+                    });
+                    store.setValue('shopsTotalCount', totalCount);
+                } else {
+                    // Condition 3: TinyBase is write-only here. Dispatch
+                    // straight to Redux — this is the single writer for
+                    // "server truth" in this mode.
+                    setRemoteOnly({ shops: fetchedShops, totalCount });
+                    dispatch(setShops({ shops: fetchedShops, totalCount }));
+                }
                 setState({ loading: false, error: null });
             })
             .catch((error: any) => {
@@ -247,45 +315,83 @@ export function useMyShops(opts: { limit: number; offset: number; isSubscribed: 
         return () => {
             cancelled = true;
         };
-    }, [isSubscribed, limit, offset, store]);
+    }, [isSubscribed, limit, offset, store, persistLocally, dispatch]);
 
-    // Single read path, online or offline: everything server-fetched has
-    // already landed in TinyBase (upsertServerRow above), and anything
-    // created/edited locally is already sitting here too.
-    const allShops = useMemo(() => {
+    // 2. TINYBASE READ PATH — only meaningful for Condition 1/2. In
+    // Condition 3 nothing reads shopsTable for display purposes; it exists
+    // solely as syncEngine's dirty-row queue.
+    const allShopsFromTinyBase = useMemo(() => {
         return Object.entries(shopsTable)
             .filter(([, row]: any) => !row._deleted)
             .map(([id, row]) => fromShopRow(id, row))
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [shopsTable]);
 
-    // totalCount: prefer the real local count once we have it; fall back to
-    // whatever the server last reported so pagination doesn't flicker to 0
-    // while a fetch is in flight.
-    const totalCount = isSubscribed ? Math.max(serverTotalCount, allShops.length) : allShops.length;
+    // 3. OUTPUT RESOLVER
+    const resolvedPayload = useMemo(() => {
+        if (isSubscribed && !persistLocally) {
+            // Condition 3: purely a reflection of the last fetch — no
+            // TinyBase blending. Local creations/edits are represented in
+            // Redux directly by the mutation hooks and syncEngine, not here.
+            const serverShops = remoteOnly?.shops ?? [];
+            const serverCount = remoteOnly?.totalCount ?? 0;
+            return {
+                loading: state.loading,
+                error: state.error,
+                shops: serverShops,
+                totalCount: serverCount,
+                hasNextPage: offset + limit < serverCount,
+            };
+        }
 
-    // IMPORTANT: memoize the returned object. Without this, every render of
-    // a *consuming* component builds a brand-new `data` object here — even
-    // when nothing in TinyBase actually changed — which breaks referential
-    // equality for any effect downstream that lists `data` as a dependency
-    // (e.g. MyShops.tsx dispatching into Redux). That effect then fires on
-    // every render, dispatches, the dispatch triggers a re-render via
-    // useSelector, which calls this hook again, which builds a new object
-    // again... "Maximum update depth exceeded".
-    return useMemo(() => {
-        const page = allShops.slice(offset, offset + limit);
+        const page = allShopsFromTinyBase.slice(offset, offset + limit);
+        const totalCount = isSubscribed ? Math.max(serverTotalCount, allShopsFromTinyBase.length) : allShopsFromTinyBase.length;
+
         return {
             loading: state.loading,
             error: state.error,
-            data: {
-                getMyShops: {
-                    shops: page,
-                    totalCount,
-                    hasNextPage: offset + limit < totalCount,
-                },
-            },
+            shops: page,
+            totalCount,
+            hasNextPage: offset + limit < totalCount,
         };
-    }, [allShops, offset, limit, totalCount, state.loading, state.error]);
+    }, [allShopsFromTinyBase, offset, limit, serverTotalCount, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
+
+    // 4. REDUX RECONCILE EFFECT — Condition 1/2 ONLY. This is what keeps
+    // Redux in sync with TinyBase-as-read-model whenever a local dirty edit
+    // changes the table. Condition 3 must never run this: it already
+    // dispatched from the fetch effect above, and letting this effect ALSO
+    // dispatch (keyed off the same shopsTable subscription) is exactly what
+    // caused the previous bug — a second writer racing the first.
+    const stableShopIdsString = JSON.stringify(resolvedPayload.shops.map((s) => s.id));
+
+    useEffect(() => {
+        if (isSubscribed && !persistLocally) return; // Condition 3 — handled in the fetch effect only
+
+        if (resolvedPayload.error) {
+            dispatch(setErrorMyShops(resolvedPayload.error.message));
+            return;
+        }
+
+        dispatch(
+            setShops({
+                shops: resolvedPayload.shops,
+                totalCount: resolvedPayload.totalCount,
+            })
+        );
+    }, [stableShopIdsString, resolvedPayload.totalCount, resolvedPayload.error, dispatch, isSubscribed, persistLocally]);
+
+    // 5. Return payload for Apollo-shape consumers
+    return useMemo(() => ({
+        loading: resolvedPayload.loading,
+        error: resolvedPayload.error,
+        data: {
+            getMyShops: {
+                shops: resolvedPayload.shops,
+                totalCount: resolvedPayload.totalCount,
+                hasNextPage: resolvedPayload.hasNextPage,
+            },
+        },
+    }), [resolvedPayload]);
 }
 
 // ---- 2. useShopInventory (GET_SHOP_INVENTORY_QUERY) ----
@@ -302,6 +408,8 @@ export function useShopInventory(opts: {
     const store = useStore() as Store;
     const inventoryTable = useTable('inventory', store);
     const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: false, error: null });
+    const [remoteOnly, setRemoteOnly] = useState<{ items: Item[]; totalCount: number } | null>(null);
+    const persistLocally = shouldPersistLocally(isSubscribed);
 
     useEffect(() => {
         if (!isSubscribed || !shopId) return;
@@ -323,9 +431,19 @@ export function useShopInventory(opts: {
             })
             .then(({ data }: any) => {
                 if (cancelled) return;
-                (data?.getShopInventory?.items ?? []).forEach((item: any) => {
-                    upsertServerRow(store, 'inventory', item.id, toItemRow(item));
-                });
+                const fetchedItems = data?.getShopInventory?.items ?? [];
+
+                if (persistLocally) {
+                    fetchedItems.forEach((item: any) => {
+                        upsertServerRow(store, 'inventory', item.id, toItemRow(item));
+                    });
+                } else {
+                    setRemoteOnly({
+                        items: fetchedItems,
+                        totalCount: data?.getShopInventory?.totalCount ?? fetchedItems.length,
+                    });
+                }
+
                 setState({ loading: false, error: null });
             })
             .catch((error: any) => {
@@ -335,9 +453,9 @@ export function useShopInventory(opts: {
         return () => {
             cancelled = true;
         };
-    }, [isSubscribed, shopId, itemsPerPage, offset, search, sortBy, sortOrder, store]);
+    }, [isSubscribed, shopId, itemsPerPage, offset, search, sortBy, sortOrder, store, persistLocally]);
 
-    const items = useMemo(() => {
+    const localItems = useMemo(() => {
         let result = Object.entries(inventoryTable)
             .filter(([, row]: any) => !row._deleted)
             .map(([id, row]) => fromItemRow(id, row))
@@ -348,12 +466,9 @@ export function useShopInventory(opts: {
             result = result.filter((i) => re.test(i.itemName));
         }
         if (sortBy) {
-            // Callers (e.g. InventoryPage's sortableColumns) pass snake_case keys
-            // like 'item_name' / 'cost_price' to match the backend's column naming,
-            // but Item/fromItemRow use camelCase (itemName, costPrice, ...). Map
-            // between the two here so a[key] actually resolves to a real field —
-            // without this, a[sortBy] is always undefined and the sort silently
-            // no-ops for every column.
+            // Callers pass snake_case keys (matching the backend's column
+            // naming) but Item/fromItemRow use camelCase. Map between the
+            // two so a[key] resolves to a real field.
             const fieldMap: Record<string, keyof Item> = {
                 item_name: 'itemName',
                 itemName: 'itemName',
@@ -372,10 +487,6 @@ export function useShopInventory(opts: {
                 updatedAt: 'updatedAt',
             };
             const field = fieldMap[sortBy] ?? (sortBy as keyof Item);
-
-            // Accept 'ASC'/'DESC' (what InventoryPage tracks) as well as
-            // lowercase, so direction actually flips instead of always
-            // evaluating to ascending.
             const dir = String(sortOrder).toUpperCase() === 'DESC' ? -1 : 1;
 
             result = [...result].sort((a: any, b: any) => {
@@ -394,21 +505,36 @@ export function useShopInventory(opts: {
     }, [inventoryTable, shopId, search, sortBy, sortOrder]);
 
     return useMemo(() => {
-        const page = items.slice(offset, offset + itemsPerPage);
+        if (isSubscribed && !persistLocally) {
+            const items = remoteOnly?.items ?? [];
+            return {
+                loading: state.loading,
+                error: state.error,
+                data: { getShopInventory: { items, totalCount: remoteOnly?.totalCount ?? items.length } },
+            };
+        }
+
+        const page = localItems.slice(offset, offset + itemsPerPage);
         return {
             loading: state.loading,
             error: state.error,
-            data: { getShopInventory: { items: page, totalCount: items.length } },
+            data: { getShopInventory: { items: page, totalCount: localItems.length } },
         };
-    }, [items, offset, itemsPerPage, state.loading, state.error]);
+    }, [localItems, offset, itemsPerPage, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
 }
 
 // ---- 3. useSearchShopProducts (SEARCH_SHOP_PRODUCTS_QUERY) ----
+// Search results ARE inventory rows (same shape as useShopInventory's),
+// so this now mirrors them into TinyBase on the online path too, gated by
+// the same persistLocally flag — consistent with every other query hook.
+// Previously this hook ignored the flag entirely and never mirrored
+// anything regardless of its value, which was the actual inconsistency.
 export function useSearchShopProducts(isSubscribed: boolean) {
     const store = useStore() as Store;
+    const persistLocally = shouldPersistLocally(isSubscribed);
     const [result, setResult] = useState<{ loading: boolean; error: any; data?: any }>({
         loading: false,
-        error: null
+        error: null,
     });
 
     const search = useCallback(
@@ -418,7 +544,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 query: string;
                 limit: number;
                 offset: number;
-            }
+            };
         }) => {
             const { shopId, query, limit, offset } = options.variables;
 
@@ -433,12 +559,11 @@ export function useSearchShopProducts(isSubscribed: boolean) {
 
                 const slicedResults = allResults.slice(offset, offset + limit);
 
-                // 🚀 EXACT STRUCTURAL SHAPE DISCOVERED: Matches result.data?.searchShopProducts?.products
                 const data = {
                     searchShopProducts: {
-                        products: slicedResults,        // 🟢 Matches what ManualSearchTab checks for!
-                        totalCount: allResults.length
-                    }
+                        products: slicedResults,
+                        totalCount: allResults.length,
+                    },
                 };
 
                 setResult({ loading: false, error: null, data });
@@ -452,6 +577,14 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                     variables: { shopId, query, limit, offset },
                     fetchPolicy: 'no-cache',
                 });
+
+                if (persistLocally) {
+                    const products = data?.searchShopProducts?.products ?? [];
+                    products.forEach((item: any) => {
+                        upsertServerRow(store, 'inventory', item.id, toItemRow(item));
+                    });
+                }
+
                 setResult({ loading: false, error: null, data });
                 return { data };
             } catch (error) {
@@ -459,15 +592,11 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 throw error;
             }
         },
-        [isSubscribed, store]
+        [isSubscribed, store, persistLocally]
     );
 
     return [search, result] as const;
 }
-
-
-
-
 
 // ---- 4. useCheckoutHistory (GET_CHECKOUT_HISTORY_QUERY) ----
 export function useCheckoutHistory(opts: {
@@ -481,6 +610,8 @@ export function useCheckoutHistory(opts: {
     const store = useStore() as Store;
     const checkoutTable = useTable('checkoutHistory', store);
     const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: false, error: null });
+    const [remoteOnly, setRemoteOnly] = useState<{ batches: any[]; totalCount: number } | null>(null);
+    const persistLocally = shouldPersistLocally(isSubscribed);
 
     useEffect(() => {
         if (!isSubscribed || !shopId || activeTab !== 'checkout') return;
@@ -495,17 +626,27 @@ export function useCheckoutHistory(opts: {
             })
             .then(({ data }: any) => {
                 if (cancelled) return;
-                (data?.getCheckoutHistory?.batches ?? []).forEach((batch: any) => {
-                    upsertServerRow(store, 'checkoutHistory', batch.id, {
-                        shopId: batch.shopId,
-                        soldAt: batch.soldAt,
-                        totalItems: batch.totalItems,
-                        totalCost: batch.totalCost,
-                        grossSale: batch.grossSale,
-                        grossProfit: batch.grossProfit,
-                        itemsJson: JSON.stringify(batch.items ?? []),
+                const fetchedBatches = data?.getCheckoutHistory?.batches ?? [];
+
+                if (persistLocally) {
+                    fetchedBatches.forEach((batch: any) => {
+                        upsertServerRow(store, 'checkoutHistory', batch.id, {
+                            shopId: batch.shopId,
+                            soldAt: batch.soldAt,
+                            totalItems: batch.totalItems,
+                            totalCost: batch.totalCost,
+                            grossSale: batch.grossSale,
+                            grossProfit: batch.grossProfit,
+                            itemsJson: JSON.stringify(batch.items ?? []),
+                        });
                     });
-                });
+                } else {
+                    setRemoteOnly({
+                        batches: fetchedBatches,
+                        totalCount: data?.getCheckoutHistory?.totalCount ?? fetchedBatches.length,
+                    });
+                }
+
                 setState({ loading: false, error: null });
             })
             .catch((error: any) => {
@@ -515,18 +656,35 @@ export function useCheckoutHistory(opts: {
         return () => {
             cancelled = true;
         };
-    }, [isSubscribed, shopId, activeTab, offset, pageLimit, store]);
+    }, [isSubscribed, shopId, activeTab, offset, pageLimit, store, persistLocally]);
 
     const batches = useMemo(() => {
         if (activeTab !== 'checkout') return [];
         return Object.entries(checkoutTable)
             .filter(([, row]: any) => row.shopId === shopId && !row._deleted)
             .map(([id, row]) => fromCheckoutRow(id, row))
-            .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime()); // matches ORDER BY sold_at DESC
+            .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime());
     }, [checkoutTable, shopId, activeTab]);
 
     return useMemo(() => {
         if (activeTab !== 'checkout') return { loading: state.loading, error: state.error, data: undefined };
+
+        if (isSubscribed && !persistLocally) {
+            const list = remoteOnly?.batches ?? [];
+            const totalCount = remoteOnly?.totalCount ?? list.length;
+            return {
+                loading: state.loading,
+                error: state.error,
+                data: {
+                    getCheckoutHistory: {
+                        batches: list,
+                        totalCount,
+                        hasNextPage: offset + pageLimit < totalCount,
+                    },
+                },
+            };
+        }
+
         const page = batches.slice(offset, offset + pageLimit);
         return {
             loading: state.loading,
@@ -539,15 +697,14 @@ export function useCheckoutHistory(opts: {
                 },
             },
         };
-    }, [batches, activeTab, offset, pageLimit, state.loading, state.error]);
+    }, [batches, activeTab, offset, pageLimit, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
 }
 
 // ---- 5. useItemActionHistory (GET_ITEM_ACTION_HISTORY_QUERY) ----
-// Pull-only on purpose: your backend writes these rows itself as a side
-// effect of other mutations (AddInventoryItem/UpdateInventoryItem/
-// DeleteInventoryItem/IncrementStock). There's no client mutation that
-// creates a local-only unsynced action record, so there's no _dirty case
-// to worry about here — a plain upsert is all this table ever needs.
+// Pull-only on purpose: the backend writes these rows itself as a side
+// effect of other mutations. There's no client mutation that creates a
+// local-only unsynced action record, so there's no _dirty case to worry
+// about here.
 export function useItemActionHistory(opts: {
     shopId: string;
     offset: number;
@@ -559,6 +716,8 @@ export function useItemActionHistory(opts: {
     const store = useStore() as Store;
     const actionsTable = useTable('itemActionHistory', store);
     const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: false, error: null });
+    const [remoteOnly, setRemoteOnly] = useState<{ records: any[]; totalCount: number } | null>(null);
+    const persistLocally = shouldPersistLocally(isSubscribed);
 
     useEffect(() => {
         if (!isSubscribed || !shopId || activeTab !== 'actions') return;
@@ -573,17 +732,27 @@ export function useItemActionHistory(opts: {
             })
             .then(({ data }: any) => {
                 if (cancelled) return;
-                (data?.getItemActionHistory?.records ?? []).forEach((record: any) => {
-                    store.setRow('itemActionHistory', record.id, {
-                        shopId: record.shopId ?? shopId,
-                        inventoryItemId: record.inventoryItemId ?? '',
-                        itemName: record.itemName ?? '',
-                        action: record.action ?? '',
-                        quantity: record.quantity ?? 0,
-                        date: record.date ?? '',
-                        _serverSynced: true,
+                const fetchedRecords = data?.getItemActionHistory?.records ?? [];
+
+                if (persistLocally) {
+                    fetchedRecords.forEach((record: any) => {
+                        store.setRow('itemActionHistory', record.id, {
+                            shopId: record.shopId ?? shopId,
+                            inventoryItemId: record.inventoryItemId ?? '',
+                            itemName: record.itemName ?? '',
+                            action: record.action ?? '',
+                            quantity: record.quantity ?? 0,
+                            date: record.date ?? '',
+                            _serverSynced: true,
+                        });
                     });
-                });
+                } else {
+                    setRemoteOnly({
+                        records: fetchedRecords,
+                        totalCount: data?.getItemActionHistory?.totalCount ?? fetchedRecords.length,
+                    });
+                }
+
                 setState({ loading: false, error: null });
             })
             .catch((error: any) => {
@@ -593,7 +762,7 @@ export function useItemActionHistory(opts: {
         return () => {
             cancelled = true;
         };
-    }, [isSubscribed, shopId, activeTab, offset, pageLimit, store]);
+    }, [isSubscribed, shopId, activeTab, offset, pageLimit, store, persistLocally]);
 
     const records = useMemo(() => {
         if (activeTab !== 'actions') return [];
@@ -608,11 +777,28 @@ export function useItemActionHistory(opts: {
                 quantity: row.quantity,
                 date: row.date,
             }))
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // matches ORDER BY created_at DESC
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [actionsTable, shopId, activeTab]);
 
     return useMemo(() => {
         if (activeTab !== 'actions') return { loading: state.loading, error: state.error, data: undefined };
+
+        if (isSubscribed && !persistLocally) {
+            const list = remoteOnly?.records ?? [];
+            const totalCount = remoteOnly?.totalCount ?? list.length;
+            return {
+                loading: state.loading,
+                error: state.error,
+                data: {
+                    getItemActionHistory: {
+                        records: list,
+                        totalCount,
+                        hasNextPage: offset + pageLimit < totalCount,
+                    },
+                },
+            };
+        }
+
         const page = records.slice(offset, offset + pageLimit);
         return {
             loading: state.loading,
@@ -625,7 +811,7 @@ export function useItemActionHistory(opts: {
                 },
             },
         };
-    }, [records, activeTab, offset, pageLimit, state.loading, state.error]);
+    }, [records, activeTab, offset, pageLimit, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
 }
 
 // ---- 6. useShopById (GET_SHOP_BY_ID_QUERY) ----
@@ -633,6 +819,8 @@ export function useShopById(shopId: string, shop: Shop | undefined, isSubscribed
     const store = useStore() as Store;
     const row = useRow('shops', shopId, store);
     const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: false, error: null });
+    const [remoteOnly, setRemoteOnly] = useState<Shop | null>(null);
+    const persistLocally = shouldPersistLocally(isSubscribed);
 
     useEffect(() => {
         if (!isSubscribed || !shopId || shop) return;
@@ -644,7 +832,11 @@ export function useShopById(shopId: string, shop: Shop | undefined, isSubscribed
             .then(({ data }: any) => {
                 if (cancelled) return;
                 if (data?.getShopById) {
-                    upsertServerRow(store, 'shops', shopId, toShopRow(data.getShopById));
+                    if (persistLocally) {
+                        upsertServerRow(store, 'shops', shopId, toShopRow(data.getShopById));
+                    } else {
+                        setRemoteOnly(data.getShopById);
+                    }
                 }
                 setState({ loading: false, error: null });
             })
@@ -655,34 +847,31 @@ export function useShopById(shopId: string, shop: Shop | undefined, isSubscribed
         return () => {
             cancelled = true;
         };
-    }, [isSubscribed, shopId, shop, store]);
+    }, [isSubscribed, shopId, shop, store, persistLocally]);
 
     return useMemo(() => {
+        if (isSubscribed && !persistLocally) {
+            return {
+                loading: state.loading,
+                error: state.error,
+                data: remoteOnly ? { getShopById: remoteOnly } : undefined,
+            };
+        }
+
         const hasRow = row && Object.keys(row).length > 0;
         return {
             loading: state.loading,
             error: state.error,
             data: hasRow ? { getShopById: fromShopRow(shopId, row) } : undefined,
         };
-    }, [row, shopId, state.loading, state.error]);
+    }, [row, shopId, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
 }
 
 // ---- 7. useShopDashboardMetrics (GET_SHOP_DASHBOARD_METRICS_QUERY) ----
-// Computed locally from inventory + checkoutHistory to MATCH your Go
-// resolver's SQL as closely as JS date math allows:
-//   - todaysGrossSales / todaysSalesGrowthPct: today vs the exact same
-//     calendar day 7 days ago (a 1-day window each), per your salesQuery.
-//   - weeklyRevenueGrowthIndex: trailing 7 days vs the 7 days before that,
-//     per your weeklyQuery. 100 when there's no prior-period baseline.
-//   - averageTicketSize: AVG(gross_sale) across ALL checkout batches ever
-//     for this shop — NOT just today's — matching your aovQuery exactly.
-//   - inventoryCapitalRatio: sum(cost*qty) / sum(price*qty) * 100.
-//   - weeklySalesTrend: last 7 calendar days, oldest -> newest, matching
-//     your RECURSIVE calendar series query.
-//
-// NOT merged with local deltas when isSubscribed: true — this is a
-// server-computed SQL aggregate, not a list of rows. An offline sale won't
-// show in the ONLINE metrics view until it's actually pushed via "Sync now".
+// Like useSearchShopProducts, this hook already never writes to TinyBase on
+// the isSubscribed path — it returns `remote` (the raw Apollo response)
+// directly. The offline-computed version below is only used when
+// isSubscribed is false.
 export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
     const store = useStore() as Store;
     const inventoryTable = useTable('inventory', store);
@@ -698,7 +887,7 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
             .query({
                 query: GET_SHOP_DASHBOARD_METRICS_QUERY,
                 variables: { shopId },
-                fetchPolicy: 'no-cache', // was previously defaulting to cache-first — real bug, fixed here
+                fetchPolicy: 'no-cache',
             })
             .then(({ data }: any) => {
                 if (!cancelled) setRemote({ loading: false, error: null, data });
@@ -798,10 +987,19 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
 }
 
 // =========================================================================
-// MUTATIONS — dual-write when isSubscribed. All mutations now call Apollo
+// MUTATIONS — dual-write when isSubscribed (gated by
+// WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED). All mutations call Apollo
 // imperatively (client.mutate) instead of useMutation, since nothing reads
-// from Apollo's cache anymore — refetchQueries/awaitRefetchQueries are gone
-// because there's no cache-bound UI left for them to refresh.
+// from Apollo's cache anymore.
+//
+// IMPORTANT: any branch that writes a _dirty row to TinyBase now ALSO
+// dispatches an optimistic Redux update immediately. In Condition 3
+// (isSubscribed && !persistLocally) TinyBase is write-only — nothing
+// subscribes to it for display — so if a mutation hook doesn't push its
+// own optimistic change into Redux, that change is invisible until
+// syncEngine confirms it, and even then only if syncEngine's dispatch
+// doesn't get raced by something else. Dispatching here, once, at the
+// moment of the write, is what makes the count stay correct end to end.
 // =========================================================================
 
 type MutationCallbacks = {
@@ -818,24 +1016,36 @@ function useMutationState() {
 // ---- useDeleteShop ----
 export function useDeleteShop(opts: MutationCallbacks) {
     const store = useStore() as Store;
-    const { loading, setLoading } = useMutationState();
+    const [loading, setLoading] = useState<boolean>(false);
 
     const deleteShop = useCallback(
         async (options: { variables: { shopId: string } }) => {
             const { shopId } = options.variables;
             setLoading(true);
+
             try {
                 if (opts.isSubscribed) {
-                    await client.mutate({ mutation: DELETE_SHOP_MUTATION, variables: { shopId } });
-                    store.delRow('shops', shopId);
+                    await client.mutate({
+                        mutation: DELETE_SHOP_MUTATION,
+                        variables: { shopId },
+                    });
+
+                    if (shouldPersistLocally(opts.isSubscribed)) {
+                        store.delRow('shops', shopId);
+                    }
+                    // Redux removal for Condition 3 is done by the caller
+                    // (MyShops.tsx already dispatches deleteShopAction in its
+                    // onCompleted — that's the single writer here, so it's
+                    // left as-is rather than duplicated in this hook).
                 } else {
                     const existing = store.getRow('shops', shopId);
-                    if (existing && Object.keys(existing).length > 0 && existing._serverSynced) {
+                    if (existing && Object.keys(existing).length > 0 && (existing as any)._serverSynced) {
                         store.setPartialRow('shops', shopId, { _deleted: true, _dirty: true });
                     } else {
                         store.delRow('shops', shopId);
                     }
                 }
+
                 opts.onCompleted?.();
             } catch (err) {
                 opts.onError?.(err);
@@ -843,7 +1053,7 @@ export function useDeleteShop(opts: MutationCallbacks) {
                 setLoading(false);
             }
         },
-        [opts.isSubscribed, store]
+        [opts.isSubscribed, opts.onCompleted, opts.onError, store]
     );
 
     return [deleteShop, { loading }] as const;
@@ -852,16 +1062,23 @@ export function useDeleteShop(opts: MutationCallbacks) {
 // ---- useCreateShop ----
 export function useCreateShop(opts: MutationCallbacks) {
     const store = useStore() as Store;
-    const { loading, setLoading } = useMutationState();
+    const [loading, setLoading] = useState<boolean>(false);
 
     const createShop = useCallback(
         async (options: { variables: { input: Partial<Shop> & { photo?: File | string | null; newPhoto?: File } } }) => {
             setLoading(true);
             try {
                 if (opts.isSubscribed) {
-                    const { data } = await client.mutate({ mutation: CREATE_SHOP_MUTATION, variables: options.variables });
+                    const { data } = await client.mutate({
+                        mutation: CREATE_SHOP_MUTATION,
+                        variables: options.variables,
+                    });
                     const serverShop = data?.createShop;
-                    if (serverShop) {
+
+                    if (serverShop && shouldPersistLocally(opts.isSubscribed)) {
+                        // Condition 2: TinyBase is the read model — write the
+                        // clean server row there; the reconcile effect in
+                        // useMyShops picks it up and dispatches it.
                         store.setRow('shops', serverShop.id, {
                             ...toShopRow(serverShop),
                             _dirty: false,
@@ -869,16 +1086,45 @@ export function useCreateShop(opts: MutationCallbacks) {
                             _deleted: false,
                         });
                     }
+                    // Condition 3 (flag off): nothing to mirror into
+                    // TinyBase. Redux is NOT dispatched here — this hook's
+                    // only job is IO + TinyBase; the caller dispatches from
+                    // onCompleted's returned `data`, same convention as
+                    // useDeleteShop. Dispatching here too would duplicate
+                    // whatever the caller already does.
+
                     opts.onCompleted?.(data);
                 } else {
+                    // --- PURE OFFLINE MODE (also used when isSubscribed is
+                    // true but the caller treats this as a queued/local
+                    // write) ---
                     const id = crypto.randomUUID();
                     const input: any = { ...options.variables.input };
+
                     if (input.photo instanceof File) {
                         input.photo = await fileToStorableBase64(input.photo);
                     }
-                    const row = { ...toShopRow(input), _dirty: true, _serverSynced: false, _deleted: false };
+
+                    const row = {
+                        ...toShopRow(input),
+                        _dirty: true,
+                        _serverSynced: false,
+                        _deleted: false,
+                    };
+
                     store.setRow('shops', id, row);
-                    opts.onCompleted?.({ createShop: fromShopRow(id, row) });
+                    const optimisticShop = fromShopRow(id, row);
+
+                    // No dispatch here — hand the optimistic shop back via
+                    // onCompleted and let the caller add it to Redux (same
+                    // shape whether this was the online or offline branch,
+                    // so the caller can dispatch uniformly either way).
+                    // syncEngine.replaceLocalShop later swaps this same
+                    // entry in place (by id === localId) once the server
+                    // confirms it, so the count never drifts — as long as
+                    // there's exactly one dispatch per event, which this
+                    // hook no longer competes for.
+                    opts.onCompleted?.({ createShop: optimisticShop });
                 }
             } catch (err) {
                 opts.onError?.(err);
@@ -886,27 +1132,19 @@ export function useCreateShop(opts: MutationCallbacks) {
                 setLoading(false);
             }
         },
-        [opts.isSubscribed, store]
+        [opts.isSubscribed, store, opts.onCompleted, opts.onError]
     );
 
     return [createShop, { loading }] as const;
 }
 
 // ---- useUpdateShop ----
-// FIX: the offline branch used to only ever look at `input.photo` (a
-// string) when building the local row, so a newly-picked cover image sent
-// as `input.newPhoto` (a File — matching UpdateShopInput's photo:String +
-// newPhoto:Upload split) was silently dropped. Now newPhoto is preferred
-// and converted to a storable base64 string, same as the create path, so
-// syncEngine's splitPhotoForUpdate() finds it and uploads it on next sync.
 export function useUpdateShop(opts: MutationCallbacks) {
     const store = useStore() as Store;
-    const { loading, setLoading } = useMutationState();
+    const [loading, setLoading] = useState<boolean>(false);
 
     const updateShop = useCallback(
-        async (options: {
-            variables: { shopId: string; input: Partial<Shop> & { photo?: string | null; newPhoto?: File; photos?: string[] } };
-        }) => {
+        async (options: { variables: { shopId: string; input: Partial<Shop> & { photo?: string | null; newPhoto?: File; photos?: string[] } } }) => {
             setLoading(true);
             try {
                 if (opts.isSubscribed) {
@@ -915,7 +1153,8 @@ export function useUpdateShop(opts: MutationCallbacks) {
                         variables: { input: { shopId: options.variables.shopId, ...options.variables.input } },
                     });
                     const serverShop = data?.updateShop;
-                    if (serverShop) {
+
+                    if (serverShop && shouldPersistLocally(opts.isSubscribed)) {
                         store.setRow('shops', options.variables.shopId, {
                             ...toShopRow(serverShop),
                             _dirty: false,
@@ -923,24 +1162,33 @@ export function useUpdateShop(opts: MutationCallbacks) {
                             _deleted: false,
                         });
                     }
+                    // Condition 3 (flag off): no TinyBase mirror, and no
+                    // dispatch here — caller owns Redux via onCompleted.
+
                     opts.onCompleted?.(data);
                 } else {
                     const input: any = { ...options.variables.input };
 
-                    // FIX: newPhoto (a File) takes priority over photo (an existing
-                    // URL string) — this is the field that actually changed.
                     if (input.newPhoto instanceof File) {
                         input.photo = await fileToStorableBase64(input.newPhoto);
                     } else if (input.photo instanceof File) {
-                        // defensive: some callers may still pass a raw File as `photo`
                         input.photo = await fileToStorableBase64(input.photo);
                     }
                     delete input.newPhoto;
 
                     const existing = store.getRow('shops', options.variables.shopId);
-                    const merged = { ...existing, ...toShopRow(input), _dirty: true };
+
+                    const merged = {
+                        ...existing,
+                        ...toShopRow(input),
+                        _dirty: true,
+                    };
+
                     store.setRow('shops', options.variables.shopId, merged);
-                    opts.onCompleted?.({ updateShop: fromShopRow(options.variables.shopId, merged) });
+                    const optimisticShop = fromShopRow(options.variables.shopId, merged);
+
+                    // No dispatch here — same reasoning as useCreateShop.
+                    opts.onCompleted?.({ updateShop: optimisticShop });
                 }
             } catch (err) {
                 opts.onError?.(err);
@@ -948,20 +1196,13 @@ export function useUpdateShop(opts: MutationCallbacks) {
                 setLoading(false);
             }
         },
-        [opts.isSubscribed, store]
+        [opts.isSubscribed, store, opts.onCompleted, opts.onError]
     );
 
     return [updateShop, { loading }] as const;
 }
 
 // ---- useAddInventoryItem ----
-// FIX: the offline branch used to pass options.variables.input straight into
-// toItemRow(), which only keeps `photo` when it's already a string
-// (`typeof item.photo === 'string' ? item.photo : ''`). A freshly-picked
-// File was silently discarded, so newly-added offline items always saved
-// with no photo — invisible until you looked at the edit form. Now we
-// convert the File to a storable base64 string first, same pattern as
-// useCreateShop.
 export function useAddInventoryItem(opts: MutationCallbacks) {
     const store = useStore() as Store;
     const { loading, setLoading } = useMutationState();
@@ -973,7 +1214,7 @@ export function useAddInventoryItem(opts: MutationCallbacks) {
                 if (opts.isSubscribed) {
                     const { data } = await client.mutate({ mutation: ADD_INVENTORY_ITEM_MUTATION, variables: options.variables });
                     const serverItem = data?.addInventoryItem;
-                    if (serverItem) {
+                    if (serverItem && shouldPersistLocally(opts.isSubscribed)) {
                         store.setRow('inventory', serverItem.id, {
                             ...toItemRow(serverItem),
                             _dirty: false,
@@ -1005,21 +1246,6 @@ export function useAddInventoryItem(opts: MutationCallbacks) {
 }
 
 // ---- useUpdateInventoryItem ----
-// FIX (two bugs):
-//  1. Photo: same File-dropping issue as useAddInventoryItem — plus this
-//     hook now honors `newPhoto` (a File, sent when the user picks a new
-//     photo while editing) the same way useUpdateShop does. If neither
-//     `newPhoto` nor `photo` is present in the input (user didn't touch the
-//     photo field at all), we keep whatever the item already had instead of
-//     wiping it.
-//  2. shopId clobbering (the "item disappears after save" bug): toItemRow()
-//     defaults shopId to '' when it's not present on the input — and the
-//     edit form's payload never includes shopId. Since `{ ...existing,
-//     ...toItemRow(input) }` spreads toItemRow's result AFTER existing, that
-//     '' was overwriting the item's real shopId, so useShopInventory's
-//     `i.shopId === shopId` filter stopped matching and the item vanished
-//     from the list (it was never actually deleted). Fix: always resolve
-//     shopId from `existing` unless the input explicitly overrides it.
 export function useUpdateInventoryItem(opts: MutationCallbacks) {
     const store = useStore() as Store;
     const { loading, setLoading } = useMutationState();
@@ -1036,7 +1262,7 @@ export function useUpdateInventoryItem(opts: MutationCallbacks) {
                         variables: { input: { itemId: options.variables.itemId, ...options.variables.input } },
                     });
                     const serverItem = data?.updateInventoryItem;
-                    if (serverItem) {
+                    if (serverItem && shouldPersistLocally(opts.isSubscribed)) {
                         store.setRow('inventory', options.variables.itemId, {
                             ...toItemRow(serverItem),
                             _dirty: false,
@@ -1056,12 +1282,6 @@ export function useUpdateInventoryItem(opts: MutationCallbacks) {
                     } else if (input.photo instanceof File) {
                         input.photo = await fileToStorableBase64(input.photo);
                     } else if (input.photo === undefined && input.newPhoto === undefined) {
-                        // Field genuinely absent from this call (caller didn't send it
-                        // at all) — keep the existing photo instead of letting
-                        // toItemRow() default it to ''.
-                        // IMPORTANT: this is NOT the same as input.photo === '' — an
-                        // explicit empty string means the user actively removed the
-                        // photo and it must be cleared, not restored.
                         input.photo = existing.photo;
                     }
                     delete input.newPhoto;
@@ -1087,9 +1307,6 @@ export function useUpdateInventoryItem(opts: MutationCallbacks) {
 }
 
 // ---- useIncrementStock ----
-// FIX: previously passed `awaitRefetchQueries: opts.isSubscribed` to
-// useMutation without ever supplying a `refetchQueries` list, which did
-// nothing — dead code, now removed along with useMutation itself.
 export function useIncrementStock(opts: MutationCallbacks) {
     const store = useStore() as Store;
     const { loading, setLoading } = useMutationState();
@@ -1104,7 +1321,7 @@ export function useIncrementStock(opts: MutationCallbacks) {
                         variables: { input: { itemId: options.variables.itemId, quantityToAdd: options.variables.amount } },
                     });
                     const serverItem = data?.incrementStock;
-                    if (serverItem) {
+                    if (serverItem && shouldPersistLocally(opts.isSubscribed)) {
                         store.setRow('inventory', options.variables.itemId, {
                             ...toItemRow(serverItem),
                             _dirty: false,
@@ -1146,7 +1363,9 @@ export function useDeleteInventoryItem(opts: MutationCallbacks) {
             try {
                 if (opts.isSubscribed) {
                     await client.mutate({ mutation: DELETE_INVENTORY_ITEM_MUTATION, variables: { itemId: options.variables.itemId } });
-                    store.delRow('inventory', options.variables.itemId);
+                    if (shouldPersistLocally(opts.isSubscribed)) {
+                        store.delRow('inventory', options.variables.itemId);
+                    }
                 } else {
                     const existing = store.getRow('inventory', options.variables.itemId);
                     if (existing && Object.keys(existing).length > 0 && existing._serverSynced) {
@@ -1177,27 +1396,25 @@ export function useCheckoutCart(opts: MutationCallbacks & { shopId: string; isSu
             variables: {
                 input: {
                     shopId: string;
-                    items: { itemId: string; quantity: number }[]
-                }
-            }
+                    items: { itemId: string; quantity: number }[];
+                };
+            };
         }): Promise<CheckoutBatchResult | undefined> => {
-
             setLoading(true);
             const { shopId, items } = options.variables.input;
 
             try {
                 if (opts.isSubscribed) {
-                    // Online Apollo Mutation Block
                     const { data } = await client.mutate({
                         mutation: CHECKOUT_CART_MUTATION,
                         variables: {
-                            input: options.variables.input
+                            input: options.variables.input,
                         },
-                        fetchPolicy: 'no-cache'
+                        fetchPolicy: 'no-cache',
                     });
 
                     const serverBatch = data?.checkoutCart;
-                    if (serverBatch) {
+                    if (serverBatch && shouldPersistLocally(opts.isSubscribed)) {
                         store.setRow('checkoutHistory', serverBatch.id, {
                             shopId: serverBatch.shopId,
                             soldAt: serverBatch.soldAt,
@@ -1227,9 +1444,7 @@ export function useCheckoutCart(opts: MutationCallbacks & { shopId: string; isSu
 
                     opts.onCompleted?.(data);
                     return { data };
-
                 } else {
-                    // Offline Mode Simulation Block
                     const id = crypto.randomUUID();
 
                     const lineItems = items.map((cartItem) => {
@@ -1284,9 +1499,9 @@ export function useCheckoutCart(opts: MutationCallbacks & { shopId: string; isSu
                             checkoutCart: {
                                 id,
                                 ...record,
-                                items: lineItems
-                            }
-                        }
+                                items: lineItems,
+                            },
+                        },
                     };
 
                     opts.onCompleted?.(mockResponse.data);

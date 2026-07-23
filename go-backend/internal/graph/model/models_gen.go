@@ -64,6 +64,13 @@ type CheckoutBatchItemInput struct {
 	Quantity int    `json:"quantity"`
 }
 
+type CheckoutBatchSyncInput struct {
+	LocalID         string                    `json:"localId"`
+	ShopID          string                    `json:"shopId"`
+	ClientCreatedAt *string                   `json:"clientCreatedAt,omitempty"`
+	Items           []*CheckoutBatchItemInput `json:"items"`
+}
+
 type CheckoutCartInput struct {
 	ShopID string                    `json:"shopId"`
 	Items  []*CheckoutBatchItemInput `json:"items"`
@@ -136,6 +143,11 @@ type DeliveryOptionsInput struct {
 	MinOrder  *float64 `json:"minOrder,omitempty"`
 }
 
+type DeltaResponse struct {
+	Upserted   []map[string]any `json:"upserted"`
+	DeletedIds []string         `json:"deletedIds"`
+}
+
 type GoogleLoginInput struct {
 	Code string `json:"code"`
 }
@@ -151,6 +163,24 @@ type IncrementStockInput struct {
 	QuantityToAdd int    `json:"quantityToAdd"`
 }
 
+type InventorySyncInput struct {
+	LocalID         string   `json:"localId"`
+	ShopID          string   `json:"shopId"`
+	IsDeleted       bool     `json:"isDeleted"`
+	IsServerSynced  bool     `json:"isServerSynced"`
+	ClientCreatedAt *string  `json:"clientCreatedAt,omitempty"`
+	ItemName        *string  `json:"itemName,omitempty"`
+	Description     *string  `json:"description,omitempty"`
+	Barcode         *string  `json:"barcode,omitempty"`
+	Category        *string  `json:"category,omitempty"`
+	UnitOfMeasure   *string  `json:"unitOfMeasure,omitempty"`
+	CostPrice       *float64 `json:"costPrice,omitempty"`
+	SellingPrice    *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity   *int     `json:"stockQuantity,omitempty"`
+	ReorderLevel    *int     `json:"reorderLevel,omitempty"`
+	Photo           *string  `json:"photo,omitempty"`
+}
+
 type ItemActionHistory struct {
 	ID              string  `json:"id"`
 	ShopID          string  `json:"shopId"`
@@ -159,6 +189,16 @@ type ItemActionHistory struct {
 	Action          string  `json:"action"`
 	Quantity        *int    `json:"quantity,omitempty"`
 	Date            string  `json:"date"`
+}
+
+type ItemActionHistorySyncInput struct {
+	LocalID         string  `json:"localId"`
+	ShopID          string  `json:"shopId"`
+	InventoryItemID *string `json:"inventoryItemId,omitempty"`
+	ItemName        string  `json:"itemName"`
+	Action          string  `json:"action"`
+	Quantity        *int    `json:"quantity,omitempty"`
+	ClientCreatedAt string  `json:"clientCreatedAt"`
 }
 
 type Mutation struct {
@@ -325,6 +365,24 @@ type ShopStatus struct {
 	IsActive bool `json:"isActive"`
 }
 
+type ShopSyncInput struct {
+	LocalID         string                `json:"localId"`
+	IsDeleted       bool                  `json:"isDeleted"`
+	IsServerSynced  bool                  `json:"isServerSynced"`
+	ClientCreatedAt *string               `json:"clientCreatedAt,omitempty"`
+	ShopName        *string               `json:"shopName,omitempty"`
+	Address         *string               `json:"address,omitempty"`
+	Description     *string               `json:"description,omitempty"`
+	Coordinates     *CoordinatesInput     `json:"coordinates,omitempty"`
+	BusinessHours   *BusinessHoursInput   `json:"businessHours,omitempty"`
+	PaymentMethods  *PaymentMethodsInput  `json:"paymentMethods,omitempty"`
+	Delivery        *DeliveryOptionsInput `json:"delivery,omitempty"`
+	SocialMedia     *SocialMediaInput     `json:"socialMedia,omitempty"`
+	ContactDetails  *ContactDetailsInput  `json:"contactDetails,omitempty"`
+	Photo           *string               `json:"photo,omitempty"`
+	Photos          []string              `json:"photos,omitempty"`
+}
+
 type SocialMedia struct {
 	Facebook  *string `json:"facebook,omitempty"`
 	Instagram *string `json:"instagram,omitempty"`
@@ -333,6 +391,22 @@ type SocialMedia struct {
 type SocialMediaInput struct {
 	Facebook  *string `json:"facebook,omitempty"`
 	Instagram *string `json:"instagram,omitempty"`
+}
+
+type UnifiedBatchSyncInput struct {
+	LastSyncedAt    string                        `json:"lastSyncedAt"`
+	Shops           []*ShopSyncInput              `json:"shops"`
+	Inventory       []*InventorySyncInput         `json:"inventory"`
+	Checkouts       []*CheckoutBatchSyncInput     `json:"checkouts"`
+	ActionHistories []*ItemActionHistorySyncInput `json:"actionHistories"`
+}
+
+type UnifiedBatchSyncPayload struct {
+	ShopsDelta           *DeltaResponse `json:"shopsDelta"`
+	InventoryDelta       *DeltaResponse `json:"inventoryDelta"`
+	CheckoutsDelta       *DeltaResponse `json:"checkoutsDelta"`
+	ActionHistoriesDelta *DeltaResponse `json:"actionHistoriesDelta"`
+	ServerTime           string         `json:"serverTime"`
 }
 
 type UpdateInventoryItemInput struct {

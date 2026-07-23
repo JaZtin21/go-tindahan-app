@@ -96,6 +96,11 @@ type ComplexityRoot struct {
 		Radius    func(childComplexity int) int
 	}
 
+	DeltaResponse struct {
+		DeletedIds func(childComplexity int) int
+		Upserted   func(childComplexity int) int
+	}
+
 	HourlySalesMetric struct {
 		Hour         func(childComplexity int) int
 		ItemsSold    func(childComplexity int) int
@@ -126,6 +131,7 @@ type ComplexityRoot struct {
 		Logout              func(childComplexity int) int
 		Ping                func(childComplexity int) int
 		RefreshToken        func(childComplexity int) int
+		UnifiedBatchSync    func(childComplexity int, input model.UnifiedBatchSyncInput) int
 		UpdateInventoryItem func(childComplexity int, input model.UpdateInventoryItemInput) int
 		UpdatePost          func(childComplexity int, input model.UpdatePostInput) int
 		UpdateShop          func(childComplexity int, input model.UpdateShopInput) int
@@ -303,6 +309,14 @@ type ComplexityRoot struct {
 		Instagram func(childComplexity int) int
 	}
 
+	UnifiedBatchSyncPayload struct {
+		ActionHistoriesDelta func(childComplexity int) int
+		CheckoutsDelta       func(childComplexity int) int
+		InventoryDelta       func(childComplexity int) int
+		ServerTime           func(childComplexity int) int
+		ShopsDelta           func(childComplexity int) int
+	}
+
 	User struct {
 		Email        func(childComplexity int) int
 		FirstName    func(childComplexity int) int
@@ -340,6 +354,7 @@ type MutationResolver interface {
 	IncrementStock(ctx context.Context, input model.IncrementStockInput) (*model.OwnerInventoryItem, error)
 	DecrementStock(ctx context.Context, input model.DecrementStockInput) (*model.OwnerInventoryItem, error)
 	CheckoutCart(ctx context.Context, input model.CheckoutCartInput) (*model.CheckoutBatch, error)
+	UnifiedBatchSync(ctx context.Context, input model.UnifiedBatchSyncInput) (*model.UnifiedBatchSyncPayload, error)
 }
 type QueryResolver interface {
 	Ping(ctx context.Context) (string, error)
@@ -587,6 +602,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DeliveryOptions.Radius(childComplexity), true
 
+	case "DeltaResponse.deletedIds":
+		if e.ComplexityRoot.DeltaResponse.DeletedIds == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeltaResponse.DeletedIds(childComplexity), true
+	case "DeltaResponse.upserted":
+		if e.ComplexityRoot.DeltaResponse.Upserted == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeltaResponse.Upserted(childComplexity), true
+
 	case "HourlySalesMetric.hour":
 		if e.ComplexityRoot.HourlySalesMetric.Hour == nil {
 			break
@@ -777,6 +805,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RefreshToken(childComplexity), true
+	case "Mutation.unifiedBatchSync":
+		if e.ComplexityRoot.Mutation.UnifiedBatchSync == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unifiedBatchSync_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UnifiedBatchSync(childComplexity, args["input"].(model.UnifiedBatchSyncInput)), true
 	case "Mutation.updateInventoryItem":
 		if e.ComplexityRoot.Mutation.UpdateInventoryItem == nil {
 			break
@@ -1576,6 +1615,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.SocialMedia.Instagram(childComplexity), true
 
+	case "UnifiedBatchSyncPayload.actionHistoriesDelta":
+		if e.ComplexityRoot.UnifiedBatchSyncPayload.ActionHistoriesDelta == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UnifiedBatchSyncPayload.ActionHistoriesDelta(childComplexity), true
+	case "UnifiedBatchSyncPayload.checkoutsDelta":
+		if e.ComplexityRoot.UnifiedBatchSyncPayload.CheckoutsDelta == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UnifiedBatchSyncPayload.CheckoutsDelta(childComplexity), true
+	case "UnifiedBatchSyncPayload.inventoryDelta":
+		if e.ComplexityRoot.UnifiedBatchSyncPayload.InventoryDelta == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UnifiedBatchSyncPayload.InventoryDelta(childComplexity), true
+	case "UnifiedBatchSyncPayload.serverTime":
+		if e.ComplexityRoot.UnifiedBatchSyncPayload.ServerTime == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UnifiedBatchSyncPayload.ServerTime(childComplexity), true
+	case "UnifiedBatchSyncPayload.shopsDelta":
+		if e.ComplexityRoot.UnifiedBatchSyncPayload.ShopsDelta == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UnifiedBatchSyncPayload.ShopsDelta(childComplexity), true
+
 	case "User.email":
 		if e.ComplexityRoot.User.Email == nil {
 			break
@@ -1648,6 +1718,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputAddInventoryItemInput,
 		ec.unmarshalInputBusinessHoursInput,
 		ec.unmarshalInputCheckoutBatchItemInput,
+		ec.unmarshalInputCheckoutBatchSyncInput,
 		ec.unmarshalInputCheckoutCartInput,
 		ec.unmarshalInputContactDetailsInput,
 		ec.unmarshalInputCoordinatesInput,
@@ -1657,8 +1728,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDeliveryOptionsInput,
 		ec.unmarshalInputGoogleLoginInput,
 		ec.unmarshalInputIncrementStockInput,
+		ec.unmarshalInputInventorySyncInput,
+		ec.unmarshalInputItemActionHistorySyncInput,
 		ec.unmarshalInputPaymentMethodsInput,
+		ec.unmarshalInputShopSyncInput,
 		ec.unmarshalInputSocialMediaInput,
+		ec.unmarshalInputUnifiedBatchSyncInput,
 		ec.unmarshalInputUpdateInventoryItemInput,
 		ec.unmarshalInputUpdatePostInput,
 		ec.unmarshalInputUpdateShopInput,
@@ -1874,6 +1949,16 @@ func (ec *executionContext) childFields_DeliveryOptions(ctx context.Context, fie
 		return ec.fieldContext_DeliveryOptions_minOrder(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type DeliveryOptions", field.Name)
+}
+
+func (ec *executionContext) childFields_DeltaResponse(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "upserted":
+		return ec.fieldContext_DeltaResponse_upserted(ctx, field)
+	case "deletedIds":
+		return ec.fieldContext_DeltaResponse_deletedIds(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type DeltaResponse", field.Name)
 }
 
 func (ec *executionContext) childFields_ItemActionHistory(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2208,6 +2293,22 @@ func (ec *executionContext) childFields_SocialMedia(ctx context.Context, field g
 	return nil, fmt.Errorf("no field named %q was found under type SocialMedia", field.Name)
 }
 
+func (ec *executionContext) childFields_UnifiedBatchSyncPayload(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "shopsDelta":
+		return ec.fieldContext_UnifiedBatchSyncPayload_shopsDelta(ctx, field)
+	case "inventoryDelta":
+		return ec.fieldContext_UnifiedBatchSyncPayload_inventoryDelta(ctx, field)
+	case "checkoutsDelta":
+		return ec.fieldContext_UnifiedBatchSyncPayload_checkoutsDelta(ctx, field)
+	case "actionHistoriesDelta":
+		return ec.fieldContext_UnifiedBatchSyncPayload_actionHistoriesDelta(ctx, field)
+	case "serverTime":
+		return ec.fieldContext_UnifiedBatchSyncPayload_serverTime(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type UnifiedBatchSyncPayload", field.Name)
+}
+
 func (ec *executionContext) childFields_User(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -2486,6 +2587,20 @@ func (ec *executionContext) field_Mutation_loginWithGoogle_args(ctx context.Cont
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.GoogleLoginInput, error) {
 			return ec.unmarshalNGoogleLoginInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐGoogleLoginInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unifiedBatchSync_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UnifiedBatchSyncInput, error) {
+			return ec.unmarshalNUnifiedBatchSyncInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -3730,6 +3845,52 @@ func (ec *executionContext) fieldContext_DeliveryOptions_minOrder(_ context.Cont
 	return graphql.NewScalarFieldContext("DeliveryOptions", field, false, false, errors.New("field of type Float does not have child fields"))
 }
 
+func (ec *executionContext) _DeltaResponse_upserted(ctx context.Context, field graphql.CollectedField, obj *model.DeltaResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeltaResponse_upserted(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Upserted, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []map[string]any) graphql.Marshaler {
+			return ec.marshalNJSON2ᚕmapᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeltaResponse_upserted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeltaResponse", field, false, false, errors.New("field of type JSON does not have child fields"))
+}
+
+func (ec *executionContext) _DeltaResponse_deletedIds(ctx context.Context, field graphql.CollectedField, obj *model.DeltaResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeltaResponse_deletedIds(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeletedIds, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNID2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeltaResponse_deletedIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeltaResponse", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
 func (ec *executionContext) _HourlySalesMetric_hour(ctx context.Context, field graphql.CollectedField, obj *model.HourlySalesMetric) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4747,6 +4908,63 @@ func (ec *executionContext) fieldContext_Mutation_checkoutCart(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_checkoutCart_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unifiedBatchSync(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_unifiedBatchSync(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UnifiedBatchSync(ctx, fc.Args["input"].(model.UnifiedBatchSyncInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.UnifiedBatchSyncPayload
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.UnifiedBatchSyncPayload) graphql.Marshaler {
+			return ec.marshalNUnifiedBatchSyncPayload2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncPayload(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_unifiedBatchSync(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_UnifiedBatchSyncPayload(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unifiedBatchSync_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8035,6 +8253,157 @@ func (ec *executionContext) fieldContext_SocialMedia_instagram(_ context.Context
 	return graphql.NewScalarFieldContext("SocialMedia", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _UnifiedBatchSyncPayload_shopsDelta(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UnifiedBatchSyncPayload_shopsDelta(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ShopsDelta, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.DeltaResponse) graphql.Marshaler {
+			return ec.marshalNDeltaResponse2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeltaResponse(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UnifiedBatchSyncPayload_shopsDelta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnifiedBatchSyncPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeltaResponse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnifiedBatchSyncPayload_inventoryDelta(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UnifiedBatchSyncPayload_inventoryDelta(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.InventoryDelta, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.DeltaResponse) graphql.Marshaler {
+			return ec.marshalNDeltaResponse2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeltaResponse(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UnifiedBatchSyncPayload_inventoryDelta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnifiedBatchSyncPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeltaResponse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnifiedBatchSyncPayload_checkoutsDelta(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UnifiedBatchSyncPayload_checkoutsDelta(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CheckoutsDelta, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.DeltaResponse) graphql.Marshaler {
+			return ec.marshalNDeltaResponse2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeltaResponse(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UnifiedBatchSyncPayload_checkoutsDelta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnifiedBatchSyncPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeltaResponse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnifiedBatchSyncPayload_actionHistoriesDelta(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UnifiedBatchSyncPayload_actionHistoriesDelta(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionHistoriesDelta, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.DeltaResponse) graphql.Marshaler {
+			return ec.marshalNDeltaResponse2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeltaResponse(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UnifiedBatchSyncPayload_actionHistoriesDelta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnifiedBatchSyncPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeltaResponse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnifiedBatchSyncPayload_serverTime(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UnifiedBatchSyncPayload_serverTime(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ServerTime, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UnifiedBatchSyncPayload_serverTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UnifiedBatchSyncPayload", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9502,6 +9871,57 @@ func (ec *executionContext) unmarshalInputCheckoutBatchItemInput(ctx context.Con
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCheckoutBatchSyncInput(ctx context.Context, obj any) (model.CheckoutBatchSyncInput, error) {
+	var it model.CheckoutBatchSyncInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"localId", "shopId", "clientCreatedAt", "items"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "localId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("localId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LocalID = data
+		case "shopId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShopID = data
+		case "clientCreatedAt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCreatedAt"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCreatedAt = data
+		case "items":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("items"))
+			data, err := ec.unmarshalNCheckoutBatchItemInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchItemInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Items = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCheckoutCartInput(ctx context.Context, obj any) (model.CheckoutCartInput, error) {
 	var it model.CheckoutCartInput
 	if obj == nil {
@@ -9912,6 +10332,206 @@ func (ec *executionContext) unmarshalInputIncrementStockInput(ctx context.Contex
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context, obj any) (model.InventorySyncInput, error) {
+	var it model.InventorySyncInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"localId", "shopId", "isDeleted", "isServerSynced", "clientCreatedAt", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "localId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("localId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LocalID = data
+		case "shopId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShopID = data
+		case "isDeleted":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDeleted"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDeleted = data
+		case "isServerSynced":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isServerSynced"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsServerSynced = data
+		case "clientCreatedAt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCreatedAt"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCreatedAt = data
+		case "itemName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemName"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ItemName = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		case "barcode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("barcode"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Barcode = data
+		case "category":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("category"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Category = data
+		case "unitOfMeasure":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unitOfMeasure"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UnitOfMeasure = data
+		case "costPrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("costPrice"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CostPrice = data
+		case "sellingPrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sellingPrice"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SellingPrice = data
+		case "stockQuantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("stockQuantity"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StockQuantity = data
+		case "reorderLevel":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reorderLevel"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ReorderLevel = data
+		case "photo":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photo"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Photo = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputItemActionHistorySyncInput(ctx context.Context, obj any) (model.ItemActionHistorySyncInput, error) {
+	var it model.ItemActionHistorySyncInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"localId", "shopId", "inventoryItemId", "itemName", "action", "quantity", "clientCreatedAt"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "localId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("localId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LocalID = data
+		case "shopId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShopID = data
+		case "inventoryItemId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inventoryItemId"))
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.InventoryItemID = data
+		case "itemName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ItemName = data
+		case "action":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("action"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Action = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		case "clientCreatedAt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCreatedAt"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCreatedAt = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputPaymentMethodsInput(ctx context.Context, obj any) (model.PaymentMethodsInput, error) {
 	var it model.PaymentMethodsInput
 	if obj == nil {
@@ -9963,6 +10583,134 @@ func (ec *executionContext) unmarshalInputPaymentMethodsInput(ctx context.Contex
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj any) (model.ShopSyncInput, error) {
+	var it model.ShopSyncInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"localId", "isDeleted", "isServerSynced", "clientCreatedAt", "shopName", "address", "description", "coordinates", "businessHours", "paymentMethods", "delivery", "socialMedia", "contactDetails", "photo", "photos"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "localId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("localId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LocalID = data
+		case "isDeleted":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDeleted"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDeleted = data
+		case "isServerSynced":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isServerSynced"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsServerSynced = data
+		case "clientCreatedAt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCreatedAt"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCreatedAt = data
+		case "shopName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopName"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShopName = data
+		case "address":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Address = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		case "coordinates":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("coordinates"))
+			data, err := ec.unmarshalOCoordinatesInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCoordinatesInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Coordinates = data
+		case "businessHours":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessHours"))
+			data, err := ec.unmarshalOBusinessHoursInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBusinessHoursInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BusinessHours = data
+		case "paymentMethods":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("paymentMethods"))
+			data, err := ec.unmarshalOPaymentMethodsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaymentMethodsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PaymentMethods = data
+		case "delivery":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("delivery"))
+			data, err := ec.unmarshalODeliveryOptionsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeliveryOptionsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Delivery = data
+		case "socialMedia":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("socialMedia"))
+			data, err := ec.unmarshalOSocialMediaInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMediaInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SocialMedia = data
+		case "contactDetails":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contactDetails"))
+			data, err := ec.unmarshalOContactDetailsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐContactDetailsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContactDetails = data
+		case "photo":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photo"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Photo = data
+		case "photos":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photos"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Photos = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSocialMediaInput(ctx context.Context, obj any) (model.SocialMediaInput, error) {
 	var it model.SocialMediaInput
 	if obj == nil {
@@ -9995,6 +10743,64 @@ func (ec *executionContext) unmarshalInputSocialMediaInput(ctx context.Context, 
 				return it, err
 			}
 			it.Instagram = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUnifiedBatchSyncInput(ctx context.Context, obj any) (model.UnifiedBatchSyncInput, error) {
+	var it model.UnifiedBatchSyncInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"lastSyncedAt", "shops", "inventory", "checkouts", "actionHistories"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "lastSyncedAt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lastSyncedAt"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LastSyncedAt = data
+		case "shops":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shops"))
+			data, err := ec.unmarshalNShopSyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐShopSyncInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Shops = data
+		case "inventory":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inventory"))
+			data, err := ec.unmarshalNInventorySyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐInventorySyncInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Inventory = data
+		case "checkouts":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("checkouts"))
+			data, err := ec.unmarshalNCheckoutBatchSyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchSyncInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Checkouts = data
+		case "actionHistories":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("actionHistories"))
+			data, err := ec.unmarshalNItemActionHistorySyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistorySyncInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ActionHistories = data
 		}
 	}
 	return it, nil
@@ -10714,6 +11520,49 @@ func (ec *executionContext) _DeliveryOptions(ctx context.Context, sel ast.Select
 	return out
 }
 
+var deltaResponseImplementors = []string{"DeltaResponse"}
+
+func (ec *executionContext) _DeltaResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeltaResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deltaResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeltaResponse")
+		case "upserted":
+			out.Values[i] = ec._DeltaResponse_upserted(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deletedIds":
+			out.Values[i] = ec._DeltaResponse_deletedIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var hourlySalesMetricImplementors = []string{"HourlySalesMetric"}
 
 func (ec *executionContext) _HourlySalesMetric(ctx context.Context, sel ast.SelectionSet, obj *model.HourlySalesMetric) graphql.Marshaler {
@@ -10958,6 +11807,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "checkoutCart":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_checkoutCart(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unifiedBatchSync":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unifiedBatchSync(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -12428,6 +13284,64 @@ func (ec *executionContext) _SocialMedia(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var unifiedBatchSyncPayloadImplementors = []string{"UnifiedBatchSyncPayload"}
+
+func (ec *executionContext) _UnifiedBatchSyncPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnifiedBatchSyncPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, unifiedBatchSyncPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UnifiedBatchSyncPayload")
+		case "shopsDelta":
+			out.Values[i] = ec._UnifiedBatchSyncPayload_shopsDelta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inventoryDelta":
+			out.Values[i] = ec._UnifiedBatchSyncPayload_inventoryDelta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "checkoutsDelta":
+			out.Values[i] = ec._UnifiedBatchSyncPayload_checkoutsDelta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "actionHistoriesDelta":
+			out.Values[i] = ec._UnifiedBatchSyncPayload_actionHistoriesDelta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "serverTime":
+			out.Values[i] = ec._UnifiedBatchSyncPayload_serverTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var userImplementors = []string{"User"}
 
 func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *model.User) graphql.Marshaler {
@@ -13056,6 +13970,25 @@ func (ec *executionContext) unmarshalNCheckoutBatchItemInput2ᚖgoᚑbackendᚋi
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCheckoutBatchSyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchSyncInputᚄ(ctx context.Context, v any) ([]*model.CheckoutBatchSyncInput, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.CheckoutBatchSyncInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNCheckoutBatchSyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchSyncInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNCheckoutBatchSyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutBatchSyncInput(ctx context.Context, v any) (*model.CheckoutBatchSyncInput, error) {
+	res, err := ec.unmarshalInputCheckoutBatchSyncInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCheckoutCartInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCheckoutCartInput(ctx context.Context, v any) (model.CheckoutCartInput, error) {
 	res, err := ec.unmarshalInputCheckoutCartInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13147,6 +14080,16 @@ func (ec *executionContext) unmarshalNDeliveryOptionsInput2ᚖgoᚑbackendᚋint
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNDeltaResponse2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeltaResponse(ctx context.Context, sel ast.SelectionSet, v *model.DeltaResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeltaResponse(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13184,6 +14127,35 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) unmarshalNID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNID2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNID2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNID2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNIncrementStockInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐIncrementStockInput(ctx context.Context, v any) (model.IncrementStockInput, error) {
 	res, err := ec.unmarshalInputIncrementStockInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13203,6 +14175,25 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNInventorySyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐInventorySyncInputᚄ(ctx context.Context, v any) ([]*model.InventorySyncInput, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.InventorySyncInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInventorySyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐInventorySyncInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNInventorySyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐInventorySyncInput(ctx context.Context, v any) (*model.InventorySyncInput, error) {
+	res, err := ec.unmarshalInputInventorySyncInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNItemActionHistory2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ItemActionHistory) graphql.Marshaler {
@@ -13229,6 +14220,76 @@ func (ec *executionContext) marshalNItemActionHistory2ᚖgoᚑbackendᚋinternal
 		return graphql.Null
 	}
 	return ec._ItemActionHistory(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNItemActionHistorySyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistorySyncInputᚄ(ctx context.Context, v any) ([]*model.ItemActionHistorySyncInput, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.ItemActionHistorySyncInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNItemActionHistorySyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistorySyncInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNItemActionHistorySyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐItemActionHistorySyncInput(ctx context.Context, v any) (*model.ItemActionHistorySyncInput, error) {
+	res, err := ec.unmarshalInputItemActionHistorySyncInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNJSON2map(ctx context.Context, v any) (map[string]any, error) {
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNJSON2ᚕmapᚄ(ctx context.Context, v any) ([]map[string]any, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]map[string]any, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNJSON2map(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNJSON2ᚕmapᚄ(ctx context.Context, sel ast.SelectionSet, v []map[string]any) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNJSON2map(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNOwnerInventoryItem2goᚑbackendᚋinternalᚋgraphᚋmodelᚐOwnerInventoryItem(ctx context.Context, sel ast.SelectionSet, v model.OwnerInventoryItem) graphql.Marshaler {
@@ -13550,6 +14611,25 @@ func (ec *executionContext) marshalNShopStatus2ᚖgoᚑbackendᚋinternalᚋgrap
 	return ec._ShopStatus(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNShopSyncInput2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐShopSyncInputᚄ(ctx context.Context, v any) ([]*model.ShopSyncInput, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.ShopSyncInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNShopSyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐShopSyncInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNShopSyncInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐShopSyncInput(ctx context.Context, v any) (*model.ShopSyncInput, error) {
+	res, err := ec.unmarshalInputShopSyncInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNSocialMedia2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMedia(ctx context.Context, sel ast.SelectionSet, v *model.SocialMedia) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -13608,6 +14688,25 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNUnifiedBatchSyncInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncInput(ctx context.Context, v any) (model.UnifiedBatchSyncInput, error) {
+	res, err := ec.unmarshalInputUnifiedBatchSyncInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUnifiedBatchSyncPayload2goᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncPayload(ctx context.Context, sel ast.SelectionSet, v model.UnifiedBatchSyncPayload) graphql.Marshaler {
+	return ec._UnifiedBatchSyncPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUnifiedBatchSyncPayload2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncPayload(ctx context.Context, sel ast.SelectionSet, v *model.UnifiedBatchSyncPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UnifiedBatchSyncPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNUpdateInventoryItemInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐUpdateInventoryItemInput(ctx context.Context, v any) (model.UpdateInventoryItemInput, error) {
@@ -13837,6 +14936,38 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) unmarshalOBusinessHoursInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBusinessHoursInput(ctx context.Context, v any) (*model.BusinessHoursInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputBusinessHoursInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOContactDetailsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐContactDetailsInput(ctx context.Context, v any) (*model.ContactDetailsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputContactDetailsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCoordinatesInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCoordinatesInput(ctx context.Context, v any) (*model.CoordinatesInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCoordinatesInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalODeliveryOptionsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeliveryOptionsInput(ctx context.Context, v any) (*model.DeliveryOptionsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDeliveryOptionsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
 	if v == nil {
 		return nil, nil
@@ -13897,11 +15028,27 @@ func (ec *executionContext) marshalOOwnerShop2ᚖgoᚑbackendᚋinternalᚋgraph
 	return ec._OwnerShop(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOPaymentMethodsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaymentMethodsInput(ctx context.Context, v any) (*model.PaymentMethodsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputPaymentMethodsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOPost2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Post(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOSocialMediaInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMediaInput(ctx context.Context, v any) (*model.SocialMediaInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputSocialMediaInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
