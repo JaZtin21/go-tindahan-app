@@ -335,7 +335,7 @@ export const ShopDetailDashboard = () => {
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
                     onClick={handleOpenCheckoutModal}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10  rounded-2xl p-5 shadow-sm transition-all duration-300   cursor-pointer "
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10  rounded-2xl p-5 shadow-sm transition-all duration-300   cursor-pointer "
                 >
                     {/* Centered Asset Representation Box matching your shop card geometry layout */}
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
@@ -349,7 +349,7 @@ export const ShopDetailDashboard = () => {
                 {/* 2. Add Items in Inventory (Modal Trigger) */}
                 <div
                     onClick={handleOpenInventoryModal}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300  hover:bg-bg-primary-hover cursor-pointer "
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300  hover:bg-bg-primary-hover cursor-pointer "
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <PlusCircle className="w-6 h-6 text-text-sub" />
@@ -362,7 +362,7 @@ export const ShopDetailDashboard = () => {
                 {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
                 <a
                     onClick={handleOpenRestockModal}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Package className="w-6 h-6 text-text-sub" />
@@ -375,7 +375,7 @@ export const ShopDetailDashboard = () => {
                 {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/inventory`)}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Package className="w-6 h-6 text-text-sub" />
@@ -388,7 +388,7 @@ export const ShopDetailDashboard = () => {
                 {/* 4. View Inquiries (Subroute Navigation Anchor) */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/inquiries`)}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <MessageSquare className="w-6 h-6 text-text-sub" />
@@ -401,7 +401,7 @@ export const ShopDetailDashboard = () => {
                 {/* 5. Sales History */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/sales-history`)}
-                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
+                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <History className="w-6 h-6 text-text-sub" />
@@ -414,7 +414,7 @@ export const ShopDetailDashboard = () => {
                 {/* 6. Edit Shop Info (Modal Trigger) */}
                 <div
                     onClick={() => triggerModalAction('Edit Shop Info')}
-                    className="group  flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
+                    className="group  flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Store className="w-6 h-6 text-text-sub" />
