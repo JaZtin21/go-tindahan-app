@@ -62,14 +62,14 @@ export const SalesHistoryPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="w-full bg-bg-primary border border-border-main rounded-xl md:p-6 p-4 flex flex-col gap-6">
+      <div className="w-full flex flex-col">
 
 
-        <div className="flex bg-bg-secondary rounded-full w-full max-w-lg border border-border-main">
+        <div className="flex  rounded-sm w-full max-w-lg ">
           <button
             type="button"
             onClick={() => setActiveTab('checkout')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-full cursor-pointer ${activeTab === 'checkout' ? 'bg-brand-gold text-text-white shadow-sm' : 'text-text-sub hover:text-text-main'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-t-2xl cursor-pointer ${activeTab === 'checkout' ? 'bg-brand-gold text-text-white shadow-sm' : 'text-text-sub hover:text-text-main'}`}
           >
             <ReceiptText size={16} />
             Checkout History
@@ -77,7 +77,7 @@ export const SalesHistoryPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('actions')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-full cursor-pointer ${activeTab === 'actions' ? 'bg-brand-gold text-text-white shadow-sm' : 'text-text-sub hover:text-text-main'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-semibold transition-all duration-200 rounded-t-2xl cursor-pointer ${activeTab === 'actions' ? 'bg-brand-gold text-text-white shadow-sm' : 'text-text-sub hover:text-text-main'}`}
           >
             <ClipboardList size={16} />
             Item Actions History
@@ -91,15 +91,15 @@ export const SalesHistoryPage: React.FC = () => {
         )}
 
         {activeTab === 'checkout' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 border-t border-border-main pt-6">
             {isLoading ? (
               <div className="text-sm text-text-muted py-8 text-center">Loading checkout history...</div>
             ) : (checkoutData?.batches?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">No checkout batches recorded yet.</div>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-6">
                 {checkoutData?.batches.map((batch) => (
-                  <div key={batch.id} className="rounded-2xl border border-border-main ">
+                  <div key={batch.id} className="rounded-2xl border border-border-main overflow-hidden">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pb-4 p-4 ">
                       <div>
                         <h3 className="text-sm font-bold text-text-main">Batch #{batch.id.slice(0, 8)}</h3>
@@ -112,33 +112,42 @@ export const SalesHistoryPage: React.FC = () => {
                         <div><span className="text-text-muted block">Gross Profit</span><span className="font-bold text-brand-green">{formatCurrency(batch.grossProfit)}</span></div>
                       </div>
                     </div>
-                    <div className="overflow-x-auto  max-h-[200px] bg-brand-gold/10  rounded-2xl">
-                      <table className="w-full min-w-[700px] text-left border-collapse">
-                        <thead className='sticky top-0 bg-brand-gold '>
-                          <tr className="border-b border-border-sub/40 text-text-white text-xs font-bold uppercase tracking-wider h-10">
-                            <th className="pl-4 ">Item Name</th>
-                            <th>Qty</th>
-                            <th>Cost Price</th>
-                            <th>Selling Price</th>
-                            <th>Line Cost</th>
-                            <th>Line Sale</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-sub/20 text-sm font-medium">
-                          {batch.items.map((item: any) => (
-                            <tr key={item.id} className="h-11">
-                              <td className="font-semibold text-text-main pl-4">{item.itemName}</td>
-                              <td>{item.quantity}</td>
-                              <td>{formatCurrency(item.costPrice)}</td>
-                              <td>{formatCurrency(item.sellingPrice)}</td>
-                              <td>{formatCurrency(item.lineCostTotal)}</td>
-                              <td>{formatCurrency(item.lineSaleTotal)}</td>
-                            </tr>
+
+                    <div className="overflow-x-auto bg-brand-gold/10 rounded-b-2xl isolate">
+                      <div className="min-w-[800px] w-full flex flex-col">
+
+                        <div className="bg-brand-gold/30 grid grid-cols-[3.5fr_1fr_1.5fr_1.5fr_1.5fr_1.5fr] items-center h-10 text-text-main text-xs font-bold uppercase tracking-wider px-4">
+                          <div>Item Name</div>
+                          <div>Qty</div>
+                          <div>Cost Price</div>
+                          <div>Selling Price</div>
+                          <div>Line Cost</div>
+                          <div>Line Sale</div>
+                        </div>
+
+                        <div className="overflow-y-auto overflow-x-hidden max-h-[160px] text-sm font-medium">
+                          {batch.items.map((item: any, index: number) => (
+                            <div
+                              key={item.id}
+                              className="grid grid-cols-[3.5fr_1fr_1.5fr_1.5fr_1.5fr_1.5fr] items-center h-11 border-b border-border-sub/20 text-text-main hover:bg-black/5 transition-colors px-4"
+                            >
+                              <div className="truncate font-semibold pr-4">
+                                <span className="mr-1 text-text-sub">{index + 1}.</span>
+                                {item.itemName}
+                              </div>
+                              <div>{item.quantity}</div>
+                              <div>{formatCurrency(item.costPrice)}</div>
+                              <div>{formatCurrency(item.sellingPrice)}</div>
+                              <div>{formatCurrency(item.lineCostTotal)}</div>
+                              <div>{formatCurrency(item.lineSaleTotal)}</div>
+                            </div>
                           ))}
-                        </tbody>
-                      </table>
+                        </div>
+
+                      </div>
                     </div>
                   </div>
+
                 ))}
               </div>
             )}
@@ -163,16 +172,16 @@ export const SalesHistoryPage: React.FC = () => {
         )}
 
         {activeTab === 'actions' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 border-t border-border-main pt-6">
             {isLoading ? (
               <div className="text-sm text-text-muted py-8 text-center">Loading item action history...</div>
             ) : (actionData?.records?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">No item action history recorded yet.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left border-collapse">
+              <div className="overflow-x-auto border border-border-main rounded-2xl ">
+                <table className="w-full min-w-[900px] text-left border-collapse px-4">
                   <thead>
-                    <tr className="border-b border-border-sub/40 text-text-muted text-xs font-bold uppercase tracking-wider h-12">
+                    <tr className="border-b border-border-sub text-text-muted text-xs font-bold uppercase tracking-wider h-12 ">
                       <th>Action</th>
                       <th>Item Name</th>
                       <th>Quantity</th>

@@ -37,7 +37,7 @@ export const Layout: React.FC = () => {
                 <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
                 {/* 3. FIXED mobile offset padding constraints: pl-0 on mobile, pl-16 on tablet/desktop */}
-                <main className="relative flex flex-1 flex-col pl-0 md:pl-12 h-full w-full bg-bg-secondary transition-all duration-200 overflow-hidden">
+                <main className="relative flex flex-1 flex-col pl-0 md:pl-12 h-full w-full bg-bg-primary transition-all duration-200 overflow-hidden">
 
                     {/* MAP ENGINE CANVAS LAYER */}
                     <MapCanvas

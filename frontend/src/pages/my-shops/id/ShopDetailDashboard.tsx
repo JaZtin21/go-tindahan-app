@@ -123,7 +123,7 @@ export const ShopDetailDashboard = () => {
 
 
     return (
-        <div className="min-h-screen bg-bg-secondary transition-colors duration-300 pb-12">
+        <div className="min-h-screen  transition-colors duration-300 pb-12">
 
 
             {/* --- COMMAND IMPLEMENTED: GO BACK STRIP ON TOP OF CHART CONTAINER --- */}
@@ -139,7 +139,7 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="bg-bg-primary rounded-3xl p-5 shadow-xs mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
+            <div className="border-2 border-brand-gold/20 bg-brand-gold/10  rounded-3xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
                 <div className="flex items-center  justify-between gap-12 min-w-[1300px] w-full px-8 py-4 ">
 
@@ -335,10 +335,10 @@ export const ShopDetailDashboard = () => {
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
                     onClick={handleOpenCheckoutModal}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10  rounded-2xl p-5 shadow-sm transition-all duration-300   cursor-pointer "
                 >
                     {/* Centered Asset Representation Box matching your shop card geometry layout */}
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <ShoppingCart className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -349,9 +349,9 @@ export const ShopDetailDashboard = () => {
                 {/* 2. Add Items in Inventory (Modal Trigger) */}
                 <div
                     onClick={handleOpenInventoryModal}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300  hover:bg-bg-primary-hover cursor-pointer "
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <PlusCircle className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -362,9 +362,9 @@ export const ShopDetailDashboard = () => {
                 {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
                 <a
                     onClick={handleOpenRestockModal}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Package className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -375,9 +375,9 @@ export const ShopDetailDashboard = () => {
                 {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/inventory`)}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Package className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -388,9 +388,9 @@ export const ShopDetailDashboard = () => {
                 {/* 4. View Inquiries (Subroute Navigation Anchor) */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/inquiries`)}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <MessageSquare className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -401,9 +401,9 @@ export const ShopDetailDashboard = () => {
                 {/* 5. Sales History */}
                 <a
                     onClick={() => navigate(`/my-shops/${shopId}/sales-history`)}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline border border-transparent"
+                    className="group flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <History className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">
@@ -414,9 +414,9 @@ export const ShopDetailDashboard = () => {
                 {/* 6. Edit Shop Info (Modal Trigger) */}
                 <div
                     onClick={() => triggerModalAction('Edit Shop Info')}
-                    className="flex flex-col bg-bg-primary rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer border border-transparent"
+                    className="group  flex flex-col border-2 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
                 >
-                    <div className="w-full aspect-video bg-bg-secondary rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
                         <Store className="w-6 h-6 text-text-sub" />
                     </div>
                     <div className="flex-1">

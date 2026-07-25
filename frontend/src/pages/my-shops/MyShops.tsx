@@ -185,7 +185,7 @@ export const MyShops: React.FC = () => {
                             <div
                                 key={shop.id}
                                 onClick={() => navigate(`/my-shops/${shop.id}`)}
-                                className="group flex flex-col bg-bg-primary rounded-2xl shadow-xs transition-all duration-300 hover:shadow-md cursor-pointer overflow-hidden relative aspect-square w-full"
+                                className="group flex flex-col  rounded-2xl shadow-xs transition-all duration-300 hover:shadow-md cursor-pointer overflow-hidden relative aspect-square w-full"
                             >
                                 {/* 1. Core Background Image Asset */}
                                 <div className="absolute inset-0 w-full h-full shrink-0 z-0">
