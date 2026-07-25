@@ -182,7 +182,7 @@ export const SalesHistoryPage: React.FC = () => {
                 <table className="w-full min-w-[900px] text-left border-collapse px-4">
                   <thead>
                     <tr className="border-b border-border-sub text-text-muted text-xs font-bold uppercase tracking-wider h-12 ">
-                      <th>Action</th>
+                      <th className="pl-4">Action</th>
                       <th>Item Name</th>
                       <th>Quantity</th>
                       <th>Date</th>
@@ -191,7 +191,7 @@ export const SalesHistoryPage: React.FC = () => {
                   <tbody className="divide-y divide-border-sub/20 text-sm font-medium">
                     {actionData?.records.map((record) => (
                       <tr key={record.id} className="hover:bg-item-hover/20 transition-colors h-12">
-                        <td className="font-bold text-text-main capitalize">{record.action}</td>
+                        <td className="font-bold text-text-main capitalize pl-4">{record.action}</td>
                         <td>{record.itemName}</td>
                         <td>{record.quantity ?? '--'}</td>
                         <td>{formatDate(record.date)}</td>
