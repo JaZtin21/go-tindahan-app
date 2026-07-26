@@ -3,7 +3,7 @@ import * as tf from '@tensorflow/tfjs';
 import { initScannerAssets, getCachedScannerAssets, clearScannerCache } from '~/utils/scannerModelManager';
 import { isOcrEngineReady, recognizeProductText, imageElementToCanvas } from '~/utils/ocrEngine';
 import { resolveProductIdentity, type VisualMatch } from '~/utils/productMatching';
-import { TriangleAlert, ImageIcon, RotateCcw } from 'lucide-react';
+import { TriangleAlert, ImageIcon, RotateCcw, WifiOff } from 'lucide-react';
 
 interface ProductScannerCameraProps {
     onCaptureComplete: (file: File, previewUrl: string, matchedName: string, unitOfMeasure: string) => void;
@@ -20,7 +20,7 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isPredicting, setIsPredicting] = useState(false);
-    const [loadPhase, setLoadPhase] = useState<'model' | 'names' | 'embeddings' | 'ocr' | 'ready' | 'error'>('model');
+    const [loadPhase, setLoadPhase] = useState<'model' | 'names' | 'embeddings' | 'ocr' | 'ready' | 'error' | 'offline'>('model');
     const [loadProgress, setLoadProgress] = useState(0);
     const [retryCount, setRetryCount] = useState(0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -38,9 +38,42 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
             setLoadProgress(status.progress);
         }).catch((err) => {
             console.error(err);
-            setLoadPhase('error');
+            // 'offline' is already set via the onProgress callback above right
+            // before this rejection fires — don't stomp it back to 'error'.
+            if (err?.name !== 'OfflineRequiredError') {
+                setLoadPhase('error');
+            }
         });
     }, [retryCount]);
+
+    // While waiting on connectivity, retry automatically the moment the
+    // browser reports it's back online — no user action required. A manual
+    // "Retry now" button is still offered in case the online/offline event
+    // doesn't fire reliably (some browsers are inconsistent about this,
+    // especially on flaky connections where the OS thinks it's online but
+    // requests still fail — that case will just loop back to 'offline' again).
+    useEffect(() => {
+        if (loadPhase !== 'offline') return;
+
+        const handleOnline = () => {
+            setLoadPhase('model');
+            setLoadProgress(0);
+            setRetryCount((prev) => prev + 1);
+        };
+
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, [loadPhase]);
+
+    const handleManualOfflineRetry = () => {
+        // Deliberately does NOT call clearScannerCache() — whatever loaded
+        // successfully before the offline failure is still valid and cached;
+        // re-running init will skip straight past it and only re-attempt the
+        // piece that actually needs the network.
+        setLoadPhase('model');
+        setLoadProgress(0);
+        setRetryCount((prev) => prev + 1);
+    };
 
     const startCamera = async () => {
         setCameraError(null);
@@ -268,6 +301,30 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
         }
         onRetry?.();
     };
+
+    if (loadPhase === 'offline') {
+        return (
+            <div className="relative flex flex-col flex-1 w-full bg-bg-secondary h-full min-h-[400px] items-center justify-center text-white px-8">
+                <div className="w-full max-w-xs flex flex-col items-center gap-3 text-center">
+                    <WifiOff className="w-8 h-8 text-amber-400" />
+                    <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                        Internet Required
+                    </div>
+                    <p className="text-[11px] text-text-main leading-normal">
+                        The scanner needs to redownload some files and can't reach the network right now.
+                        It'll resume automatically as soon as you're back online.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleManualOfflineRetry}
+                        className="mt-2 px-5 py-2 text-xs font-bold text-[#3f3f3f] bg-[#d9d9d9] hover:bg-white active:scale-95 transition-all rounded-md cursor-pointer shadow-md focus:outline-none"
+                    >
+                        Retry Now
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (loadPhase !== 'ready') {
         return (
