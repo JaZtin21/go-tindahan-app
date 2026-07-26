@@ -4,6 +4,7 @@ import { UNIFIED_BATCH_SYNC_MUTATION } from '~/api/graphql';
 import { store as reduxStore } from '~/store';
 import { replaceLocalShop, deleteShop } from '~/store/myShopsSlice';
 import { WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED } from '~/api/queries';
+import { dataUriToFile, isBase64Image } from '~/utils';
 
 // ============================================================================
 // WHO OWNS REDUX, AND WHY replaceLocalShop INSTEAD OF addShop/updateShop
@@ -71,6 +72,35 @@ export async function syncAll(store: Store): Promise<void> {
         const localShops = store.getTable('shops') || {};
         for (const [id, row] of Object.entries(localShops) as [string, any][]) {
             if (!row._dirty && !row._deleted) continue;
+
+            // NEW: photos stored offline are base64 data URIs (see toShopRow /
+            // fileToStorableBase64 in shopHooks.ts). Convert those back into
+            // real File objects so they go through the same `newPhoto` /
+            // `newPhotos` Upload path CreateShop/UpdateShop already use —
+            // rather than sending the raw base64 string to the backend.
+            // Anything that's already a URL (previously uploaded, untouched
+            // this session) stays in `photo` / `photos` unchanged.
+            const rawPhoto: string = row.photo || '';
+            const rawPhotos: string[] = JSON.parse(row.photosJson || '[]');
+
+            let photo = '';
+            let newPhoto: File | undefined;
+            if (isBase64Image(rawPhoto)) {
+                newPhoto = dataUriToFile(rawPhoto, `${id}_cover.jpg`);
+            } else {
+                photo = rawPhoto;
+            }
+
+            const photos: string[] = [];
+            const newPhotos: File[] = [];
+            rawPhotos.forEach((p, i) => {
+                if (isBase64Image(p)) {
+                    newPhotos.push(dataUriToFile(p, `${id}_gallery_${i}.jpg`));
+                } else if (p) {
+                    photos.push(p);
+                }
+            });
+
             payload.shops.push({
                 localId: id,
                 isDeleted: !!row._deleted,
@@ -85,8 +115,10 @@ export async function syncAll(store: Store): Promise<void> {
                 delivery: JSON.parse(row.deliveryJson || '{"available":false}'),
                 socialMedia: JSON.parse(row.socialMediaJson || '{}'),
                 contactDetails: JSON.parse(row.contactDetailsJson || '{}'),
-                photo: row.photo || '',
-                photos: JSON.parse(row.photosJson || '[]'),
+                photo,
+                newPhoto,
+                photos,
+                newPhotos,
             });
         }
         log(`PHASE 1: gathered ${payload.shops.length} dirty shop(s)`, payload.shops.map((s) => ({ localId: s.localId, shopName: s.shopName })));
@@ -94,6 +126,17 @@ export async function syncAll(store: Store): Promise<void> {
         const localInventory = store.getTable('inventory') || {};
         for (const [id, row] of Object.entries(localInventory) as [string, any][]) {
             if (!row._dirty && !row._deleted) continue;
+
+            // NEW: same base64 -> File conversion as shops, above.
+            const rawPhoto: string = row.photo || '';
+            let photo = '';
+            let newPhoto: File | undefined;
+            if (isBase64Image(rawPhoto)) {
+                newPhoto = dataUriToFile(rawPhoto, `${id}.jpg`);
+            } else {
+                photo = rawPhoto;
+            }
+
             payload.inventory.push({
                 localId: id,
                 shopId: row.shopId,
@@ -109,7 +152,8 @@ export async function syncAll(store: Store): Promise<void> {
                 sellingPrice: Number(row.sellingPrice || 0),
                 stockQuantity: Number(row.stockQuantity || 0),
                 reorderLevel: Number(row.reorderLevel || 0),
-                photo: row.photo || '',
+                photo,
+                newPhoto,
             });
         }
 
@@ -144,6 +188,13 @@ export async function syncAll(store: Store): Promise<void> {
         // =========================================================================
         // PHASE 2: EXECUTE BATCH MUTATION
         // =========================================================================
+        // NOTE: payload.shops[i].newPhoto / newPhotos and
+        // payload.inventory[i].newPhoto may now contain real File objects.
+        // Apollo's upload link (createUploadLink in apolloClient.ts) walks
+        // `variables` recursively and extracts any File/Blob it finds into
+        // the multipart request per the GraphQL multipart request spec — so
+        // no special handling is needed here, same as any other Upload-typed
+        // mutation in this app.
         log('PHASE 2: sending unifiedBatchSync mutation...');
         const { data } = await client.mutate({
             mutation: UNIFIED_BATCH_SYNC_MUTATION,

@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -12,36 +14,52 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudinary/cloudinary-go/v2"
-	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// ImageUploader handles image uploads to Cloudinary
+// ImageUploader handles image uploads to Cloudflare R2 (S3-compatible)
 type ImageUploader struct {
-	cloudinary *cloudinary.Cloudinary
-	folder     string
+	client    *s3.Client
+	bucket    string
+	publicURL string // e.g. https://pub-xxxx.r2.dev  OR your custom domain, no trailing slash
+	folder    string
 }
 
 // UploadResult contains the result of an image upload
 type UploadResult struct {
 	URL      string
-	PublicID string
+	PublicID string // this is the R2 object "key" (kept as PublicID so calling code doesn't change)
 	Format   string
 	Width    int
 	Height   int
 	Size     int
 }
 
-// NewImageUploader creates a new ImageUploader instance
-func NewImageUploader(cloudName, apiKey, apiSecret, folder string) (*ImageUploader, error) {
-	cld, err := cloudinary.NewFromParams(cloudName, apiKey, apiSecret)
+// NewImageUploader creates a new ImageUploader instance backed by Cloudflare R2.
+// accountID, accessKeyID, secretAccessKey, bucketName, publicURL come from your R2_* envs.
+func NewImageUploader(accountID, accessKeyID, secretAccessKey, bucketName, publicURL, folder string) (*ImageUploader, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion("auto"),
+		config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+		),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize cloudinary: %w", err)
+		return nil, fmt.Errorf("failed to load R2 config: %w", err)
 	}
 
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(fmt.Sprintf("https://%s.r2.cloudflarestorage.com", accountID))
+	})
+
 	return &ImageUploader{
-		cloudinary: cld,
-		folder:     folder,
+		client:    client,
+		bucket:    bucketName,
+		publicURL: strings.TrimSuffix(publicURL, "/"),
+		folder:    strings.Trim(folder, "/"),
 	}, nil
 }
 
@@ -60,69 +78,54 @@ func DiffPhotoURLs(oldSlice, currentSlice []string) []string {
 	return diff
 }
 
-// UploadImage uploads a single image to Cloudinary
+// UploadImage uploads a single image to R2
 func (u *ImageUploader) UploadImage(ctx context.Context, reader io.Reader, filename string) (*UploadResult, error) {
 	if err := u.validateFile(filename); err != nil {
 		return nil, err
 	}
 
-	// Generate unique public ID
-	publicID := u.generatePublicID(filename)
-
-	uploadParams := uploader.UploadParams{
-		PublicID:       publicID,
-		Folder:         u.folder,
-		ResourceType:   "image",
-		Transformation: "q_auto",
-		Format:         "webp",
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image data: %w", err)
 	}
 
-	result, err := u.cloudinary.Upload.Upload(ctx, reader, uploadParams)
+	key := u.generateKey(filename)
+	contentType := contentTypeFromFilename(filename)
+
+	_, err = u.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(u.bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String(contentType),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload image: %w", err)
+		return nil, fmt.Errorf("failed to upload image to R2: %w", err)
 	}
 
 	return &UploadResult{
-		URL:      result.SecureURL,
-		PublicID: result.PublicID,
-		Format:   result.Format,
-		Width:    result.Width,
-		Height:   result.Height,
-		Size:     result.Bytes,
+		URL:      u.publicURL + "/" + key,
+		PublicID: key,
+		Format:   strings.TrimPrefix(filepath.Ext(filename), "."),
+		Size:     len(data),
 	}, nil
 }
 
-// UploadBase64 uploads a base64-encoded image
+// UploadBase64 uploads a base64-encoded image (accepts raw base64 or a data: URI)
 func (u *ImageUploader) UploadBase64(ctx context.Context, base64Data, filename string) (*UploadResult, error) {
-	if err := u.validateFile(filename); err != nil {
-		return nil, err
+	raw := base64Data
+	if idx := strings.Index(base64Data, ","); idx != -1 && strings.HasPrefix(base64Data, "data:") {
+		raw = base64Data[idx+1:]
 	}
 
-	publicID := u.generatePublicID(filename)
-
-	uploadParams := uploader.UploadParams{
-		PublicID:       publicID,
-		Folder:         u.folder,
-		ResourceType:   "image",
-		Transformation: "f_auto,q_auto",
-	}
-
-	result, err := u.cloudinary.Upload.Upload(ctx, base64Data, uploadParams)
+	decoded, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload base64 image: %w", err)
+		return nil, fmt.Errorf("failed to decode base64 image: %w", err)
 	}
 
-	return &UploadResult{
-		URL:      result.SecureURL,
-		PublicID: result.PublicID,
-		Format:   result.Format,
-		Width:    result.Width,
-		Height:   result.Height,
-		Size:     result.Bytes,
-	}, nil
+	return u.UploadImage(ctx, bytes.NewReader(decoded), filename)
 }
 
-// UploadRemoteImage downloads an image from a URL and uploads it to Cloudinary.
+// UploadRemoteImage downloads an image from a URL and uploads it to R2.
 func (u *ImageUploader) UploadRemoteImage(ctx context.Context, imageURL string) (*UploadResult, error) {
 	resp, err := http.Get(imageURL)
 	if err != nil {
@@ -176,10 +179,23 @@ func extensionFromContentType(contentType string) string {
 	return exts[0]
 }
 
-// DeleteImage deletes an image from Cloudinary by its public ID
-func (u *ImageUploader) DeleteImage(ctx context.Context, publicID string) error {
-	_, err := u.cloudinary.Upload.Destroy(ctx, uploader.DestroyParams{
-		PublicID: publicID,
+func contentTypeFromFilename(filename string) string {
+	ext := filepath.Ext(filename)
+	ct := mime.TypeByExtension(ext)
+	if ct == "" {
+		return "application/octet-stream"
+	}
+	return ct
+}
+
+// DeleteImage deletes an image from R2 by its object key
+func (u *ImageUploader) DeleteImage(ctx context.Context, key string) error {
+	if key == "" {
+		return nil
+	}
+	_, err := u.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(u.bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
@@ -187,70 +203,39 @@ func (u *ImageUploader) DeleteImage(ctx context.Context, publicID string) error 
 	return nil
 }
 
-// DeleteImageByURL deletes an image from Cloudinary using the full secured URL.
+// DeleteImageByURL deletes an image from R2 using its full public URL.
 func (u *ImageUploader) DeleteImageByURL(ctx context.Context, imageURL string) error {
 	if imageURL == "" {
 		return nil
 	}
 
-	publicID := ExtractPublicIDFromURL(imageURL)
-	if publicID == "" {
-		return fmt.Errorf("unable to determine public ID from URL: %s", imageURL)
+	key := u.ExtractKeyFromURL(imageURL)
+	if key == "" {
+		return fmt.Errorf("unable to determine object key from URL: %s", imageURL)
 	}
 
-	return u.DeleteImage(ctx, publicID)
+	return u.DeleteImage(ctx, key)
 }
 
-// ExtractPublicIDFromURL extracts the Cloudinary public ID from a stored image URL.
-func ExtractPublicIDFromURL(imageURL string) string {
+// ExtractKeyFromURL extracts the R2 object key from a stored public image URL.
+func (u *ImageUploader) ExtractKeyFromURL(imageURL string) string {
 	if imageURL == "" {
 		return ""
 	}
 
-	parsed, err := url.Parse(imageURL)
-	if err != nil {
-		return ""
-	}
-
-	pathStr := parsed.Path
-	if idx := strings.Index(pathStr, "/upload/"); idx >= 0 {
-		pathStr = pathStr[idx+len("/upload/"):]
-	}
-	pathStr = strings.Trim(pathStr, "/")
-	if pathStr == "" {
-		return ""
-	}
-
-	segments := strings.Split(pathStr, "/")
-	if len(segments) > 0 && strings.HasPrefix(segments[0], "v") {
-		segments = segments[1:]
-	}
-	if len(segments) == 0 {
-		return ""
-	}
-
-	lastSegment := segments[len(segments)-1]
-	segments[len(segments)-1] = strings.TrimSuffix(lastSegment, filepath.Ext(lastSegment))
-
-	return strings.Join(segments, "/")
+	trimmed := strings.TrimPrefix(imageURL, u.publicURL)
+	trimmed = strings.TrimPrefix(trimmed, "/")
+	return trimmed
 }
 
-// GetOptimizedURL returns an optimized URL for an existing image
-func (u *ImageUploader) GetOptimizedURL(publicID string, width, height int) (string, error) {
-	img, err := u.cloudinary.Image(publicID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get image asset: %w", err)
+// GetOptimizedURL returns the public URL for an existing object.
+// R2 does not do on-the-fly transformations like Cloudinary; width/height are ignored
+// unless you've enabled Cloudflare Image Resizing in front of this bucket/domain.
+func (u *ImageUploader) GetOptimizedURL(key string, width, height int) (string, error) {
+	if key == "" {
+		return "", fmt.Errorf("key is required")
 	}
-
-	if width > 0 && height > 0 {
-		img.Transformation = fmt.Sprintf("w_%d,h_%d,c_fill", width, height)
-	}
-
-	url, err := img.String()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate image URL: %w", err)
-	}
-	return url, nil
+	return u.publicURL + "/" + key, nil
 }
 
 // validateFile checks if the file has an allowed extension
@@ -267,23 +252,29 @@ func (u *ImageUploader) validateFile(filename string) error {
 	return fmt.Errorf("unsupported file type: %s (allowed: jpg, jpeg, png, gif, webp, svg, bmp, ico)", ext)
 }
 
-// generatePublicID creates a unique public ID for the image
-func (u *ImageUploader) generatePublicID(filename string) string {
+// generateKey creates a unique object key for the image, namespaced under the folder
+func (u *ImageUploader) generateKey(filename string) string {
 	ext := filepath.Ext(filename)
 	name := strings.TrimSuffix(filename, ext)
-	// Clean the name - remove special characters and spaces
 	name = strings.ReplaceAll(name, " ", "_")
 	name = strings.ReplaceAll(name, "-", "_")
 
 	timestamp := time.Now().Unix()
-	return fmt.Sprintf("%s_%d", name, timestamp)
+	base := fmt.Sprintf("%s_%d%s", name, timestamp, ext)
+
+	if u.folder == "" {
+		return base
+	}
+	return u.folder + "/" + base
 }
 
 // WithFolder creates a new uploader with a different folder
 func (u *ImageUploader) WithFolder(folder string) *ImageUploader {
 	return &ImageUploader{
-		cloudinary: u.cloudinary,
-		folder:     folder,
+		client:    u.client,
+		bucket:    u.bucket,
+		publicURL: u.publicURL,
+		folder:    strings.Trim(folder, "/"),
 	}
 }
 

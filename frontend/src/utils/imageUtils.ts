@@ -37,16 +37,23 @@ export async function fileToStorableBase64(file: File, maxWidth = 800, quality =
 // a real File, so it can be sent through your normal upload mechanism during
 // sync. Only called on rows whose `photo` is still a data: URL (meaning it
 // was taken/added while offline and never actually uploaded anywhere).
-export function base64ToFile(dataUrl: string, filename: string): File {
-    const [header, base64] = dataUrl.split(',');
+export function dataUriToFile(dataUri: string, filename: string): File {
+    const [header, base64Data] = dataUri.split(',');
     const mimeMatch = header.match(/data:(.*?);base64/);
     const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const binary = atob(base64);
+
+    const binary = atob(base64Data);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
     return new File([bytes], filename, { type: mime });
 }
 
+export function isBase64Image(value: unknown): value is string {
+    return typeof value === 'string' && value.startsWith('data:image/');
+}
 
 
 /**

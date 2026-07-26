@@ -374,12 +374,14 @@ input ShopSyncInput {
   socialMedia: SocialMediaInput
   contactDetails: ContactDetailsInput
   photo: String
+  newPhoto: Upload      # NEW — fresh file binary for the cover photo
   photos: [String!]
+  newPhotos: [Upload!]  # NEW — fresh file binaries to append to the gallery
 }
 
 input InventorySyncInput {
   localId: ID!
-  shopId: ID!           # Could be a real server ID or a localId string
+  shopId: ID!
   isDeleted: Boolean!
   isServerSynced: Boolean!
   clientCreatedAt: String
@@ -394,6 +396,7 @@ input InventorySyncInput {
   stockQuantity: Int
   reorderLevel: Int
   photo: String
+  newPhoto: Upload   # NEW — fresh file binary for the product photo
 }
 
 input CheckoutBatchSyncInput {

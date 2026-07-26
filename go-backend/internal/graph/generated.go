@@ -138,39 +138,43 @@ type ComplexityRoot struct {
 	}
 
 	OwnerInventoryItem struct {
-		Barcode       func(childComplexity int) int
-		Category      func(childComplexity int) int
-		CostPrice     func(childComplexity int) int
-		Description   func(childComplexity int) int
-		ID            func(childComplexity int) int
-		ItemName      func(childComplexity int) int
-		Photo         func(childComplexity int) int
-		ReorderLevel  func(childComplexity int) int
-		SellingPrice  func(childComplexity int) int
-		ShopID        func(childComplexity int) int
-		StockQuantity func(childComplexity int) int
-		UnitOfMeasure func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
+		Barcode         func(childComplexity int) int
+		Category        func(childComplexity int) int
+		CostPrice       func(childComplexity int) int
+		DeletedAt       func(childComplexity int) int
+		Description     func(childComplexity int) int
+		ID              func(childComplexity int) int
+		ItemName        func(childComplexity int) int
+		Photo           func(childComplexity int) int
+		ReorderLevel    func(childComplexity int) int
+		SellingPrice    func(childComplexity int) int
+		ServerUpdatedAt func(childComplexity int) int
+		ShopID          func(childComplexity int) int
+		StockQuantity   func(childComplexity int) int
+		UnitOfMeasure   func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
 	}
 
 	OwnerShop struct {
-		Address        func(childComplexity int) int
-		BusinessHours  func(childComplexity int) int
-		ContactDetails func(childComplexity int) int
-		Coordinates    func(childComplexity int) int
-		CreatedAt      func(childComplexity int) int
-		Delivery       func(childComplexity int) int
-		Description    func(childComplexity int) int
-		ID             func(childComplexity int) int
-		Owner          func(childComplexity int) int
-		OwnerID        func(childComplexity int) int
-		PaymentMethods func(childComplexity int) int
-		Photo          func(childComplexity int) int
-		Photos         func(childComplexity int) int
-		ShopName       func(childComplexity int) int
-		SocialMedia    func(childComplexity int) int
-		Status         func(childComplexity int) int
-		Verification   func(childComplexity int) int
+		Address         func(childComplexity int) int
+		BusinessHours   func(childComplexity int) int
+		ContactDetails  func(childComplexity int) int
+		Coordinates     func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		DeletedAt       func(childComplexity int) int
+		Delivery        func(childComplexity int) int
+		Description     func(childComplexity int) int
+		ID              func(childComplexity int) int
+		Owner           func(childComplexity int) int
+		OwnerID         func(childComplexity int) int
+		PaymentMethods  func(childComplexity int) int
+		Photo           func(childComplexity int) int
+		Photos          func(childComplexity int) int
+		ServerUpdatedAt func(childComplexity int) int
+		ShopName        func(childComplexity int) int
+		SocialMedia     func(childComplexity int) int
+		Status          func(childComplexity int) int
+		Verification    func(childComplexity int) int
 	}
 
 	PaginatedCheckoutBatches struct {
@@ -868,6 +872,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OwnerInventoryItem.CostPrice(childComplexity), true
+	case "OwnerInventoryItem.deletedAt":
+		if e.ComplexityRoot.OwnerInventoryItem.DeletedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OwnerInventoryItem.DeletedAt(childComplexity), true
 	case "OwnerInventoryItem.description":
 		if e.ComplexityRoot.OwnerInventoryItem.Description == nil {
 			break
@@ -904,6 +914,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OwnerInventoryItem.SellingPrice(childComplexity), true
+	case "OwnerInventoryItem.serverUpdatedAt":
+		if e.ComplexityRoot.OwnerInventoryItem.ServerUpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OwnerInventoryItem.ServerUpdatedAt(childComplexity), true
 	case "OwnerInventoryItem.shopId":
 		if e.ComplexityRoot.OwnerInventoryItem.ShopID == nil {
 			break
@@ -959,6 +975,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OwnerShop.CreatedAt(childComplexity), true
+	case "OwnerShop.deletedAt":
+		if e.ComplexityRoot.OwnerShop.DeletedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OwnerShop.DeletedAt(childComplexity), true
 	case "OwnerShop.delivery":
 		if e.ComplexityRoot.OwnerShop.Delivery == nil {
 			break
@@ -1007,6 +1029,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OwnerShop.Photos(childComplexity), true
+	case "OwnerShop.serverUpdatedAt":
+		if e.ComplexityRoot.OwnerShop.ServerUpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OwnerShop.ServerUpdatedAt(childComplexity), true
 	case "OwnerShop.shopName":
 		if e.ComplexityRoot.OwnerShop.ShopName == nil {
 			break
@@ -2009,6 +2037,10 @@ func (ec *executionContext) childFields_OwnerInventoryItem(ctx context.Context, 
 		return ec.fieldContext_OwnerInventoryItem_reorderLevel(ctx, field)
 	case "updatedAt":
 		return ec.fieldContext_OwnerInventoryItem_updatedAt(ctx, field)
+	case "deletedAt":
+		return ec.fieldContext_OwnerInventoryItem_deletedAt(ctx, field)
+	case "serverUpdatedAt":
+		return ec.fieldContext_OwnerInventoryItem_serverUpdatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type OwnerInventoryItem", field.Name)
 }
@@ -2049,6 +2081,10 @@ func (ec *executionContext) childFields_OwnerShop(ctx context.Context, field gra
 		return ec.fieldContext_OwnerShop_photos(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_OwnerShop_createdAt(ctx, field)
+	case "deletedAt":
+		return ec.fieldContext_OwnerShop_deletedAt(ctx, field)
+	case "serverUpdatedAt":
+		return ec.fieldContext_OwnerShop_serverUpdatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type OwnerShop", field.Name)
 }
@@ -5270,6 +5306,52 @@ func (ec *executionContext) fieldContext_OwnerInventoryItem_updatedAt(_ context.
 	return graphql.NewScalarFieldContext("OwnerInventoryItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _OwnerInventoryItem_deletedAt(ctx context.Context, field graphql.CollectedField, obj *model.OwnerInventoryItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OwnerInventoryItem_deletedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeletedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_OwnerInventoryItem_deletedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OwnerInventoryItem", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OwnerInventoryItem_serverUpdatedAt(ctx context.Context, field graphql.CollectedField, obj *model.OwnerInventoryItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OwnerInventoryItem_serverUpdatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ServerUpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_OwnerInventoryItem_serverUpdatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OwnerInventoryItem", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _OwnerShop_id(ctx context.Context, field graphql.CollectedField, obj *model.OwnerShop) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5739,6 +5821,52 @@ func (ec *executionContext) _OwnerShop_createdAt(ctx context.Context, field grap
 	)
 }
 func (ec *executionContext) fieldContext_OwnerShop_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OwnerShop", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OwnerShop_deletedAt(ctx context.Context, field graphql.CollectedField, obj *model.OwnerShop) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OwnerShop_deletedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeletedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_OwnerShop_deletedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OwnerShop", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OwnerShop_serverUpdatedAt(ctx context.Context, field graphql.CollectedField, obj *model.OwnerShop) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OwnerShop_serverUpdatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ServerUpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_OwnerShop_serverUpdatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("OwnerShop", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -10343,7 +10471,7 @@ func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"localId", "shopId", "isDeleted", "isServerSynced", "clientCreatedAt", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo"}
+	fieldsInOrder := [...]string{"localId", "shopId", "isDeleted", "isServerSynced", "clientCreatedAt", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10455,6 +10583,13 @@ func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context
 				return it, err
 			}
 			it.Photo = data
+		case "newPhoto":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newPhoto"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewPhoto = data
 		}
 	}
 	return it, nil
@@ -10594,7 +10729,7 @@ func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"localId", "isDeleted", "isServerSynced", "clientCreatedAt", "shopName", "address", "description", "coordinates", "businessHours", "paymentMethods", "delivery", "socialMedia", "contactDetails", "photo", "photos"}
+	fieldsInOrder := [...]string{"localId", "isDeleted", "isServerSynced", "clientCreatedAt", "shopName", "address", "description", "coordinates", "businessHours", "paymentMethods", "delivery", "socialMedia", "contactDetails", "photo", "newPhoto", "photos", "newPhotos"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10699,6 +10834,13 @@ func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Photo = data
+		case "newPhoto":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newPhoto"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewPhoto = data
 		case "photos":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photos"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
@@ -10706,6 +10848,13 @@ func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Photos = data
+		case "newPhotos":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newPhotos"))
+			data, err := ec.unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewPhotos = data
 		}
 	}
 	return it, nil
@@ -11916,6 +12065,16 @@ func (ec *executionContext) _OwnerInventoryItem(ctx context.Context, sel ast.Sel
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "deletedAt":
+			out.Values[i] = ec._OwnerInventoryItem_deletedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "serverUpdatedAt":
+			out.Values[i] = ec._OwnerInventoryItem_serverUpdatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12032,6 +12191,16 @@ func (ec *executionContext) _OwnerShop(ctx context.Context, sel ast.SelectionSet
 		case "createdAt":
 			out.Values[i] = ec._OwnerShop_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deletedAt":
+			out.Values[i] = ec._OwnerShop_deletedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "serverUpdatedAt":
+			out.Values[i] = ec._OwnerShop_serverUpdatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:

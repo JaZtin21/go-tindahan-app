@@ -30,21 +30,15 @@ func (r *mutationResolver) CreateShop(ctx context.Context, input model.CreateSho
 
 	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: media processing failure",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
-	}
-	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER: %v", err)
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: media processing failure",
 			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
@@ -53,7 +47,7 @@ func (r *mutationResolver) CreateShop(ctx context.Context, input model.CreateSho
 	}
 
 	// Dynamic target isolation mapping: /userId/shops
-	uploadFolder := fmt.Sprintf("%s/%s/shops", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID)
+	uploadFolder := fmt.Sprintf("shops/%s/shops", currentUser.ID)
 	shopUploader := uploader.WithFolder(uploadFolder)
 
 	// 2. UPLOAD PRIMARY LOGO/BANNER TO USER'S SHOPS CONTAINER
@@ -218,19 +212,21 @@ func (r *mutationResolver) UpdateShop(ctx context.Context, input model.UpdateSho
 		return nil, nil
 	}
 
-	// INITIALIZE THE CLOUDINARY UPLOADER UTILITY VIA REGULAR ENVS
+	// INITIALIZE THE R2 UPLOADER UTILITY VIA REGULAR ENVS
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN UPDATESHOP: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER IN UPDATESHOP: %v", err)
 		return nil, fmt.Errorf("media processor error")
 	}
 
-	uploadFolder := fmt.Sprintf("%s/%s/shops", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID)
+	uploadFolder := fmt.Sprintf("shops/%s/shops", currentUser.ID)
 	shopUploader := uploader.WithFolder(uploadFolder)
 
 	// =========================================================================
@@ -328,14 +324,14 @@ func (r *mutationResolver) UpdateShop(ctx context.Context, input model.UpdateSho
 	}
 
 	// =========================================================================
-	// 4. SECURE CLOUDINARY CLEANUP SWEEPS (Best-effort execution pipeline)
+	// 4. SECURE R2 CLEANUP SWEEPS (Best-effort execution pipeline)
 	// =========================================================================
-	// Clean up cover image from Cloudinary if deleted or overwritten
+	// Clean up cover image from R2 if deleted or overwritten
 	if deletedPrimaryPhoto != "" {
 		_ = shopUploader.DeleteImageByURL(ctx, deletedPrimaryPhoto)
 	}
 
-	// Clean up individual deleted gallery carousel items from Cloudinary
+	// Clean up individual deleted gallery carousel items from R2
 	for _, photoURL := range deletedGalleryPhotos {
 		if photoURL != "" {
 			_ = shopUploader.DeleteImageByURL(ctx, photoURL)
@@ -367,7 +363,9 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id and all associated photos before deleting the row
+	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id and all associated
+	// photos BEFORE deleting the row. This part is unchanged — we still need
+	// to know what to clean up, we just don't clean it up yet.
 	var dbOwnerID string
 	var oldPrimaryPhoto *string
 	var oldPhotosSlice []string
@@ -394,11 +392,8 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 		return false, nil
 	}
 
-	// NEW: collect photo URLs for every non-deleted inventory item under
-	// this shop too — the old hard-delete relied on ON DELETE CASCADE to
-	// wipe these rows, but that cascade never cleaned up their Cloudinary
-	// images either, so this was already an orphaned-asset gap; folding it
-	// in here since we're touching this cascade anyway.
+	// Collect photo URLs for every non-deleted inventory item under this
+	// shop too — same as before, still just gathering, not deleting yet.
 	invRows, err := r.Resolver.DB.Query(ctx, `SELECT photo FROM inventory_items WHERE shop_id = $1 AND deleted_at IS NULL`, shopID)
 	var inventoryPhotos []string
 	if err != nil {
@@ -413,47 +408,28 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 		invRows.Close()
 	}
 
-	// 1. INITIALIZE THE CLOUDINARY UPLOADER UTILITY DIRECTLY VIA OS ENVS
+	// Initialize the R2 uploader now (cheap, no network call yet) so it's
+	// ready to use once the DB delete has actually succeeded below.
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN DELETESHOP: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER IN DELETESHOP: %v", err)
 		return false, fmt.Errorf("media processor error")
 	}
 
-	uploadFolder := fmt.Sprintf("%s/%s/shops", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID)
+	uploadFolder := fmt.Sprintf("shops/%s/shops", currentUser.ID)
 	shopUploader := uploader.WithFolder(uploadFolder)
 
-	// 2. TRIGGER CLOUDINARY CLEANUP CODES FOR PRIMARY PHOTO
-	if oldPrimaryPhoto != nil && *oldPrimaryPhoto != "" {
-		if cleanErr := shopUploader.DeleteImageByURL(ctx, *oldPrimaryPhoto); cleanErr != nil {
-			log.Printf("⚠️ Failed to remove primary shop image %s on deletion: %v", *oldPrimaryPhoto, cleanErr)
-		}
-	}
-
-	// 3. TRIGGER CLOUDINARY CLEANUP CODES FOR ALL GALLERY CAROUSEL PHOTOS
-	for _, oldURL := range oldPhotosSlice {
-		if oldURL != "" {
-			if cleanErr := shopUploader.DeleteImageByURL(ctx, oldURL); cleanErr != nil {
-				log.Printf("⚠️ Failed to remove gallery shop image %s on deletion: %v", oldURL, cleanErr)
-			}
-		}
-	}
-
-	// NEW: clean up inventory item photos (separate folder from shop photos)
-	inventoryUploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopID)
+	inventoryUploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory", currentUser.ID, shopID)
 	inventoryUploader := uploader.WithFolder(inventoryUploadFolder)
-	for _, oldURL := range inventoryPhotos {
-		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, oldURL); cleanErr != nil {
-			log.Printf("⚠️ Failed to remove inventory image %s during shop deletion: %v", oldURL, cleanErr)
-		}
-	}
 
-	// 4. CASCADE THE DELETION ATOMICALLY
+	// MOVED: DB cascade now runs FIRST, before any R2 call.
 	//
 	//   - shops:            soft delete (tombstone — needed so pull-sync on
 	//                        other devices can detect this shop is gone)
@@ -508,6 +484,27 @@ func (r *mutationResolver) DeleteShop(ctx context.Context, shopID string) (bool,
 		return false, fmt.Errorf("internal server error")
 	}
 
+	// MOVED: only now — after the DB delete is durably committed — do we
+	// touch R2. Best-effort: a failed cleanup is logged, never fails the
+	// mutation, same tolerance your original code had, just re-ordered.
+	if oldPrimaryPhoto != nil && *oldPrimaryPhoto != "" {
+		if cleanErr := shopUploader.DeleteImageByURL(ctx, *oldPrimaryPhoto); cleanErr != nil {
+			log.Printf("⚠️ Failed to remove primary shop image %s on deletion: %v", *oldPrimaryPhoto, cleanErr)
+		}
+	}
+	for _, oldURL := range oldPhotosSlice {
+		if oldURL != "" {
+			if cleanErr := shopUploader.DeleteImageByURL(ctx, oldURL); cleanErr != nil {
+				log.Printf("⚠️ Failed to remove gallery shop image %s on deletion: %v", oldURL, cleanErr)
+			}
+		}
+	}
+	for _, oldURL := range inventoryPhotos {
+		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, oldURL); cleanErr != nil {
+			log.Printf("⚠️ Failed to remove inventory image %s during shop deletion: %v", oldURL, cleanErr)
+		}
+	}
+
 	return true, nil
 }
 
@@ -547,13 +544,15 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 
 	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER FOR INVENTORY: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER FOR INVENTORY: %v", err)
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: media processing failure",
 			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
@@ -562,10 +561,10 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	}
 
 	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory/%s", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopName, input.ItemName)
+	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s", currentUser.ID, shopName, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
-	// 2. UPLOAD PRODUCT PHOTO TO CLOUDINARY IF PROVIDED
+	// 2. UPLOAD PRODUCT PHOTO TO R2 IF PROVIDED
 	finalProductPhoto := ""
 	if input.Photo != nil && input.Photo.File != nil {
 
@@ -578,7 +577,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		}
 	}
 
-	// 3. PERSIST RECORD TO POSTGRES CONFIGURED WITH SECURE CLOUDINARY PATH URL
+	// 3. PERSIST RECORD TO POSTGRES CONFIGURED WITH SECURE R2 PATH URL
 	query := `
 		INSERT INTO inventory_items (
 			shop_id, item_name, description, barcode, category, 
@@ -644,7 +643,7 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	// SECURITY GUARD 2: Fetch current database values to evaluate owner and grab old photo
 	var shopOwnerID string
 	var oldPhoto *string
-	var shopName string // 🚀 Rename variable to capture name
+	var shopName string
 	checkQuery := `
 		SELECT s.owner_id, i.photo, s.shop_name FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
@@ -671,20 +670,22 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		return nil, nil
 	}
 
-	// INITIALIZE THE CLOUDINARY UPLOADER UTILITY VIA REGULAR ENVS
+	// INITIALIZE THE R2 UPLOADER UTILITY VIA REGULAR ENVS
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN UPDATEINVENTORYITEM: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER IN UPDATEINVENTORYITEM: %v", err)
 		return nil, fmt.Errorf("media processor error")
 	}
 
 	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory/%s", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopName, input.ItemName)
+	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s", currentUser.ID, shopName, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
 	// =========================================================================
@@ -746,9 +747,9 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	})
 
 	// =========================================================================
-	// 3. SECURE CLOUDINARY CLEANUP SWEEPS (Best-effort execution pipeline)
+	// 3. SECURE R2 CLEANUP SWEEPS (Best-effort execution pipeline)
 	// =========================================================================
-	// Purges old orphaned asset from Cloudinary storage if overwritten or cleared
+	// Purges old orphaned asset from R2 storage if overwritten or cleared
 	if deletedPhoto != "" {
 		_ = inventoryUploader.DeleteImageByURL(ctx, deletedPhoto)
 	}
@@ -761,7 +762,8 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id, photo link, and shop id before resource wipeout
+	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id, photo link, and
+	// shop id before resource wipeout — unchanged, still just gathering.
 	var shopOwnerID string
 	var oldPhoto *string
 	var shopID string
@@ -793,30 +795,24 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		return false, nil
 	}
 
-	// 1. INITIALIZE THE CLOUDINARY UPLOADER UTILITY DIRECTLY VIA OS ENVS
+	// Initialize the R2 uploader now, use it after the DB write succeeds.
 	uploader, err := utils.NewImageUploader(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-		os.Getenv("CLOUDINARY_FOLDER"),
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
 	)
 	if err != nil {
-		log.Printf("🔴 FAILED TO INITIALIZE CLOUDINARY UPLOADER IN DELETEINVENTORYITEM: %v", err)
+		log.Printf("🔴 FAILED TO INITIALIZE R2 UPLOADER IN DELETEINVENTORYITEM: %v", err)
 		return false, fmt.Errorf("media processor error")
 	}
 
-	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("%s/%s/shops/%s/inventory", os.Getenv("CLOUDINARY_FOLDER"), currentUser.ID, shopID)
+	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory", currentUser.ID, shopID)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
-	// 2. TRIGGER CLOUDINARY CLEANUP CODES FOR SINGLE PRODUCT PHOTO
-	if oldPhoto != nil && *oldPhoto != "" {
-		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, *oldPhoto); cleanErr != nil {
-			log.Printf("⚠️ Failed to remove inventory product image %s on deletion: %v", *oldPhoto, cleanErr)
-		}
-	}
-
-	// 3. SOFT-DELETE THE ROW (tombstone) — same reasoning as DeleteShop.
+	// MOVED: soft-delete the row FIRST.
 	// Joined through shops via shop_id since inventory_items has no
 	// owner_id column of its own; shopID/ownership was already verified
 	// above via checkQuery.
@@ -833,6 +829,13 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		ItemName:        itemName,
 		Action:          "deleted item",
 	})
+
+	// MOVED: only now — after the soft-delete succeeded — clean up R2.
+	if oldPhoto != nil && *oldPhoto != "" {
+		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, *oldPhoto); cleanErr != nil {
+			log.Printf("⚠️ Failed to remove inventory product image %s on deletion: %v", *oldPhoto, cleanErr)
+		}
+	}
 
 	return true, nil
 }

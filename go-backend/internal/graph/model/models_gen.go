@@ -164,21 +164,22 @@ type IncrementStockInput struct {
 }
 
 type InventorySyncInput struct {
-	LocalID         string   `json:"localId"`
-	ShopID          string   `json:"shopId"`
-	IsDeleted       bool     `json:"isDeleted"`
-	IsServerSynced  bool     `json:"isServerSynced"`
-	ClientCreatedAt *string  `json:"clientCreatedAt,omitempty"`
-	ItemName        *string  `json:"itemName,omitempty"`
-	Description     *string  `json:"description,omitempty"`
-	Barcode         *string  `json:"barcode,omitempty"`
-	Category        *string  `json:"category,omitempty"`
-	UnitOfMeasure   *string  `json:"unitOfMeasure,omitempty"`
-	CostPrice       *float64 `json:"costPrice,omitempty"`
-	SellingPrice    *float64 `json:"sellingPrice,omitempty"`
-	StockQuantity   *int     `json:"stockQuantity,omitempty"`
-	ReorderLevel    *int     `json:"reorderLevel,omitempty"`
-	Photo           *string  `json:"photo,omitempty"`
+	LocalID         string          `json:"localId"`
+	ShopID          string          `json:"shopId"`
+	IsDeleted       bool            `json:"isDeleted"`
+	IsServerSynced  bool            `json:"isServerSynced"`
+	ClientCreatedAt *string         `json:"clientCreatedAt,omitempty"`
+	ItemName        *string         `json:"itemName,omitempty"`
+	Description     *string         `json:"description,omitempty"`
+	Barcode         *string         `json:"barcode,omitempty"`
+	Category        *string         `json:"category,omitempty"`
+	UnitOfMeasure   *string         `json:"unitOfMeasure,omitempty"`
+	CostPrice       *float64        `json:"costPrice,omitempty"`
+	SellingPrice    *float64        `json:"sellingPrice,omitempty"`
+	StockQuantity   *int            `json:"stockQuantity,omitempty"`
+	ReorderLevel    *int            `json:"reorderLevel,omitempty"`
+	Photo           *string         `json:"photo,omitempty"`
+	NewPhoto        *graphql.Upload `json:"newPhoto,omitempty"`
 }
 
 type ItemActionHistory struct {
@@ -205,39 +206,43 @@ type Mutation struct {
 }
 
 type OwnerInventoryItem struct {
-	ID            string   `json:"id"`
-	ShopID        string   `json:"shopId"`
-	ItemName      string   `json:"itemName"`
-	Description   *string  `json:"description,omitempty"`
-	Barcode       *string  `json:"barcode,omitempty"`
-	Category      *string  `json:"category,omitempty"`
-	UnitOfMeasure *string  `json:"unitOfMeasure,omitempty"`
-	Photo         *string  `json:"photo,omitempty"`
-	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
-	StockQuantity *int     `json:"stockQuantity,omitempty"`
-	CostPrice     *float64 `json:"costPrice,omitempty"`
-	ReorderLevel  *int     `json:"reorderLevel,omitempty"`
-	UpdatedAt     string   `json:"updatedAt"`
+	ID              string   `json:"id"`
+	ShopID          string   `json:"shopId"`
+	ItemName        string   `json:"itemName"`
+	Description     *string  `json:"description,omitempty"`
+	Barcode         *string  `json:"barcode,omitempty"`
+	Category        *string  `json:"category,omitempty"`
+	UnitOfMeasure   *string  `json:"unitOfMeasure,omitempty"`
+	Photo           *string  `json:"photo,omitempty"`
+	SellingPrice    *float64 `json:"sellingPrice,omitempty"`
+	StockQuantity   *int     `json:"stockQuantity,omitempty"`
+	CostPrice       *float64 `json:"costPrice,omitempty"`
+	ReorderLevel    *int     `json:"reorderLevel,omitempty"`
+	UpdatedAt       string   `json:"updatedAt"`
+	DeletedAt       *string  `json:"deletedAt,omitempty"`
+	ServerUpdatedAt *string  `json:"serverUpdatedAt,omitempty"`
 }
 
 type OwnerShop struct {
-	ID             string           `json:"id"`
-	OwnerID        string           `json:"ownerId"`
-	Owner          *User            `json:"owner"`
-	ShopName       string           `json:"shopName"`
-	Coordinates    *Coordinates     `json:"coordinates"`
-	Description    *string          `json:"description,omitempty"`
-	BusinessHours  *BusinessHours   `json:"businessHours"`
-	PaymentMethods *PaymentMethods  `json:"paymentMethods"`
-	Delivery       *DeliveryOptions `json:"delivery"`
-	SocialMedia    *SocialMedia     `json:"socialMedia"`
-	Verification   *Verification    `json:"verification"`
-	ContactDetails *ContactDetails  `json:"contactDetails"`
-	Status         *ShopStatus      `json:"status"`
-	Address        string           `json:"address"`
-	Photo          *string          `json:"photo,omitempty"`
-	Photos         []string         `json:"photos"`
-	CreatedAt      string           `json:"createdAt"`
+	ID              string           `json:"id"`
+	OwnerID         string           `json:"ownerId"`
+	Owner           *User            `json:"owner"`
+	ShopName        string           `json:"shopName"`
+	Coordinates     *Coordinates     `json:"coordinates"`
+	Description     *string          `json:"description,omitempty"`
+	BusinessHours   *BusinessHours   `json:"businessHours"`
+	PaymentMethods  *PaymentMethods  `json:"paymentMethods"`
+	Delivery        *DeliveryOptions `json:"delivery"`
+	SocialMedia     *SocialMedia     `json:"socialMedia"`
+	Verification    *Verification    `json:"verification"`
+	ContactDetails  *ContactDetails  `json:"contactDetails"`
+	Status          *ShopStatus      `json:"status"`
+	Address         string           `json:"address"`
+	Photo           *string          `json:"photo,omitempty"`
+	Photos          []string         `json:"photos"`
+	CreatedAt       string           `json:"createdAt"`
+	DeletedAt       *string          `json:"deletedAt,omitempty"`
+	ServerUpdatedAt *string          `json:"serverUpdatedAt,omitempty"`
 }
 
 type PaginatedCheckoutBatches struct {
@@ -380,7 +385,9 @@ type ShopSyncInput struct {
 	SocialMedia     *SocialMediaInput     `json:"socialMedia,omitempty"`
 	ContactDetails  *ContactDetailsInput  `json:"contactDetails,omitempty"`
 	Photo           *string               `json:"photo,omitempty"`
+	NewPhoto        *graphql.Upload       `json:"newPhoto,omitempty"`
 	Photos          []string              `json:"photos,omitempty"`
+	NewPhotos       []*graphql.Upload     `json:"newPhotos,omitempty"`
 }
 
 type SocialMedia struct {
