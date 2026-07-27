@@ -19,6 +19,9 @@ interface ParsedUnit {
     unit: string;
     grams: number | null;
     ml: number | null;
+    digits: string; // the raw captured number text (e.g. "00", "100", "2.1") — kept
+    // separate from `value` because parseFloat("00") === 0, which loses the original
+    // digit shape we need for garbled-OCR substring comparison later.
 }
 
 const parseAllUnits = (text: string): ParsedUnit[] => {
@@ -34,17 +37,21 @@ const parseAllUnits = (text: string): ParsedUnit[] => {
             unit,
             grams: MASS_TO_GRAMS[unit] != null ? value * MASS_TO_GRAMS[unit] : null,
             ml: VOLUME_TO_ML[unit] != null ? value * VOLUME_TO_ML[unit] : null,
+            digits: match[1],
         });
     }
     return results;
 };
 
-export const extractUnitOfMeasure = (text: string): string => {
-    const units = parseAllUnits(text);
-    if (units.length === 0) return '';
+const pickPrimaryUnit = (units: ParsedUnit[]): ParsedUnit | null => {
+    if (units.length === 0) return null;
     const metric = units.find(u => ['g', 'kg', 'ml', 'l'].includes(u.unit));
-    const chosen = metric ?? units[0];
-    return `${chosen.value}${chosen.unit}`;
+    return metric ?? units[0];
+};
+
+export const extractUnitOfMeasure = (text: string): string => {
+    const chosen = pickPrimaryUnit(parseAllUnits(text));
+    return chosen ? `${chosen.value}${chosen.unit}` : '';
 };
 
 export const stripUnitOfMeasure = (text: string): string => {
@@ -134,7 +141,8 @@ const tokenize = (str: string) =>
 
 const extraTokenPenalty = (
     candidateName: string,
-    ocrText: string
+    ocrText: string,
+    textScore: number
 ): { penalty: number; missingTokens: string[] } => {
     const rawTokens = tokenize(normalizeForComparison(candidateName));
     // Skip index 0 — the leading word is usually the brand/logo, which packaging often
@@ -158,10 +166,18 @@ const extraTokenPenalty = (
         }
     }
 
-    return {
-        penalty: Math.min(missingTokens.length * EXTRA_TOKEN_PENALTY, MAX_EXTRA_TOKEN_PENALTY),
-        missingTokens,
-    };
+    const rawPenalty = Math.min(missingTokens.length * EXTRA_TOKEN_PENALTY, MAX_EXTRA_TOKEN_PENALTY);
+
+    // Dampen by (1 - textScore): letterRunScore already lowers the candidate's score
+    // for every character of a missing word (that's exactly what pulls ratioScore
+    // down), so penalizing the same missing word again here double-counts the same
+    // evidence. When textScore is already high — meaning most of what OCR *did*
+    // capture lines up with this candidate — a couple of words OCR simply never read
+    // (camera angle, obscured banner text, etc.) shouldn't be weighted the same as
+    // when textScore is low and a missing token is one of the few signals available.
+    const penalty = rawPenalty * (1 - textScore);
+
+    return { penalty, missingTokens };
 };
 
 // ---------- weight/unit agreement ----------
@@ -234,7 +250,7 @@ const scoreCandidate = (candidate: VisualMatch, ocrText: string, ocrUnits: Parse
     const textScore = letterRunScore(comparableName, comparableOcr);
     const visualScore = visualConfidence(candidate.distance);
     const { adjustment: weightAdjustment, detail: weightDetail } = weightAgreementAdjustment(candidate.name, ocrUnits);
-    const { penalty: tokenPenalty, missingTokens } = extraTokenPenalty(candidate.name, ocrText);
+    const { penalty: tokenPenalty, missingTokens } = extraTokenPenalty(candidate.name, ocrText, textScore);
 
     const combinedScore = Math.max(0, Math.min(1,
         textScore * TEXT_SCORE_WEIGHT + visualScore * VISUAL_SCORE_WEIGHT + weightAdjustment - tokenPenalty
@@ -244,6 +260,15 @@ const scoreCandidate = (candidate: VisualMatch, ocrText: string, ocrUnits: Parse
 };
 
 const MATCH_THRESHOLD = 0.5;
+// Lower bar applied only when exactly one candidate clears MIN_TEXT_SCORE_TO_QUALIFY.
+// MATCH_THRESHOLD assumes there are other plausible candidates to be more confident
+// than — it's a bar for winning a comparison. When only one candidate resembles the
+// OCR text at all, there's no comparison happening; the question is just "is this
+// resemblance real," which MIN_TEXT_SCORE_TO_QUALIFY (via textScore) already answers.
+// Requiring the full MATCH_THRESHOLD on top of that rejects clear, uncontested
+// text matches whenever the visual model itself isn't confident on that photo
+// (weak visualScore alone can otherwise sink an otherwise-solid text match).
+const SOLO_ELIGIBLE_MATCH_THRESHOLD = 0.3;
 const MIN_OCR_LENGTH_FOR_RAW_FALLBACK = 10;
 
 // How much better (lower distance) the #1 candidate needs to be than #2 to count as
@@ -281,7 +306,71 @@ export const pickBestCandidate = (
     if (eligible.length === 0) return null;
 
     const best = eligible.reduce((a, b) => (b.combinedScore > a.combinedScore ? b : a));
-    return best.combinedScore >= MATCH_THRESHOLD ? { name: best.name, score: best.combinedScore } : null;
+    const effectiveThreshold = eligible.length === 1 ? SOLO_ELIGIBLE_MATCH_THRESHOLD : MATCH_THRESHOLD;
+
+    if (MATCH_DEBUG_LOGGING && eligible.length === 1) {
+        console.log(`%c[Match] Only one eligible candidate — using solo threshold ${SOLO_ELIGIBLE_MATCH_THRESHOLD} instead of ${MATCH_THRESHOLD}`, 'color: #a855f7; font-weight: bold');
+    }
+
+    return best.combinedScore >= effectiveThreshold ? { name: best.name, score: best.combinedScore } : null;
+};
+
+// ---------- unit-of-measure resolution (OCR vs. matched candidate name) ----------
+
+const MIN_DIGIT_SEQUENCE_MATCH = 2;
+
+// Checks whether the OCR-read number and the catalog name's number are plausibly the
+// "same" measurement, allowing for OCR corruption that drops leading/trailing digits
+// (e.g. "100" misread as "00", leaving only a 2-digit contiguous overlap). Requires at
+// least a 2-digit run so a single coincidental shared digit ("0" appearing in both
+// "100" and "50") doesn't false-positive.
+const digitSequenceRelated = (ocrDigits: string, nameDigits: string): boolean => {
+    const a = ocrDigits.replace(/\./g, '');
+    const b = nameDigits.replace(/\./g, '');
+    if (a.length < MIN_DIGIT_SEQUENCE_MATCH || b.length < MIN_DIGIT_SEQUENCE_MATCH) return false;
+    return a.includes(b) || b.includes(a);
+};
+
+const sameUnitCategory = (a: ParsedUnit, b: ParsedUnit): boolean =>
+    (a.grams != null && b.grams != null) || (a.ml != null && b.ml != null);
+
+interface UnitResolution {
+    unit: string;
+    source: 'ocr-only' | 'name-only' | 'name-confirmed-by-ocr' | 'ocr-conflicts-with-name' | 'none';
+    ocrUnit: string;
+    nameUnit: string;
+}
+
+const resolveUnitOfMeasure = (chosenName: string, ocrText: string): UnitResolution => {
+    const ocrUnit = pickPrimaryUnit(parseAllUnits(ocrText));
+    const nameUnit = pickPrimaryUnit(parseAllUnits(chosenName));
+
+    const ocrUnitStr = ocrUnit ? `${ocrUnit.value}${ocrUnit.unit}` : '';
+    const nameUnitStr = nameUnit ? `${nameUnit.value}${nameUnit.unit}` : '';
+
+    // OCR found no measurement at all — nothing to check the model name against,
+    // just use whatever the model name has (or nothing).
+    if (!ocrUnit) {
+        return { unit: nameUnitStr, source: nameUnit ? 'name-only' : 'none', ocrUnit: ocrUnitStr, nameUnit: nameUnitStr };
+    }
+
+    // OCR found a measurement, but the matched candidate name has none to check it
+    // against — use the OCR reading directly.
+    if (!nameUnit) {
+        return { unit: ocrUnitStr, source: 'ocr-only', ocrUnit: ocrUnitStr, nameUnit: nameUnitStr };
+    }
+
+    // Both found a measurement — check whether OCR's digits are plausibly a corrupted
+    // read of the model name's digits (e.g. OCR "00g" vs. name "100g": "00" is a
+    // contiguous substring of "100"). If so, trust the catalog name's clean value.
+    if (sameUnitCategory(ocrUnit, nameUnit) && digitSequenceRelated(ocrUnit.digits, nameUnit.digits)) {
+        return { unit: nameUnitStr, source: 'name-confirmed-by-ocr', ocrUnit: ocrUnitStr, nameUnit: nameUnitStr };
+    }
+
+    // Both present but the digits don't relate at all — a genuine conflict rather
+    // than OCR corruption. Trust the literal OCR reading over the catalog name, since
+    // the vision model may have matched the right product at the wrong size/variant.
+    return { unit: ocrUnitStr, source: 'ocr-conflicts-with-name', ocrUnit: ocrUnitStr, nameUnit: nameUnitStr };
 };
 
 export const resolveProductIdentity = (
@@ -324,7 +413,23 @@ export const resolveProductIdentity = (
         console.log(`%c[Match] Chosen: "${chosenName}" via ${source}`, 'color: #a855f7; font-weight: bold');
     }
 
-    const unitOfMeasure = extractUnitOfMeasure(ocrText) || extractUnitOfMeasure(chosenName);
+    // Resolve the unit of measure by checking the matched candidate name's measurement
+    // against the OCR-read one, rather than blindly preferring either source:
+    //   - OCR has a measurement, name doesn't        -> use OCR's value
+    //   - OCR has none, name has one                 -> use name's value
+    //   - both present, digits plausibly relate       -> trust name's clean value
+    //     (e.g. OCR "00g" vs. name "100g" — "00" is a substring of "100", so this
+    //     is treated as OCR corruption of the same number, not a different product)
+    //   - both present, digits don't relate at all    -> trust the literal OCR read
+    //     (a genuine conflict, not corruption — the vision model may have picked
+    //     the right product at the wrong size/variant)
+    const unitResolution = resolveUnitOfMeasure(chosenName, ocrText);
+    const unitOfMeasure = unitResolution.unit;
+
+    if (MATCH_DEBUG_LOGGING) {
+        console.log(`%c[Match] Unit of measure: "${unitOfMeasure || '(none)'}" via ${unitResolution.source} — ocrUnit="${unitResolution.ocrUnit || '-'}" nameUnit="${unitResolution.nameUnit || '-'}"`, 'color: #a855f7; font-weight: bold');
+    }
+
     const finalName = stripUnitOfMeasure(chosenName);
 
     return { name: finalName, unitOfMeasure };

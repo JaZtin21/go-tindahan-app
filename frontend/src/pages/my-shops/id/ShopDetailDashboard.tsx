@@ -5,7 +5,8 @@ import { Shop } from '~/types/shop';
 import { ShopForm } from '~/pages/my-shops/components/ShopForm';
 import { Modal } from '~/components';
 import { useSelector, useDispatch } from 'react-redux';
-import { useQuery } from '@apollo/client/react';
+import { deleteShop as deleteShopAction } from '~/store/myShopsSlice';
+import { useMyShops, useDeleteShop } from "~/api/queries";
 import {
     ResponsiveContainer,
     AreaChart,
@@ -23,7 +24,7 @@ import {
     RadialBarChart,
     RadialBar
 } from 'recharts';
-import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft, History } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft, History, TriangleAlert, X, Check, Trash2 } from 'lucide-react';
 import { setAddShopModalOpen } from '~/store/uiSlice';
 import InventoryForm from '../components/InventoryForm';
 import { GET_SHOP_BY_ID_QUERY, GET_SHOP_DASHBOARD_METRICS_QUERY } from '~/api/graphql';
@@ -119,6 +120,68 @@ export const ShopDetailDashboard = () => {
     const handleOpenRestockModal = () => setIsRestockModalOpen(true);
 
 
+    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+
+    const [deleteShop, { loading: isDeleting }] = useDeleteShop({
+        isSubscribed: isSubscribed,
+        onCompleted: () => {
+            // Reuse your existing modal helper to show success
+            setIsConfirmingDelete(false);
+            setIsModalOpen(true);
+            setIsSuccess(true);
+            setModalMessage('Shop and its entire inventory have been permanently deleted.');
+            if (selectedShopId) {
+                // Optimistic Redux removal — makes the card disappear
+                // immediately instead of waiting on the network refetch below.
+                dispatch(deleteShopAction(selectedShopId));
+            }
+            setSelectedShopId(null);
+        },
+        onError: (error) => {
+            setIsConfirmingDelete(false);
+            setIsModalOpen(true);
+            setIsSuccess(false);
+            setModalMessage(error.message || 'Failed to delete shop. Please try again.');
+            setSelectedShopId(null);
+        }
+    });
+
+
+    // 1. Triggered when user clicks "Delete" on the shop card
+    const handleOpenDeletePrompt = (shopId: string) => {
+        setSelectedShopId(shopId);
+        setIsConfirmingDelete(true);
+        setIsModalOpen(true);
+    };
+
+    // 2. Triggered when user clicks "Yes, Delete" inside the modal
+    const handleExecuteDelete = async () => {
+        if (!selectedShopId) return;
+
+        try {
+            await deleteShop({
+                variables: { shopId: selectedShopId }
+            });
+        } catch (err) {
+            // Error is already gracefully handled inside the useMutation onError block
+        }
+    };
+
+    const handleDeleteModalClose = ({ navigateBack }: { navigateBack: boolean }) => {
+        setIsModalOpen(false);
+        setIsSuccess(false);
+        setIsConfirmingDelete(false);
+        setSelectedShopId(null);
+        setModalMessage('');
+        if (navigateBack) {
+            navigate('/my-shops');
+        }
+    }
 
 
 
@@ -424,6 +487,22 @@ export const ShopDetailDashboard = () => {
                     </div>
                 </div>
 
+                {/* 6. Edit Shop Info (Modal Trigger) */}
+                <div
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenDeletePrompt(shopId)
+                    }}
+                    className="group  flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
+                >
+                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                        <Trash2 className="w-6 h-6 text-text-sub" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-sm font-bold text-text-main text-center">Delete Shop</h3>
+                    </div>
+                </div>
+
             </div>
             <InventoryForm isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
             <Checkout isOpen={isCheckoutModalOpen} onClose={handleCloseCheckoutModal} />
@@ -436,6 +515,68 @@ export const ShopDetailDashboard = () => {
                 subtitle="Edit your commercial storefront blueprint"
             >
                 <ShopForm data={shop} />
+            </Modal>
+
+
+            <Modal
+                isOpen={isModalOpen}
+                onClose={handleDeleteModalClose}
+                title={isConfirmingDelete ? "Are you absolutely sure?" : (isSuccess ? "Success" : "Error")}
+                subtitle=""
+                isMobileVariant={false}
+                maxWidth="max-w-[360px] md:max-w-[400px]"
+                isHeaderVisible={false}
+                unsetHeight
+            >
+                <div className="flex flex-col gap-4 items-center text-center p-2">
+
+                    {isConfirmingDelete ? (
+                        /* --- CONFIRMATION PROMPT VIEW --- */
+                        <div className='p-6 flex gap-6 flex-col'>
+                            <div className="text-3xl self-center"><TriangleAlert className="w-8 h-8 text-brand-red" /></div>
+                            <p className="m-0 text-[15px] max-w-[400px] text-[var(--color-text-sub)] leading-relaxed">
+                                This action cannot be undone. Deleting this shop will <strong className="text-[var(--color-text-main)]">permanently delete all associated inventory, items, and transactional data</strong>.
+                            </p>
+
+                            <div className="flex gap-3 w-full mt-4">
+                                <button
+                                    onClick={handleDeleteModalClose}
+                                    disabled={isDeleting}
+                                    className="flex-1 px-4 py-2.5 bg-[var(--color-bg-primary-hover)] hover:bg-[var(--color-border-main)] text-[var(--color-text-sub)] border border-[var(--color-border-main)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleExecuteDelete}
+                                    disabled={isDeleting}
+                                    className="flex-1 px-4 py-2.5 bg-[var(--color-brand-red)] hover:bg-[var(--color-brand-red-hover)] text-[var(--color-text-white)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
+                                >
+                                    {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* --- ORIGINAL SUCCESS / ERROR VIEW --- */
+                        <div className='p-6 flex gap-6 flex-col'>
+                            <div className="text-2xl self-center">
+                                {isSuccess ? <Check className="w-8 h-8 text-brand-green" /> : <X className="w-8 h-8 text-brand-red" />}
+                            </div>
+                            <p className="m-0 text-base max-w-[400px] text-[var(--color-text-sub)]">
+                                {modalMessage}
+                            </p>
+                            <button
+                                onClick={() => handleDeleteModalClose({ navigateBack: isSuccess })}
+                                className={`mt-2 px-6 self-center w-unset py-2 text-text-white rounded-md font-semibold cursor-pointer transition-colors duration-200
+                                                ${isSuccess
+                                        ? 'bg-[var(--color-brand-green)] hover:bg-[var(--color-brand-green-hover)]'
+                                        : 'bg-[var(--color-brand-red)] hover:bg-[var(--color-brand-red-hover)]'
+                                    }`}
+                            >
+                                OK
+                            </button>
+                        </div>
+                    )}
+                </div>
             </Modal>
 
         </div>

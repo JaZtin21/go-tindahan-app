@@ -1,29 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RootState } from "../../store/store";
 import { useSelector, useDispatch } from 'react-redux';
 import { Modal } from "~/components";
 import { setAddShopModalOpen } from '../../store/uiSlice';
 import { ShopForm } from './components/ShopForm';
-import { setShops, setLoading, setError } from '~/store/myShopsSlice';
-import { useQuery } from '@apollo/client/react';
-import { GET_MY_SHOPS_QUERY } from '~/api/graphql/'; // Ensure GET_MY_SHOPS_QUERY uses TypedDocumentNode in its source file
 import type { Shop } from '~/types/shop';
 import { Plus, Store, ImageOff } from 'lucide-react';
-import { useMutation } from '@apollo/client/react';
-import { DELETE_SHOP_MUTATION } from '~/api/graphql';
-import { Check, TriangleAlert, X, Trash2 } from 'lucide-react';
-import { deleteShop as deleteShopAction } from '~/store/myShopsSlice';
 import { useMyShops, useDeleteShop } from "~/api/queries";
 import { SyncButton } from '~/components';
-
-interface GetMyShopsResponse {
-    getMyShops: {
-        shops: Shop[];
-        totalCount: number;
-        hasNextPage: boolean;
-    };
-}
 
 
 export const MyShops: React.FC = () => {
@@ -35,8 +20,6 @@ export const MyShops: React.FC = () => {
     // PAGINATION SETUP: 10 items per page limit matrix footprint
     const PAGE_LIMIT = 10;
     const [offset, setOffset] = useState<number>(0);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-
     // 1. RUN APOLLO FETCH QUERY (Types inferred automatically via type inference)
     // NOTE: `refetch` is new — see useDeleteShop's onCompleted below. When
     // WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED is false, deleting/creating/updating
@@ -45,11 +28,13 @@ export const MyShops: React.FC = () => {
     // that gap by explicitly re-running the query. (When the flag is true
     // this just causes one harmless extra fetch alongside the TinyBase
     // update that was already keeping things in sync.)
-    const { loading: dataLoading, error, data } = useMyShops({ limit: PAGE_LIMIT, offset, isSubscribed: isSubscribed });
+    const { loading: isLoading, error, data } = useMyShops({ limit: PAGE_LIMIT, offset, isSubscribed: isSubscribed });
 
     // 2. READ DIRECTLY FROM REDUX STORAGE CACHE FOR VIEW TRANSFORMS
     const loadedShops = useSelector((state: RootState) => state.myShops.shops);
     const totalCount = useSelector((state: RootState) => state.myShops.totalCount);
+
+    console.log(loadedShops.length);
 
     console.log('Loaded Shops:', loadedShops);
 
@@ -69,68 +54,6 @@ export const MyShops: React.FC = () => {
         if (hasPreviousPage) setOffset((prev) => Math.max(0, prev - PAGE_LIMIT));
     };
 
-    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
-
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
-    const [modalMessage, setModalMessage] = useState('');
-
-    // Import the Apollo client mutation hook
-    const [deleteShop, { loading: isDeleting }] = useDeleteShop({
-        isSubscribed: isSubscribed,
-        onCompleted: () => {
-            // Reuse your existing modal helper to show success
-            setIsConfirmingDelete(false);
-            setIsModalOpen(true);
-            setIsSuccess(true);
-            setModalMessage('Shop and its entire inventory have been permanently deleted.');
-            if (selectedShopId) {
-                // Optimistic Redux removal — makes the card disappear
-                // immediately instead of waiting on the network refetch below.
-                dispatch(deleteShopAction(selectedShopId));
-            }
-            setSelectedShopId(null);
-        },
-        onError: (error) => {
-            setIsConfirmingDelete(false);
-            setIsModalOpen(true);
-            setIsSuccess(false);
-            setModalMessage(error.message || 'Failed to delete shop. Please try again.');
-            setSelectedShopId(null);
-        }
-    });
-
-
-    // 1. Triggered when user clicks "Delete" on the shop card
-    const handleOpenDeletePrompt = (shopId: string) => {
-        setSelectedShopId(shopId);
-        setIsConfirmingDelete(true);
-        setIsModalOpen(true);
-    };
-
-    // 2. Triggered when user clicks "Yes, Delete" inside the modal
-    const handleExecuteDelete = async () => {
-        if (!selectedShopId) return;
-
-        try {
-            await deleteShop({
-                variables: { shopId: selectedShopId }
-            });
-        } catch (err) {
-            // Error is already gracefully handled inside the useMutation onError block
-        }
-    };
-
-    // 3. Extend your clean-up close handler to reset the deletion states
-    const handleModalClose = () => {
-        setIsModalOpen(false);
-        setIsSuccess(false);
-        setIsConfirmingDelete(false);
-        setSelectedShopId(null);
-        setModalMessage('');
-    };
-
 
     return (
         <>
@@ -147,7 +70,7 @@ export const MyShops: React.FC = () => {
                 {/* 3-COLUMN RESPONSIVE LAYOUT MATRIX GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4  gap-6 max-w-full mt-4">
 
-                    {isLoading ? (
+                    {isLoading && loadedShops.length === 0 ? (
                         /* --- DESIGN A: ANIMATED SKELETON LAYOUT MAPPING (3 Items) --- */
                         Array.from({ length: 3 }).map((_, index) => (
                             <div
@@ -165,7 +88,7 @@ export const MyShops: React.FC = () => {
                                 </div>
                             </div>
                         ))
-                    ) : loadedShops.length === 0 ? (
+                    ) : loadedShops.length === 0 && !isLoading ? (
                         /* --- FALLBACK: EMPTY STATE BOUNDARY DISPLAY CONTAINER --- */
                         <div className="flex flex-col h-[500px] align-center p-9 text-center justify-center bg-bg-primary rounded-2xl shadow-xs transition-shadow hover:shadow-sm "
                         >
@@ -206,15 +129,6 @@ export const MyShops: React.FC = () => {
 
                                 {/* 2. Top Right Destructive Action (Delete Button)       */}
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenDeletePrompt(shop.id!)
-                                    }}
-                                    className="absolute top-3 right-3 z-20 h-7 px-0.5 rounded-lg bg-brand-red/70 border-2 border-brand-red hover:bg-brand-red-hover active:scale-95 transition-all text-[11px] font-bold text-text-white cursor-pointer"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
                                 {/* 3. Dark Bottom Gradient Shadow Vignette */}
                                 <div className="absolute -inset-1 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
 
@@ -245,7 +159,7 @@ export const MyShops: React.FC = () => {
 
                         ))
                     )}
-                    <div className={`flex ${loadedShops.length === 0 ? "hidden" : ""} flex-col align-center p-9 text-center justify-center bg-bg-primary rounded-2xl shadow-xs transition-shadow hover:shadow-sm`}>
+                    <div className={`flex ${loadedShops.length !== 0 && !isLoading ? "" : "hidden"} ${isLoading ? "hidden" : ''} flex-col align-center p-9 text-center justify-center bg-bg-primary rounded-2xl shadow-xs transition-shadow hover:shadow-sm`}>
                         <Plus className="self-center text-brand-gold md:h-18 md:w-18 h-10 w-10 " />
                         <p className="text-lg font-bold text-text-main mb-2">Add Another Shop</p>
                         <p className="text-md font-medium text-text-muted mb-4">create your next shop</p>
@@ -284,67 +198,6 @@ export const MyShops: React.FC = () => {
                 )}
 
             </div >
-            <Modal
-                isOpen={isModalOpen}
-                onClose={handleModalClose}
-                title={isConfirmingDelete ? "Are you absolutely sure?" : (isSuccess ? "Success" : "Error")}
-                subtitle=""
-                isMobileVariant={false}
-                maxWidth="max-w-[360px] md:max-w-[400px]"
-                isHeaderVisible={false}
-                unsetHeight
-            >
-                <div className="flex flex-col gap-4 items-center text-center p-2">
-
-                    {isConfirmingDelete ? (
-                        /* --- CONFIRMATION PROMPT VIEW --- */
-                        <div className='p-6 flex gap-6 flex-col'>
-                            <div className="text-3xl self-center"><TriangleAlert className="w-8 h-8 text-brand-red" /></div>
-                            <p className="m-0 text-[15px] max-w-[400px] text-[var(--color-text-sub)] leading-relaxed">
-                                This action cannot be undone. Deleting this shop will <strong className="text-[var(--color-text-main)]">permanently delete all associated inventory, items, and transactional data</strong>.
-                            </p>
-
-                            <div className="flex gap-3 w-full mt-4">
-                                <button
-                                    onClick={handleModalClose}
-                                    disabled={isDeleting}
-                                    className="flex-1 px-4 py-2.5 bg-[var(--color-bg-primary-hover)] hover:bg-[var(--color-border-main)] text-[var(--color-text-sub)] border border-[var(--color-border-main)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleExecuteDelete}
-                                    disabled={isDeleting}
-                                    className="flex-1 px-4 py-2.5 bg-[var(--color-brand-red)] hover:bg-[var(--color-brand-red-hover)] text-[var(--color-text-white)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
-                                >
-                                    {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        /* --- ORIGINAL SUCCESS / ERROR VIEW --- */
-                        <div className='p-6 flex gap-6 flex-col'>
-                            <div className="text-2xl self-center">
-                                {isSuccess ? <Check className="w-8 h-8 text-brand-green" /> : <X className="w-8 h-8 text-brand-red" />}
-                            </div>
-                            <p className="m-0 text-base max-w-[400px] text-[var(--color-text-sub)]">
-                                {modalMessage}
-                            </p>
-                            <button
-                                onClick={handleModalClose}
-                                className={`mt-2 px-6 self-center w-unset py-2 text-text-white rounded-md font-semibold cursor-pointer transition-colors duration-200
-                                    ${isSuccess
-                                        ? 'bg-[var(--color-brand-green)] hover:bg-[var(--color-brand-green-hover)]'
-                                        : 'bg-[var(--color-brand-red)] hover:bg-[var(--color-brand-red-hover)]'
-                                    }`}
-                            >
-                                OK
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </Modal>
-
             <Modal
                 isOpen={isAddShopModalOpen}
                 onClose={() => dispatch(setAddShopModalOpen(false))}
