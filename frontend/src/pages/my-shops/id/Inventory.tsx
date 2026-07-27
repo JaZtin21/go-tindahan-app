@@ -11,7 +11,7 @@ import {
 import InventoryForm from '../components/InventoryForm';
 import type { Item } from '~/types';
 import { Modal } from '~/components';
-import { X, Check, TriangleAlert } from 'lucide-react';
+import { X, Check, TriangleAlert, SlidersHorizontal } from 'lucide-react';
 import { useShopInventory, useDeleteInventoryItem } from '~/api/queries';
 
 // Generic debounce hook: returns a debounced copy of `value` that only
@@ -251,6 +251,10 @@ export const InventoryPage = () => {
         { key: 'stock_quantity', label: 'Stocks' },
     ];
 
+    const [isSortModalOpen, setIsSortModalOpen] = useState(false);
+    // Optional: Track active selection to style the active sort option inside the modal
+    const [activeSort, setActiveSort] = useState<string>("");
+
 
     return (
         <div className="w-full min-h-screen text-text-main flex flex-col gap-2">
@@ -276,8 +280,10 @@ export const InventoryPage = () => {
                 </div>
 
                 {/* SEARCH BAR */}
-                <div className="mt-4 mb-4 flex gap-3 flex-wrap">
-                    <div className="relative flex-1 min-w-[200px]">
+                {/* SEARCH BAR & MOBILE SORT DROPDOWN CONTAINER */}
+                {/* SEARCH BAR CONTAINER */}
+                <div className="mt-4 mb-4 flex gap-2 items-center w-full">
+                    <div className="relative flex-1 min-w-[150px]">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                         <input
                             type="text"
@@ -287,7 +293,19 @@ export const InventoryPage = () => {
                             className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-border-main bg-bg-secondary text-text-main placeholder-text-muted focus:outline-none focus:border-brand-gold transition-colors"
                         />
                     </div>
+
+                    {/* 📱 MOBILE SORT TRIGGER BUTTON */}
+                    <button
+                        onClick={() => setIsSortModalOpen(true)}
+                        className=" h-8 px-3 text-xs font-bold rounded-lg border border-border-main bg-bg-secondary text-text-sub hover:border-brand-gold hover:text-text-main cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
+                    >
+                        {/* Uses Lucide icons (SlidersHorizontal or ArrowUpDown fit well here) */}
+                        <SlidersHorizontal size={14} />
+                        <span>Sort</span>
+                    </button>
                 </div>
+
+
 
                 {/* SCROLLABLE TABLE FRAMEWORK */}
                 <div className="w-full mt-2">
@@ -568,6 +586,66 @@ export const InventoryPage = () => {
                     )}
                 </div>
             </Modal>
+            {/* 📱 DEDICATED MOBILE SORTING SELECTION MODAL */}
+            <Modal
+                isOpen={isSortModalOpen}
+                onClose={() => setIsSortModalOpen(false)}
+                title="Sort Inventory"
+                subtitle="Select sorting parameter and direction"
+                isMobileVariant={false}
+                maxWidth="max-w-[360px] md:max-w-[400px]"
+                isHeaderVisible={false}
+                unsetHeight
+            >
+                <div className="flex flex-col gap-2 p-4 py-6 w-full">
+                    <div className="flex justify-between items-center flex-row relative mb-2">
+                        <h3 className="text-base font-semibold text-text-main ">Sort by:</h3>
+                        <X
+                            onClick={() => setIsSortModalOpen(false)}
+                            size={20}
+                            className="text-text-main" />
+                    </div>
+
+                    {sortableColumns.map((col) => (
+                        <React.Fragment key={col.key}>
+                            {/* ASCENDING ACTION ITEM BUTTON */}
+                            <button
+                                onClick={() => {
+                                    // Adjust this if your state uses split keys like setSortKey / setSortDirection
+                                    handleSortClick(col.key);
+                                    setActiveSort(`${col.key}:asc`);
+                                    setIsSortModalOpen(false); // Close instantly after tap
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex justify-between items-center ${activeSort === `${col.key}:asc`
+                                    ? 'bg-brand-gold/10 border-brand-gold text-brand-gold'
+                                    : 'bg-bg-secondary border-border-main/40 text-text-main hover:bg-item-hover/20'
+                                    }`}
+                            >
+                                <span>{col.label} (ASC)</span>
+                                {activeSort === `${col.key}:asc` && <Check size={14} />}
+                            </button>
+
+                            {/* DESCENDING ACTION ITEM BUTTON */}
+                            <button
+                                onClick={() => {
+                                    handleSortClick(col.key);
+                                    setActiveSort(`${col.key}:desc`);
+                                    setIsSortModalOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex justify-between items-center ${activeSort === `${col.key}:desc`
+                                    ? 'bg-brand-gold/10 border-brand-gold text-brand-gold'
+                                    : 'bg-bg-secondary border-border-main/40 text-text-main hover:bg-item-hover/20'
+                                    }`}
+                            >
+                                <span>{col.label} (DESC)</span>
+                                {activeSort === `${col.key}:desc` && <Check size={14} />}
+                            </button>
+                        </React.Fragment>
+                    ))}
+                    <button className='bg-brand-gold  text-text-white hover:bg-brand-gold-hover  mt-2 px-4 py-2 rounded-full font-semibold cursor-pointer transition-colors duration-200' onClick={() => setIsSortModalOpen(false)}> Close </button>
+                </div>
+            </Modal>
+
         </div>
     );
 };
