@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react'; // Added useEffect
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../config/ApolloProviderWithAuth';
 import { Header } from './Header';
@@ -14,15 +14,21 @@ export const Layout: React.FC = () => {
     const mapRef = useRef<any>(null);
     const location = useLocation();
 
-    // 1. ADDED: Shared state to manage sidebar expansion across header and sidebar boundaries
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    // ✅ 1. Create a reference specifically for the scrollable container panel
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const isMainMapPage = location.pathname === '/';
+
+    // ✅ 2. Reset the local container scroll track every time the route path switches
+    useEffect(() => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+        }
+    }, [location.pathname]);
 
     return (
         <div className="flex h-screen flex-col font-sans antialiased overflow-hidden select-none">
-
-            {/* TOP HEADER MENU - Added sidebar toggle controls */}
             <Header
                 isAuthenticated={isAuthenticated}
                 userInfo={userInfo}
@@ -31,25 +37,18 @@ export const Layout: React.FC = () => {
                 setIsSidebarOpen={setIsSidebarOpen}
             />
 
-            {/* LOWER CONTAINER WORKSPACE */}
             <div className="flex flex-1 relative overflow-hidden bg-bg-secondary ">
-                {/* 2. Pass shared states down as explicit reactive parameters */}
                 <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-                {/* 3. FIXED mobile offset padding constraints: pl-0 on mobile, pl-16 on tablet/desktop */}
                 <main className="relative flex flex-1 flex-col pl-0 md:pl-12 h-full w-full bg-bg-primary transition-all duration-200 overflow-hidden">
+                    <MapCanvas mapRef={mapRef} isMainMapPage={isMainMapPage} mapStyleUrl={MAP_TILE_URL} />
 
-                    {/* MAP ENGINE CANVAS LAYER */}
-                    <MapCanvas
-                        mapRef={mapRef}
-                        isMainMapPage={isMainMapPage}
-                        mapStyleUrl={MAP_TILE_URL}
-                    />
-
-                    {/* DYNAMIC CHILD INJECTION ROUTE PANEL */}
                     {!isMainMapPage && (
-                        /* 💡 FIX: Keep overflow-y-auto but use full flex dimensions instead of absolute layouts */
-                        <div className="w-full h-full overflow-y-auto z-10 md:px-12 px-2 md:pt-18 pt-18 pb-8">
+                        /* ✅ 3. Attach the ref to this overflow container */
+                        <div
+                            ref={scrollContainerRef}
+                            className="w-full h-full overflow-y-auto z-10 md:px-12 px-2 md:pt-18 pt-18 pb-8"
+                        >
                             <Outlet />
                         </div>
                     )}
