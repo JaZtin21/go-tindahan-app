@@ -152,7 +152,7 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2">
+            <div className={`${isLoading ? 'hidden' : ''} flex items-center justify-end gap-2`}>
               <button
                 disabled={checkoutOffset === 0}
                 onClick={() => setCheckoutOffset((prev) => Math.max(0, prev - PAGE_LIMIT))}
@@ -178,31 +178,63 @@ export const SalesHistoryPage: React.FC = () => {
             ) : (actionData?.records?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">No item action history recorded yet.</div>
             ) : (
-              <div className="overflow-x-auto border border-border-main rounded-2xl ">
-                <table className="w-full min-w-[900px] text-left border-collapse px-4">
-                  <thead>
-                    <tr className="border-b border-border-sub text-text-muted text-xs font-bold uppercase tracking-wider h-12 ">
-                      <th className="pl-4">Action</th>
-                      <th>Item Name</th>
-                      <th>Quantity</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-sub/20 text-sm font-medium">
-                    {actionData?.records.map((record) => (
-                      <tr key={record.id} className="hover:bg-item-hover/20 transition-colors h-12">
-                        <td className="font-bold text-text-main capitalize pl-4">{record.action}</td>
-                        <td>{record.itemName}</td>
-                        <td>{record.quantity ?? '--'}</td>
-                        <td>{formatDate(record.date)}</td>
+              <>
+                {/* 📱 MOBILE VIEW: Renders as cards on small screens, hidden on md breakpoint and above */}
+                <div className="block md:hidden flex flex-col gap-3">
+                  {actionData?.records.map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex flex-col gap-2 p-4 border border-border-main rounded-2xl bg-bg-primary hover:bg-item-hover/5 transition-colors"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold uppercase tracking-wider text-brand-gold bg-brand-gold/10 px-2.5 py-1 rounded-full border border-brand-gold/20 font-sans capitalize">
+                          {record.action}
+                        </span>
+                        <span className="text-xs text-text-muted">
+                          {formatDate(record.date)}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-sm font-semibold text-text-main truncate">
+                          {record.itemName}
+                        </span>
+                        <span className="text-xs text-text-muted">
+                          Quantity: <strong className="text-text-main font-medium">{record.quantity ?? '--'}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 💻 DESKTOP VIEW: Renders as a structured table, hidden completely on mobile screen dimensions */}
+                <div className="hidden md:block overflow-x-auto border border-border-main rounded-2xl ">
+                  <table className="w-full min-w-[900px] text-left border-collapse px-4">
+                    <thead>
+                      <tr className="border-b bg-brand-gold/30 border-border-sub text-text-muted text-xs font-bold uppercase tracking-wider h-12 ">
+                        <th className="pl-4">Action</th>
+                        <th>Item Name</th>
+                        <th>Quantity</th>
+                        <th>Date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border-sub/20 text-sm font-medium">
+                      {actionData?.records.map((record) => (
+                        <tr key={record.id} className="hover:bg-item-hover/20 transition-colors h-12">
+                          <td className="font-bold text-text-main capitalize pl-4">{record.action}</td>
+                          <td>{record.itemName}</td>
+                          <td>{record.quantity ?? '--'}</td>
+                          <td>{formatDate(record.date)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
-            <div className="flex items-center justify-end gap-2">
+            {/* PAGINATION CONTROLS */}
+            <div className={`flex items-center justify-end gap-2 ${isLoading ? 'hidden' : ''}`}>
               <button
                 disabled={actionsOffset === 0}
                 onClick={() => setActionsOffset((prev) => Math.max(0, prev - PAGE_LIMIT))}
@@ -219,6 +251,7 @@ export const SalesHistoryPage: React.FC = () => {
               </button>
             </div>
           </div>
+
         )}
       </div>
     </div>

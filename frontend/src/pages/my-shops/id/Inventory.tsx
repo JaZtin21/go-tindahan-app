@@ -31,7 +31,7 @@ export const InventoryPage = () => {
     const { shopId } = useParams<{ shopId: string }>();
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const isSubscribed = false
+    const isSubscribed = true;
 
     // 1. PAGINATION SETUP: 10 items per page limit matrix footprint
     const itemsPerPage = 10;
@@ -290,80 +290,165 @@ export const InventoryPage = () => {
                 </div>
 
                 {/* SCROLLABLE TABLE FRAMEWORK */}
-                <div className="overflow-x-auto w-full mt-2">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
-                        <thead>
-                            <tr className="border-b border-border-sub/40 text-text-muted text-xs font-bold uppercase tracking-wider h-12">
-                                {sortableColumns.map(col => (
-                                    <th
-                                        key={col.key}
-                                        onClick={() => handleSortClick(col.key)}
-                                        className="pb-3 cursor-pointer hover:text-text-main transition-colors"
-                                    >
-                                        <span className="flex items-center">
-                                            {col.label}
-                                            {getSortIcon(col.key)}
-                                        </span>
-                                    </th>
-                                ))}
-                                <th className="pb-3 text-right pr-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className=" text-sm font-medium">
-                            {tableLoading && (
-                                <tr>
-                                    <td colSpan={6} className="text-center py-8">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-gold"></div>
-                                            <span className="text-text-muted">Loading inventory...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                            {!tableLoading && inventoryItems.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="text-center py-8 text-text-muted">
-                                        No items found. Try adjusting your search or filters.
-                                    </td>
-                                </tr>
-                            )}
-                            {!tableLoading && inventoryItems.map((item: Item) => (
-                                <tr key={item.id} className="hover:bg-item-hover/50 transition-colors h-14">
-                                    <td className="pl-2 font-bold text-text-main truncate max-w-[150px]">{item.itemName}</td>
-                                    <td className="text-text-main font-semibold">{item.unitOfMeasure ? item.unitOfMeasure : '--'}</td>
+                <div className="w-full mt-2">
+                    {/* ========================================================================= */}
+                    {/* ⏳ LOADING STATE (Rendered inside a regular div on mobile, table row on desktop) */}
+                    {/* ========================================================================= */}
+                    {tableLoading && (
+                        <>
+                            {/* Mobile Loading View */}
+                            <div className="block md:hidden text-center py-8">
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-gold"></div>
+                                    <span className="text-text-muted text-sm font-medium">Loading inventory...</span>
+                                </div>
+                            </div>
 
-                                    <td className="text-text-main font-semibold">{formatCurrency(item.costPrice)}</td>
-                                    <td className="text-text-main font-semibold">{formatCurrency(item.sellingPrice)}</td>
-                                    <td>
-                                        <span className={`inline-flex items-center justify-center px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${item.stockQuantity <= item.reorderLevel
-                                            ? 'bg-brand-red/10 border-brand-red/20 text-brand-red'
-                                            : 'bg-brand-green/10 border-brand-green/20 text-brand-green'
-                                            }`}>
-                                            {item.stockQuantity} units
-                                        </span>
-                                    </td>
-                                    <td className="text-right pr-4">
-                                        <div className="inline-flex gap-2">
-                                            <button onClick={() => handleEditClick(item)} className="h-7 px-3 text-xs font-bold rounded-md bg-brand-gold text-white hover:bg-brand-gold-hover transition-colors cursor-pointer shadow-xs">
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleOpenDeletePrompt(item.id)}
-                                                className="h-7 px-3 text-xs font-bold rounded-md bg-brand-red text-white hover:bg-brand-red-hover transition-colors cursor-pointer shadow-xs"
-                                            >
+                            {/* Desktop Loading Table Wrapper */}
+                            <div className="hidden md:block overflow-x-auto w-full">
+                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                    <tbody className="text-sm font-medium">
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-8">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-gold"></div>
+                                                    <span className="text-text-muted">Loading inventory...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* 📭 EMPTY STATE (Rendered inside a regular div on mobile, table row on desktop) */}
+                    {/* ========================================================================= */}
+                    {!tableLoading && inventoryItems.length === 0 && (
+                        <>
+                            {/* Mobile Empty View */}
+                            <div className="block md:hidden text-center py-8 text-text-muted text-sm font-medium">
+                                No items found. Try adjusting your search or filters.
+                            </div>
+
+                            {/* Desktop Empty Table Wrapper */}
+                            <div className="hidden md:block overflow-x-auto w-full">
+                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                    <tbody className="text-sm font-medium">
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-8 text-text-muted">
+                                                No items found. Try adjusting your search or filters.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* 📦 ACTIVE DATA LAYOUT STATES */}
+                    {/* ========================================================================= */}
+                    {!tableLoading && inventoryItems.length > 0 && (
+                        <>
+                            {/* 📱 MOBILE CARDS CONTAINER (Completely detached from table elements) */}
+                            <div className="block md:hidden w-full">
+                                {inventoryItems.map((item: Item) => (
+                                    <div key={`mobile-${item.id}`} className="p-4 mb-3 border border-border-main rounded-2xl bg-bg-primary hover:bg-item-hover/5 transition-colors">
+                                        {/* Card Header: Product Name & Stock Level Badge */}
+                                        <div className="flex justify-between items-start gap-2 mb-3">
+                                            <div className="flex flex-col min-w-0">
+                                                <h4 className="font-bold text-text-main text-base line-clamp-2 break-words">
+                                                    {item.itemName}
+                                                </h4>
+                                                <span className="text-xs text-text-muted mt-0.5">
+                                                    Unit: <strong className="text-text-main font-medium">{item.unitOfMeasure ? item.unitOfMeasure : '--'}</strong>
+                                                </span>
+                                            </div>
+                                            {/* Dynamic Stock Indicator Badge */}
+                                            <span className={`inline-flex items-center justify-center shrink-0 px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${item.stockQuantity <= item.reorderLevel ? 'bg-brand-red/10 border-brand-red/20 text-brand-red' : 'bg-brand-gold/10 border-brand-gold/20 text-brand-gold'}`}>
+                                                {item.stockQuantity} units
+                                            </span>
+                                        </div>
+
+                                        {/* Card Content: Financial Metrics Split Grid */}
+                                        <div className="grid grid-cols-2 gap-2 py-2.5 my-2 border-y border-border-sub/10 text-xs">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-text-muted">Cost Price</span>
+                                                <span className="text-sm font-semibold text-text-main">{formatCurrency(item.costPrice)}</span>
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-text-muted">Selling Price</span>
+                                                <span className="text-sm font-bold text-brand-green">{formatCurrency(item.sellingPrice)}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Actions Footer */}
+                                        <div className="flex gap-2 justify-end mt-3 pt-1">
+                                            <button onClick={() => handleOpenDeletePrompt(item.id)} className="flex-1 h-8 text-xs font-bold rounded-xl border-2 border-brand-red/50 bg-brand-red/60 text-text-main hover:bg-brand-red hover:text-white transition-colors cursor-pointer shadow-xs">
                                                 Delete
                                             </button>
+                                            <button onClick={() => handleEditClick(item)} className="flex-1 h-8 text-xs font-bold rounded-xl border-2 border-brand-gold/50 bg-brand-gold/40 text-text-main hover:bg-brand-gold hover:text-white transition-colors cursor-pointer shadow-xs">
+                                                Edit
+                                            </button>
+
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 💻 DESKTOP TABLE VIEW CONTAINER (Clean, valid table architecture) */}
+                            <div className="hidden md:block overflow-x-auto w-full">
+                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                    <thead className="table-header-group">
+                                        <tr className="border-b border-border-sub/40 text-text-muted text-xs font-bold uppercase tracking-wider h-12">
+                                            {sortableColumns.map(col => (
+                                                <th key={col.key} onClick={() => handleSortClick(col.key)} className="pb-3 cursor-pointer hover:text-text-main transition-colors">
+                                                    <span className="flex items-center">
+                                                        {col.label} {getSortIcon(col.key)}
+                                                    </span>
+                                                </th>
+                                            ))}
+                                            <th className="pb-3 text-right pr-4">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm font-medium">
+                                        {inventoryItems.map((item: Item) => (
+                                            <tr key={`desktop-${item.id}`} className="hover:bg-item-hover/50 transition-colors h-14">
+                                                <td className="pl-2 font-bold text-text-main truncate max-w-[150px]">{item.itemName}</td>
+                                                <td className="text-text-main font-semibold">{item.unitOfMeasure ? item.unitOfMeasure : '--'}</td>
+                                                <td className="text-text-main font-semibold">{formatCurrency(item.costPrice)}</td>
+                                                <td className="text-text-main font-semibold">{formatCurrency(item.sellingPrice)}</td>
+                                                <td>
+                                                    <span className={`inline-flex items-center justify-center px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${item.stockQuantity <= item.reorderLevel ? 'bg-brand-red/10 border-brand-red/20 text-brand-red' : 'bg-brand-green/10 border-brand-green/20 text-brand-green'}`}>
+                                                        {item.stockQuantity} units
+                                                    </span>
+                                                </td>
+                                                <td className="text-right pr-4">
+                                                    <div className="inline-flex gap-2">
+                                                        <button onClick={() => handleOpenDeletePrompt(item.id)} className="h-7 px-3 text-xs font-bold rounded-md transition-colors duration-300 border-2 border-brand-red/50 bg-brand-red/60 text-text-main hover:bg-brand-red hover:text-white cursor-pointer shadow-xs">
+                                                            Delete
+                                                        </button>
+                                                        <button onClick={() => handleEditClick(item)} className="h-7 px-3 text-xs font-bold rounded-md transition-colors duration-300 border-2 border-brand-gold/50 bg-brand-gold/40 text-text-main hover:bg-brand-gold hover:text-white cursor-pointer shadow-xs">
+                                                            Edit
+                                                        </button>
+
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
                 </div>
 
 
+
                 {/* 🧭 FOOTER PAGINATION BAR */}
-                <div className="flex items-center justify-between pt-6 mt-4 border-t border-border-sub/60 flex-wrap gap-4">
+                <div className={` ${tableLoading ? 'hidden' : ''} flex items-center justify-between pt-6 mt-4 border-t border-border-sub/60 flex-wrap gap-4`}>
                     <span className="text-xs text-text-muted">
                         Showing <span className="text-text-main font-semibold">{totalItems === 0 ? 0 : offset + 1}</span> to{' '}
                         <span className="text-text-main font-semibold">

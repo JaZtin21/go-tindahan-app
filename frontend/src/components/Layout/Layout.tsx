@@ -47,7 +47,7 @@ export const Layout: React.FC = () => {
                         /* ✅ 3. Attach the ref to this overflow container */
                         <div
                             ref={scrollContainerRef}
-                            className="w-full h-full overflow-y-auto z-10 md:px-12 px-2 md:pt-18 pt-18 pb-8"
+                            className="w-full h-full overflow-y-auto z-10 md:px-12 px-1 md:pt-18 pt-18 pb-8"
                         >
                             <Outlet />
                         </div>
