@@ -364,15 +364,15 @@ input ShopSyncInput {
   isServerSynced: Boolean!
   clientCreatedAt: String
   
-  shopName: String
-  address: String
+  shopName: String!
+  address: String!
   description: String
-  coordinates: CoordinatesInput
-  businessHours: BusinessHoursInput
-  paymentMethods: PaymentMethodsInput
-  delivery: DeliveryOptionsInput
-  socialMedia: SocialMediaInput
-  contactDetails: ContactDetailsInput
+  coordinates: CoordinatesInput!
+  businessHours: BusinessHoursInput!
+  paymentMethods: PaymentMethodsInput!
+  delivery: DeliveryOptionsInput!
+  socialMedia: SocialMediaInput!
+  contactDetails: ContactDetailsInput!
   photo: String
   newPhoto: Upload      # NEW — fresh file binary for the cover photo
   photos: [String!]
@@ -386,7 +386,7 @@ input InventorySyncInput {
   isServerSynced: Boolean!
   clientCreatedAt: String
 
-  itemName: String
+  itemName: String!
   description: String
   barcode: String
   category: String

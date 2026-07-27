@@ -44,6 +44,23 @@ function makeLogger() {
     };
 }
 
+// NEW: derive the real file extension from a data URI's mime type instead
+// of assuming .jpg. `rawPhoto`/`p` throughout this file look like
+// "data:image/webp;base64,...." — the actual format is already sitting
+// right there in the string; this just reads it instead of discarding it.
+// Falls back to 'jpg' only if the string genuinely isn't a recognizable
+// "data:image/xxx;base64," header (shouldn't happen given isBase64Image
+// already gated these call sites, but a safe fallback beats a thrown error
+// mid-sync).
+function extensionFromDataUri(dataUri: string): string {
+    const match = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(dataUri);
+    if (!match) return 'jpg';
+    const subtype = match[1].toLowerCase();
+    if (subtype === 'jpeg') return 'jpg';
+    if (subtype === 'svg+xml') return 'svg';
+    return subtype; // webp, png, gif, bmp, etc. already match the extension we want
+}
+
 export async function syncAll(store: Store): Promise<void> {
     if (isSyncRunning) {
         console.log('Sync already in progress — skipping this call.');
@@ -86,7 +103,9 @@ export async function syncAll(store: Store): Promise<void> {
             let photo = '';
             let newPhoto: File | undefined;
             if (isBase64Image(rawPhoto)) {
-                newPhoto = dataUriToFile(rawPhoto, `${id}_cover.jpg`);
+                // CHANGED: was always `${id}_cover.jpg` — now uses the real
+                // extension read from the data URI, so a webp stays webp.
+                newPhoto = dataUriToFile(rawPhoto, `${id}_cover.${extensionFromDataUri(rawPhoto)}`);
             } else {
                 photo = rawPhoto;
             }
@@ -95,7 +114,8 @@ export async function syncAll(store: Store): Promise<void> {
             const newPhotos: File[] = [];
             rawPhotos.forEach((p, i) => {
                 if (isBase64Image(p)) {
-                    newPhotos.push(dataUriToFile(p, `${id}_gallery_${i}.jpg`));
+                    // CHANGED: was always `${id}_gallery_${i}.jpg`.
+                    newPhotos.push(dataUriToFile(p, `${id}_gallery_${i}.${extensionFromDataUri(p)}`));
                 } else if (p) {
                     photos.push(p);
                 }
@@ -132,7 +152,8 @@ export async function syncAll(store: Store): Promise<void> {
             let photo = '';
             let newPhoto: File | undefined;
             if (isBase64Image(rawPhoto)) {
-                newPhoto = dataUriToFile(rawPhoto, `${id}.jpg`);
+                // CHANGED: was always `${id}.jpg`.
+                newPhoto = dataUriToFile(rawPhoto, `${id}.${extensionFromDataUri(rawPhoto)}`);
             } else {
                 photo = rawPhoto;
             }

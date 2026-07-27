@@ -513,11 +513,11 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	// SECURITY GUARD 1: Enforce valid user identity state from Redis session
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// SECURITY GUARD 2: Verify the caller is the actual owner of the target shop
+	// SECURITY GUARD 2: Verify the caller is the actual owner of the target shop.
+	// CHANGED: no longer selecting shop_name — the folder no longer needs it.
 	var shopOwnerID string
-	var shopName string
-	checkQuery := "SELECT owner_id, shop_name FROM shops WHERE id = $1 LIMIT 1"
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ShopID).Scan(&shopOwnerID, &shopName)
+	checkQuery := "SELECT owner_id FROM shops WHERE id = $1 LIMIT 1"
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ShopID).Scan(&shopOwnerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -542,6 +542,21 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		return nil, nil
 	}
 
+	// NEW: get the item's real id BEFORE the insert, so the R2 folder can
+	// be keyed by it. gen_random_uuid() is the same function this column's
+	// own DEFAULT already uses — we're just calling it a step early so we
+	// can use the value before the row exists, then handing it back in
+	// explicitly on the INSERT below.
+	var itemID string
+	if err := r.Resolver.DB.QueryRow(ctx, `SELECT gen_random_uuid()`).Scan(&itemID); err != nil {
+		log.Printf("🔴 FAILED TO GENERATE ITEM ID IN ADDINVENTORYITEM: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
 	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
 	uploader, err := utils.NewImageUploader(
 		os.Getenv("R2_ACCOUNT_ID"),
@@ -560,31 +575,33 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		return nil, nil
 	}
 
-	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s", currentUser.ID, shopName, input.ItemName)
+	// CHANGED: shops/<ownerId>/shops/<shopId>/inventory/<itemId>/<itemName>
+	// — itemId is the durable folder key; itemName just rides along for
+	// human browsing, same reason you wanted names visible in the first place.
+	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, input.ShopID, itemID, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
 	// 2. UPLOAD PRODUCT PHOTO TO R2 IF PROVIDED
 	finalProductPhoto := ""
 	if input.Photo != nil && input.Photo.File != nil {
-
 		result, err := inventoryUploader.UploadImage(ctx, input.Photo.File, input.Photo.Filename)
 		if err == nil {
 			finalProductPhoto = result.URL
 		} else {
 			log.Printf("⚠️ Product photo upload failed: %v", err)
-			// Optional: Return a graphql error here if photos are strictly mandatory
 		}
 	}
 
-	// 3. PERSIST RECORD TO POSTGRES CONFIGURED WITH SECURE R2 PATH URL
+	// 3. PERSIST RECORD TO POSTGRES — CHANGED: id is now supplied explicitly
+	// (the same value the folder above was built from), instead of letting
+	// the column's own DEFAULT gen_random_uuid() assign a different one.
 	query := `
 		INSERT INTO inventory_items (
-			shop_id, item_name, description, barcode, category, 
+			id, shop_id, item_name, description, barcode, category, 
 			unit_of_measure, photo, cost_price, selling_price, 
 			stock_quantity, reorder_level, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 0.00), COALESCE($9, 0.00), COALESCE($10, 0), COALESCE($11, 5), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 0.00), COALESCE($10, 0.00), COALESCE($11, 0), COALESCE($12, 5), NOW())
 		RETURNING id, cost_price, selling_price, stock_quantity, reorder_level, updated_at
 	`
 
@@ -594,7 +611,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	var updatedAt time.Time
 
 	err = r.Resolver.DB.QueryRow(ctx, query,
-		input.ShopID, input.ItemName, input.Description, input.Barcode, input.Category,
+		itemID, input.ShopID, input.ItemName, input.Description, input.Barcode, input.Category,
 		input.UnitOfMeasure, finalProductPhoto, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel,
 	).Scan(&insertedID, &costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &updatedAt)
 
@@ -626,7 +643,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		Barcode:       input.Barcode,
 		Category:      input.Category,
 		UnitOfMeasure: input.UnitOfMeasure,
-		Photo:         &finalProductPhoto, // Pointers sync accurately with your models schema representation
+		Photo:         &finalProductPhoto,
 		CostPrice:     &costPrice,
 		SellingPrice:  &sellingPrice,
 		StockQuantity: &stockQuantity,
@@ -640,16 +657,18 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// SECURITY GUARD 2: Fetch current database values to evaluate owner and grab old photo
+	// SECURITY GUARD 2: Fetch current database values to evaluate owner and
+	// grab old photo. CHANGED: now also selects i.shop_id instead of
+	// s.shop_name — the folder is keyed by shopId now, not shopName.
 	var shopOwnerID string
 	var oldPhoto *string
-	var shopName string
+	var shopID string
 	checkQuery := `
-		SELECT s.owner_id, i.photo, s.shop_name FROM inventory_items i
+		SELECT s.owner_id, i.photo, i.shop_id FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &oldPhoto, &shopName)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ItemID).Scan(&shopOwnerID, &oldPhoto, &shopID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -670,7 +689,6 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		return nil, nil
 	}
 
-	// INITIALIZE THE R2 UPLOADER UTILITY VIA REGULAR ENVS
 	uploader, err := utils.NewImageUploader(
 		os.Getenv("R2_ACCOUNT_ID"),
 		os.Getenv("R2_ACCESS_KEY_ID"),
@@ -684,27 +702,26 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		return nil, fmt.Errorf("media processor error")
 	}
 
-	// Dynamic target isolation mapping: /userId/shops/shopId/inventory
-	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s", currentUser.ID, shopName, input.ItemName)
+	// CHANGED: input.ItemID instead of shopName+itemName — the item already
+	// has its real id (this IS an update, not a create), so no generation
+	// step is needed here, just building the same folder shape.
+	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, shopID, input.ItemID, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
 	// =========================================================================
-	// 1. PRODUCT PHOTO UPDATES REFACTOR (Matches UpdateShop pattern exactly)
+	// 1. PRODUCT PHOTO UPDATES — unchanged logic, just the folder above changed
 	// =========================================================================
 	finalPhoto := ""
 	if input.Photo != nil {
-		finalPhoto = *input.Photo // Take what the frontend wants to retain
+		finalPhoto = *input.Photo
 	}
 
-	// Compare DB record with incoming state: if it changed or cleared, flag it for cleanup
 	var deletedPhoto string
 	if oldPhoto != nil && *oldPhoto != "" && *oldPhoto != finalPhoto {
 		deletedPhoto = *oldPhoto
 	}
 
-	// Process the new binary upload stream if sent by the client input layer
 	if input.NewPhoto != nil && input.NewPhoto.File != nil {
-
 		result, uploadErr := inventoryUploader.UploadImage(ctx, input.NewPhoto.File, input.NewPhoto.Filename)
 		if uploadErr == nil {
 			finalPhoto = result.URL
@@ -714,7 +731,7 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	}
 
 	// =========================================================================
-	// 2. PERSIST AND EXECUTE SQL DATABASE UPDATE MATRIX
+	// 2. PERSIST AND EXECUTE SQL DATABASE UPDATE MATRIX — unchanged
 	// =========================================================================
 	updateQuery := `
 		UPDATE inventory_items 
@@ -747,9 +764,8 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	})
 
 	// =========================================================================
-	// 3. SECURE R2 CLEANUP SWEEPS (Best-effort execution pipeline)
+	// 3. SECURE R2 CLEANUP — unchanged logic, folder just changed above
 	// =========================================================================
-	// Purges old orphaned asset from R2 storage if overwritten or cleared
 	if deletedPhoto != "" {
 		_ = inventoryUploader.DeleteImageByURL(ctx, deletedPhoto)
 	}
@@ -762,19 +778,20 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 	// SECURITY GUARD 1: Is user logged in?
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
-	// SECURITY GUARD 2 & ASSET ACQUISITION: Fetch owner id, photo link, and
-	// shop id before resource wipeout — unchanged, still just gathering.
+	// SECURITY GUARD 2: fetch owner id, shop id, item name.
+	// CHANGED: no longer fetching the old photo URL individually — the R2
+	// cleanup below deletes the item's whole folder instead of one known
+	// URL, so we don't need to know the photo value ahead of time anymore.
 	var shopOwnerID string
-	var oldPhoto *string
 	var shopID string
 	var itemName string
 
 	checkQuery := `
-		SELECT s.owner_id, i.photo, i.shop_id, i.item_name FROM inventory_items i
+		SELECT s.owner_id, i.shop_id, i.item_name FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE i.id = $1 AND i.deleted_at IS NULL LIMIT 1
 	`
-	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID, &oldPhoto, &shopID, &itemName)
+	err := r.Resolver.DB.QueryRow(ctx, checkQuery, itemID).Scan(&shopOwnerID, &shopID, &itemName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			graphql.AddError(ctx, &gqlerror.Error{
@@ -795,7 +812,6 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		return false, nil
 	}
 
-	// Initialize the R2 uploader now, use it after the DB write succeeds.
 	uploader, err := utils.NewImageUploader(
 		os.Getenv("R2_ACCOUNT_ID"),
 		os.Getenv("R2_ACCESS_KEY_ID"),
@@ -809,13 +825,14 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		return false, fmt.Errorf("media processor error")
 	}
 
-	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory", currentUser.ID, shopID)
-	inventoryUploader := uploader.WithFolder(uploadFolder)
+	// CHANGED: folder no longer includes itemName — deletion doesn't need
+	// it (we're deleting the whole folder, not constructing a specific
+	// object key), and dropping it here means a rename that happened after
+	// the item was created can never cause this to miss the right folder.
+	itemFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s", currentUser.ID, shopID, itemID)
+	inventoryUploader := uploader.WithFolder(itemFolder)
 
-	// MOVED: soft-delete the row FIRST.
-	// Joined through shops via shop_id since inventory_items has no
-	// owner_id column of its own; shopID/ownership was already verified
-	// above via checkQuery.
+	// MOVED (from the earlier fix): soft-delete the row FIRST.
 	deleteQuery := "UPDATE inventory_items SET deleted_at = NOW() WHERE id = $1 AND shop_id = $2"
 	_, err = r.Resolver.DB.Exec(ctx, deleteQuery, itemID, shopID)
 	if err != nil {
@@ -830,11 +847,11 @@ func (r *mutationResolver) DeleteInventoryItem(ctx context.Context, itemID strin
 		Action:          "deleted item",
 	})
 
-	// MOVED: only now — after the soft-delete succeeded — clean up R2.
-	if oldPhoto != nil && *oldPhoto != "" {
-		if cleanErr := inventoryUploader.DeleteImageByURL(ctx, *oldPhoto); cleanErr != nil {
-			log.Printf("⚠️ Failed to remove inventory product image %s on deletion: %v", *oldPhoto, cleanErr)
-		}
+	// CHANGED: one DeleteFolder call instead of a single-URL delete — wipes
+	// the current photo AND any previously-orphaned uploads under this
+	// item's id, best-effort, same non-fatal tolerance as before.
+	if cleanErr := inventoryUploader.DeleteFolder(ctx); cleanErr != nil {
+		log.Printf("⚠️ Failed to remove inventory folder %s on deletion: %v", itemFolder, cleanErr)
 	}
 
 	return true, nil
@@ -1042,6 +1059,25 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		return nil, nil
 	}
 
+	// NEW: single R2 uploader for the whole batch call, reused across every
+	// shop/item instead of re-initializing per record.
+	uploader, err := utils.NewImageUploader(
+		os.Getenv("R2_ACCOUNT_ID"),
+		os.Getenv("R2_ACCESS_KEY_ID"),
+		os.Getenv("R2_SECRET_ACCESS_KEY"),
+		os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_PUBLIC_URL"),
+		"shops",
+	)
+	if err != nil {
+		log.Printf("🔴 BATCH SYNC: FAILED TO INITIALIZE R2 UPLOADER: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: media processing failure",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
 	// 2. BEGIN ACQUIRING ATOMIC TRANSACTION PIPE
 	tx, err := r.Resolver.DB.Begin(ctx)
 	if err != nil {
@@ -1062,7 +1098,28 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// PHASE 1: PROCESS SHOPS BATCH ARRAY
 	// =========================================================================
 	for _, s := range input.Shops {
+		shopUploadFolder := fmt.Sprintf("shops/%s/shops", currentUser.ID)
+		shopUploader := uploader.WithFolder(shopUploadFolder)
+
 		if s.IsDeleted {
+			// NEW: fetch this shop's + its inventory's photo URLs BEFORE the
+			// cascade delete below, so we know what to purge from R2 — same
+			// asset-collection step DeleteShop already does. Ownership is
+			// enforced implicitly: the UPDATE shops ... WHERE owner_id = $2
+			// a few lines down is the actual security boundary, this SELECT
+			// is purely for gathering cleanup targets and is harmless if it
+			// matches nothing.
+			var oldPrimaryPhoto *string
+			var oldPhotosSlice []string
+			_ = tx.QueryRow(ctx, `SELECT photo, photos FROM shops WHERE id = $1 AND owner_id = $2`,
+				s.LocalID, currentUser.ID).Scan(&oldPrimaryPhoto, &oldPhotosSlice)
+
+			// CHANGED: no longer fetching every inventory item's photo URL
+			// individually — now that inventory folders are nested by item
+			// id (shops/<owner>/shops/<shop>/inventory/<itemId>/...), one
+			// prefix delete on .../inventory/ below covers all of them at
+			// once, recursively, regardless of how many items the shop has.
+
 			// FIX: cascade the deletion — same shape as the single-resolver
 			// DeleteShop mutation. Without this, a shop soft-deleted through
 			// batch sync leaves its inventory items behind with no
@@ -1136,7 +1193,65 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				"localId":   s.LocalID,
 				"isDeleted": true,
 			})
+
+			// NEW: clean up R2 now that the soft-delete succeeded — same
+			// direct calls DeleteShop makes, no queue, best-effort only.
+			if oldPrimaryPhoto != nil && *oldPrimaryPhoto != "" {
+				if cleanErr := shopUploader.DeleteImageByURL(ctx, *oldPrimaryPhoto); cleanErr != nil {
+					log.Printf("⚠️ BATCH SYNC: failed to remove primary shop image %s on deletion: %v", *oldPrimaryPhoto, cleanErr)
+				}
+			}
+			for _, u := range oldPhotosSlice {
+				if u != "" {
+					if cleanErr := shopUploader.DeleteImageByURL(ctx, u); cleanErr != nil {
+						log.Printf("⚠️ BATCH SYNC: failed to remove gallery shop image %s on deletion: %v", u, cleanErr)
+					}
+				}
+			}
+			inventoryUploader := uploader.WithFolder(fmt.Sprintf("shops/%s/shops/%s/inventory", currentUser.ID, s.LocalID))
+			if cleanErr := inventoryUploader.DeleteFolder(ctx); cleanErr != nil {
+				log.Printf("⚠️ BATCH SYNC: failed to remove inventory folder for shop %s during deletion: %v", s.LocalID, cleanErr)
+			}
+
 			continue
+		}
+
+		// NEW: resolve the photo(s) that will actually get written — upload
+		// any real File objects the client sent (`NewPhoto`/`NewPhotos`) and
+		// merge with whatever retained URLs came through in `Photo`/`Photos`.
+		// This is the piece that was missing entirely before: s.Photo /
+		// s.Photos used to get written to the DB as-is, so a freshly
+		// captured photo (which arrives as NewPhoto, not Photo) never made
+		// it anywhere.
+		// FIX: s.Photo is *string — ShopSyncInput.photo is a nullable
+		// `String` in the schema, same as UpdateShopInput.Photo, which your
+		// original UpdateShop resolver already dereferences the same way
+		// (`if input.Photo != nil { finalPrimaryPhoto = *input.Photo }`).
+		// I missed that here originally and assigned the pointer directly,
+		// which is what the compiler caught.
+		finalPrimaryPhoto := ""
+		if s.Photo != nil {
+			finalPrimaryPhoto = *s.Photo
+		}
+		if s.NewPhoto != nil && s.NewPhoto.File != nil {
+			result, upErr := shopUploader.UploadImage(ctx, s.NewPhoto.File, s.NewPhoto.Filename)
+			if upErr == nil {
+				finalPrimaryPhoto = result.URL
+			} else {
+				log.Printf("⚠️ BATCH SYNC: shop %s primary photo upload failed: %v", s.LocalID, upErr)
+			}
+		}
+
+		finalPhotosSlice := append([]string{}, s.Photos...)
+		for _, upload := range s.NewPhotos {
+			if upload != nil && upload.File != nil {
+				result, upErr := shopUploader.UploadImage(ctx, upload.File, upload.Filename)
+				if upErr != nil {
+					log.Printf("⚠️ BATCH SYNC: shop %s gallery photo upload failed: %v", s.LocalID, upErr)
+					continue // Gracefully skip failed slice tracks, same as CreateShop
+				}
+				finalPhotosSlice = append(finalPhotosSlice, result.URL)
+			}
 		}
 
 		hoursJSON, _ := json.Marshal(s.BusinessHours)
@@ -1148,8 +1263,24 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 
 		var finalServerID string
 		var finalCreatedAt time.Time
+		var deletedPrimaryPhoto string
+		var deletedGalleryPhotos []string
 
 		if s.IsServerSynced {
+			// NEW: grab the pre-update photo state so we can diff against
+			// finalPrimaryPhoto/finalPhotosSlice below and know what's now
+			// orphaned in R2 — same idea as UpdateShop's oldPrimaryPhoto /
+			// oldPhotosSlice fetch.
+			var oldPrimaryPhoto *string
+			var oldPhotosSlice []string
+			_ = tx.QueryRow(ctx, `SELECT photo, photos FROM shops WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
+				s.LocalID, currentUser.ID).Scan(&oldPrimaryPhoto, &oldPhotosSlice)
+
+			if oldPrimaryPhoto != nil && *oldPrimaryPhoto != "" && *oldPrimaryPhoto != finalPrimaryPhoto {
+				deletedPrimaryPhoto = *oldPrimaryPhoto
+			}
+			deletedGalleryPhotos = utils.DiffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
+
 			// FIX: AND deleted_at IS NULL — without this, editing a shop
 			// that was soft-deleted on another device silently revives it
 			// (the UPDATE succeeds and looks like a normal edit).
@@ -1161,7 +1292,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				RETURNING id, created_at
 			`
 			err = tx.QueryRow(ctx, query,
-				s.ShopName, s.Address, s.Description, s.Photo, s.Photos,
+				s.ShopName, s.Address, s.Description, finalPrimaryPhoto, finalPhotosSlice,
 				hoursJSON, paymentsJSON, deliveryJSON, socialJSON, contactJSON, coordinatesJSON,
 				s.LocalID, currentUser.ID,
 			).Scan(&finalServerID, &finalCreatedAt)
@@ -1177,6 +1308,28 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 					"localId":   s.LocalID,
 					"isDeleted": true,
 				})
+				// NEW: the shop vanished before this update landed, so any
+				// image we just uploaded above for it is now orphaned —
+				// clean it up directly rather than leaking it in R2.
+				if s.NewPhoto != nil && finalPrimaryPhoto != "" {
+					if cleanErr := shopUploader.DeleteImageByURL(ctx, finalPrimaryPhoto); cleanErr != nil {
+						log.Printf("⚠️ BATCH SYNC: failed to remove orphaned shop image %s: %v", finalPrimaryPhoto, cleanErr)
+					}
+				}
+				// Any freshly-uploaded gallery images are also orphaned here.
+				// finalPhotosSlice = retained (s.Photos) + newly uploaded URLs,
+				// so anything in it that wasn't already in s.Photos is new.
+				retainedSet := make(map[string]bool, len(s.Photos))
+				for _, p := range s.Photos {
+					retainedSet[p] = true
+				}
+				for _, u := range finalPhotosSlice {
+					if u != "" && !retainedSet[u] {
+						if cleanErr := shopUploader.DeleteImageByURL(ctx, u); cleanErr != nil {
+							log.Printf("⚠️ BATCH SYNC: failed to remove orphaned gallery image %s: %v", u, cleanErr)
+						}
+					}
+				}
 				continue
 			}
 		} else {
@@ -1198,7 +1351,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				RETURNING id, created_at
 			`
 			err = tx.QueryRow(ctx, query,
-				s.ShopName, s.Address, s.Description, s.Photo, s.Photos, currentUser.ID, createdAtAnchor,
+				s.ShopName, s.Address, s.Description, finalPrimaryPhoto, finalPhotosSlice, currentUser.ID, createdAtAnchor,
 				hoursJSON, paymentsJSON, deliveryJSON, socialJSON, contactJSON, coordinatesJSON, statusJSON, verificationJSON,
 			).Scan(&finalServerID, &finalCreatedAt)
 		}
@@ -1210,14 +1363,29 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 
 		shopIDMap[s.LocalID] = finalServerID
 
+		// NEW: clean up replaced/removed photos now that the write succeeded
+		// — same "SECURE R2 CLEANUP SWEEPS" step UpdateShop runs.
+		if deletedPrimaryPhoto != "" {
+			if cleanErr := shopUploader.DeleteImageByURL(ctx, deletedPrimaryPhoto); cleanErr != nil {
+				log.Printf("⚠️ BATCH SYNC: failed to remove replaced shop image %s: %v", deletedPrimaryPhoto, cleanErr)
+			}
+		}
+		for _, u := range deletedGalleryPhotos {
+			if u != "" {
+				if cleanErr := shopUploader.DeleteImageByURL(ctx, u); cleanErr != nil {
+					log.Printf("⚠️ BATCH SYNC: failed to remove replaced gallery image %s: %v", u, cleanErr)
+				}
+			}
+		}
+
 		upsertedShops = append(upsertedShops, map[string]any{
 			"id":             finalServerID,
 			"localId":        s.LocalID,
 			"shopName":       s.ShopName,
 			"address":        s.Address,
 			"description":    s.Description,
-			"photo":          s.Photo,
-			"photos":         s.Photos,
+			"photo":          finalPrimaryPhoto, // CHANGED: was s.Photo — now the R2-resolved URL
+			"photos":         finalPhotosSlice,  // CHANGED: was s.Photos
 			"coordinates":    s.Coordinates,
 			"businessHours":  s.BusinessHours,
 			"paymentMethods": s.PaymentMethods,
@@ -1237,6 +1405,23 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			targetShopID = realShopID
 		}
 
+		// CHANGED: folder keyed by shops/<ownerId>/shops/<shopId>/inventory/<itemLocalId>/<itemName>
+		// — item.LocalID works as the durable folder key for BOTH create and
+		// update here, with no extra generation step needed, because of what
+		// it actually is on each path:
+		//   - brand new item (IsServerSynced=false): syncEngine.ts already
+		//     generated this via crypto.randomUUID() before queuing it, so
+		//     it's a stable id even before this row exists in Postgres.
+		//   - already-synced item being edited (IsServerSynced=true): once
+		//     a shop/item is confirmed, TinyBase's row key IS the real
+		//     server id (see replaceLocalShop's swap-in-place), and that's
+		//     what gets sent back as localId on the next dirty push — so
+		//     it's already equal to the real DB id here.
+		// Either way it's the same value across every sync call for a given
+		// item, which is exactly what a folder key needs to be.
+		inventoryUploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, targetShopID, item.LocalID, item.ItemName)
+		inventoryUploader := uploader.WithFolder(inventoryUploadFolder)
+
 		if item.IsDeleted {
 			_, err = tx.Exec(ctx, `UPDATE inventory_items SET deleted_at = NOW() WHERE id = $1 AND shop_id = $2`, item.LocalID, targetShopID)
 			if err != nil {
@@ -1248,11 +1433,43 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				"localId":   item.LocalID,
 				"isDeleted": true,
 			})
+
+			// CHANGED: whole-folder delete instead of fetching one known
+			// photo URL — matches DeleteInventoryItem's new approach, and
+			// means we no longer need a SELECT before the soft-delete here.
+			if cleanErr := inventoryUploader.DeleteFolder(ctx); cleanErr != nil {
+				log.Printf("⚠️ BATCH SYNC: failed to remove inventory folder %s on deletion: %v", inventoryUploadFolder, cleanErr)
+			}
 			continue
 		}
 
+		// Same upload-or-keep resolution as shops, single photo only.
+		// FIX: same as the shops fix above — item.Photo is *string
+		// (InventorySyncInput.photo is a nullable String), not string.
+		finalPhoto := ""
+		if item.Photo != nil {
+			finalPhoto = *item.Photo
+		}
+		if item.NewPhoto != nil && item.NewPhoto.File != nil {
+			result, upErr := inventoryUploader.UploadImage(ctx, item.NewPhoto.File, item.NewPhoto.Filename)
+			if upErr == nil {
+				finalPhoto = result.URL
+			} else {
+				log.Printf("⚠️ BATCH SYNC: item %s photo upload failed: %v", item.LocalID, upErr)
+			}
+		}
+
 		var finalItemID string
+		var deletedPhoto string
+
 		if item.IsServerSynced {
+			var oldPhoto *string
+			_ = tx.QueryRow(ctx, `SELECT photo FROM inventory_items WHERE id = $1 AND shop_id = $2 AND deleted_at IS NULL`,
+				item.LocalID, targetShopID).Scan(&oldPhoto)
+			if oldPhoto != nil && *oldPhoto != "" && *oldPhoto != finalPhoto {
+				deletedPhoto = *oldPhoto
+			}
+
 			// FIX: AND deleted_at IS NULL — same reasoning as the shops UPDATE above.
 			query := `
 				UPDATE inventory_items SET 
@@ -1263,7 +1480,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			`
 			err = tx.QueryRow(ctx, query,
 				item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
-				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, item.Photo,
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto,
 				item.LocalID, targetShopID,
 			).Scan(&finalItemID)
 
@@ -1275,19 +1492,30 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 					"localId":   item.LocalID,
 					"isDeleted": true,
 				})
+				if item.NewPhoto != nil && finalPhoto != "" {
+					if cleanErr := inventoryUploader.DeleteImageByURL(ctx, finalPhoto); cleanErr != nil {
+						log.Printf("⚠️ BATCH SYNC: failed to remove orphaned item image %s: %v", finalPhoto, cleanErr)
+					}
+				}
 				continue
 			}
 		} else {
+			// CHANGED: id is now supplied explicitly as item.LocalID —
+			// same value the folder above was built from — instead of
+			// letting the column's DEFAULT gen_random_uuid() assign a
+			// different one. Mirrors AddInventoryItem's new behavior, and
+			// means finalItemID == item.LocalID for every item created
+			// through batch sync from here on.
 			query := `
 				INSERT INTO inventory_items (
-					shop_id, item_name, description, barcode, category, unit_of_measure, 
+					id, shop_id, item_name, description, barcode, category, unit_of_measure, 
 					cost_price, selling_price, stock_quantity, reorder_level, photo
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 				RETURNING id
 			`
 			err = tx.QueryRow(ctx, query,
-				targetShopID, item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
-				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, item.Photo,
+				item.LocalID, targetShopID, item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto,
 			).Scan(&finalItemID)
 		}
 
@@ -1297,6 +1525,12 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		}
 
 		itemIDMap[item.LocalID] = finalItemID
+
+		if deletedPhoto != "" {
+			if cleanErr := inventoryUploader.DeleteImageByURL(ctx, deletedPhoto); cleanErr != nil {
+				log.Printf("⚠️ BATCH SYNC: failed to remove replaced item image %s: %v", deletedPhoto, cleanErr)
+			}
+		}
 
 		upsertedInventory = append(upsertedInventory, map[string]any{
 			"id":            finalItemID,
@@ -1311,7 +1545,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			"sellingPrice":  item.SellingPrice,
 			"stockQuantity": item.StockQuantity,
 			"reorderLevel":  item.ReorderLevel,
-			"photo":         item.Photo,
+			"photo":         finalPhoto, // CHANGED: was item.Photo — now the R2-resolved URL
 			"updatedAt":     time.Now().Format(time.RFC3339),
 		})
 	}
@@ -1319,6 +1553,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// PHASE 3: PROCESS CHECKOUT TRANSACTIONS BATCH ARRAY (Append-Only)
 	// =========================================================================
+	// unchanged — no photos on checkouts
 	pushedCheckoutIDs := make(map[string]bool)
 
 	for _, c := range input.Checkouts {
@@ -1424,6 +1659,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// PHASE 4: PROCESS ITEM ACTION HISTORIES ARRAY (Append-Only)
 	// =========================================================================
+	// unchanged — no photos on action history rows
 	pushedHistoryIDs := make(map[string]bool)
 
 	for _, h := range input.ActionHistories {
@@ -1478,6 +1714,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// PHASE 5: FETCH GLOBAL DELTAS FROM PULL ANCHORS
 	// =========================================================================
+	// unchanged
 	serverCheckpointTime := time.Now().Format(time.RFC3339)
 
 	lastSyncedAnchor, parseErr := time.Parse(time.RFC3339, input.LastSyncedAt)

@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // ImageUploader handles image uploads to Cloudflare R2 (S3-compatible)
@@ -215,6 +216,60 @@ func (u *ImageUploader) DeleteImageByURL(ctx context.Context, imageURL string) e
 	}
 
 	return u.DeleteImage(ctx, key)
+}
+
+// DeleteFolder deletes every object under this uploader's current folder
+// (the one set via WithFolder) in one operation: list, then batch-delete.
+// Same convention as UploadImage/DeleteImageByURL — the folder lives on
+// the receiver, not as a separate argument, so usage stays consistent:
+//
+//	uploader.WithFolder("shops/user_1/shops/shop_9/inventory/item_3").DeleteFolder(ctx)
+//
+// Useful for wiping an entire item's (or shop's) photo folder in one call
+// instead of tracking and deleting each known URL individually.
+//
+// Handles pagination (ListObjectsV2 pages at 1000 keys) and batches
+// deletes in chunks of up to 1000 (DeleteObjects' own limit) — each
+// ListObjectsV2 page is already within that limit, so no extra chunking
+// logic is needed beyond looping pages.
+func (u *ImageUploader) DeleteFolder(ctx context.Context) error {
+	prefix := strings.Trim(u.folder, "/")
+	if prefix == "" {
+		return fmt.Errorf("refusing to delete with an empty folder — this would target the entire bucket")
+	}
+	prefix += "/"
+
+	var continuationToken *string
+	for {
+		listOut, err := u.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(u.bucket),
+			Prefix:            aws.String(prefix),
+			ContinuationToken: continuationToken,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list objects under %s: %w", prefix, err)
+		}
+
+		if len(listOut.Contents) > 0 {
+			objects := make([]types.ObjectIdentifier, 0, len(listOut.Contents))
+			for _, obj := range listOut.Contents {
+				objects = append(objects, types.ObjectIdentifier{Key: obj.Key})
+			}
+			if _, err = u.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+				Bucket: aws.String(u.bucket),
+				Delete: &types.Delete{Objects: objects},
+			}); err != nil {
+				return fmt.Errorf("failed to batch-delete objects under %s: %w", prefix, err)
+			}
+		}
+
+		if listOut.IsTruncated == nil || !*listOut.IsTruncated {
+			break
+		}
+		continuationToken = listOut.NextContinuationToken
+	}
+
+	return nil
 }
 
 // ExtractKeyFromURL extracts the R2 object key from a stored public image URL.

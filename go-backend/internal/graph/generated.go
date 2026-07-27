@@ -10515,7 +10515,7 @@ func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context
 			it.ClientCreatedAt = data
 		case "itemName":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemName"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10766,14 +10766,14 @@ func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj
 			it.ClientCreatedAt = data
 		case "shopName":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopName"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ShopName = data
 		case "address":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10787,42 +10787,42 @@ func (ec *executionContext) unmarshalInputShopSyncInput(ctx context.Context, obj
 			it.Description = data
 		case "coordinates":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("coordinates"))
-			data, err := ec.unmarshalOCoordinatesInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCoordinatesInput(ctx, v)
+			data, err := ec.unmarshalNCoordinatesInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCoordinatesInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Coordinates = data
 		case "businessHours":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessHours"))
-			data, err := ec.unmarshalOBusinessHoursInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBusinessHoursInput(ctx, v)
+			data, err := ec.unmarshalNBusinessHoursInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBusinessHoursInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.BusinessHours = data
 		case "paymentMethods":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("paymentMethods"))
-			data, err := ec.unmarshalOPaymentMethodsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaymentMethodsInput(ctx, v)
+			data, err := ec.unmarshalNPaymentMethodsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaymentMethodsInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.PaymentMethods = data
 		case "delivery":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("delivery"))
-			data, err := ec.unmarshalODeliveryOptionsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeliveryOptionsInput(ctx, v)
+			data, err := ec.unmarshalNDeliveryOptionsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeliveryOptionsInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Delivery = data
 		case "socialMedia":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("socialMedia"))
-			data, err := ec.unmarshalOSocialMediaInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMediaInput(ctx, v)
+			data, err := ec.unmarshalNSocialMediaInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMediaInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.SocialMedia = data
 		case "contactDetails":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contactDetails"))
-			data, err := ec.unmarshalOContactDetailsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐContactDetailsInput(ctx, v)
+			data, err := ec.unmarshalNContactDetailsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐContactDetailsInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -15105,38 +15105,6 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) unmarshalOBusinessHoursInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBusinessHoursInput(ctx context.Context, v any) (*model.BusinessHoursInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputBusinessHoursInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalOContactDetailsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐContactDetailsInput(ctx context.Context, v any) (*model.ContactDetailsInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputContactDetailsInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalOCoordinatesInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCoordinatesInput(ctx context.Context, v any) (*model.CoordinatesInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputCoordinatesInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalODeliveryOptionsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐDeliveryOptionsInput(ctx context.Context, v any) (*model.DeliveryOptionsInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputDeliveryOptionsInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
 	if v == nil {
 		return nil, nil
@@ -15197,27 +15165,11 @@ func (ec *executionContext) marshalOOwnerShop2ᚖgoᚑbackendᚋinternalᚋgraph
 	return ec._OwnerShop(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOPaymentMethodsInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPaymentMethodsInput(ctx context.Context, v any) (*model.PaymentMethodsInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputPaymentMethodsInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) marshalOPost2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Post(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOSocialMediaInput2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSocialMediaInput(ctx context.Context, v any) (*model.SocialMediaInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputSocialMediaInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {

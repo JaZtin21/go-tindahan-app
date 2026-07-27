@@ -40,7 +40,7 @@ export const ShopDetailDashboard = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const isAddShopModalOpen = useSelector((state: RootState) => state.ui.isAddShopModalOpen);
-    const isSubscribed = true
+    const isSubscribed = false
 
     const shop = useSelector((state: RootState) =>
         state.myShops.shops.find((s: Shop) => s.id === id)

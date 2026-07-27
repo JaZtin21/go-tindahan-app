@@ -26,7 +26,7 @@ export async function fileToStorableBase64(file: File, maxWidth = 800, quality =
             const ctx = canvas.getContext('2d');
             if (!ctx) return resolve(dataUrl); // fallback to unresized original
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            resolve(canvas.toDataURL(file.type, quality));
         };
         img.onerror = reject;
         img.src = dataUrl;
@@ -38,18 +38,26 @@ export async function fileToStorableBase64(file: File, maxWidth = 800, quality =
 // sync. Only called on rows whose `photo` is still a data: URL (meaning it
 // was taken/added while offline and never actually uploaded anywhere).
 export function dataUriToFile(dataUri: string, filename: string): File {
-    const [header, base64Data] = dataUri.split(',');
-    const mimeMatch = header.match(/data:(.*?);base64/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    // Use a regex to extract just the base64 payload and the mime type securely
+    const mimeMatch = dataUri.match(/^data:(.*?);base64,(.*)$/);
+
+    if (!mimeMatch) {
+        throw new Error("Invalid Data URI format");
+    }
+
+    const mime = mimeMatch[1]; // Correctly extracts 'image/webp'
+    const base64Data = mimeMatch[2];
 
     const binary = atob(base64Data);
     const bytes = new Uint8Array(binary.length);
+
     for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
     }
 
     return new File([bytes], filename, { type: mime });
 }
+
 
 export function isBase64Image(value: unknown): value is string {
     return typeof value === 'string' && value.startsWith('data:image/');

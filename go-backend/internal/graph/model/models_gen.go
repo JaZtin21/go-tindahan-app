@@ -169,7 +169,7 @@ type InventorySyncInput struct {
 	IsDeleted       bool            `json:"isDeleted"`
 	IsServerSynced  bool            `json:"isServerSynced"`
 	ClientCreatedAt *string         `json:"clientCreatedAt,omitempty"`
-	ItemName        *string         `json:"itemName,omitempty"`
+	ItemName        string          `json:"itemName"`
 	Description     *string         `json:"description,omitempty"`
 	Barcode         *string         `json:"barcode,omitempty"`
 	Category        *string         `json:"category,omitempty"`
@@ -375,15 +375,15 @@ type ShopSyncInput struct {
 	IsDeleted       bool                  `json:"isDeleted"`
 	IsServerSynced  bool                  `json:"isServerSynced"`
 	ClientCreatedAt *string               `json:"clientCreatedAt,omitempty"`
-	ShopName        *string               `json:"shopName,omitempty"`
-	Address         *string               `json:"address,omitempty"`
+	ShopName        string                `json:"shopName"`
+	Address         string                `json:"address"`
 	Description     *string               `json:"description,omitempty"`
-	Coordinates     *CoordinatesInput     `json:"coordinates,omitempty"`
-	BusinessHours   *BusinessHoursInput   `json:"businessHours,omitempty"`
-	PaymentMethods  *PaymentMethodsInput  `json:"paymentMethods,omitempty"`
-	Delivery        *DeliveryOptionsInput `json:"delivery,omitempty"`
-	SocialMedia     *SocialMediaInput     `json:"socialMedia,omitempty"`
-	ContactDetails  *ContactDetailsInput  `json:"contactDetails,omitempty"`
+	Coordinates     *CoordinatesInput     `json:"coordinates"`
+	BusinessHours   *BusinessHoursInput   `json:"businessHours"`
+	PaymentMethods  *PaymentMethodsInput  `json:"paymentMethods"`
+	Delivery        *DeliveryOptionsInput `json:"delivery"`
+	SocialMedia     *SocialMediaInput     `json:"socialMedia"`
+	ContactDetails  *ContactDetailsInput  `json:"contactDetails"`
 	Photo           *string               `json:"photo,omitempty"`
 	NewPhoto        *graphql.Upload       `json:"newPhoto,omitempty"`
 	Photos          []string              `json:"photos,omitempty"`
