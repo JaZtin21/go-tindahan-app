@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Product } from '~/types/item';
 import { useDebounce } from '~/utils';
 import { ImageIcon, Minus, Plus, ChevronDown, Pencil, Sparkles } from 'lucide-react';
-import { ProductScannerCamera } from './ProductScannerCamera';
+import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
@@ -12,7 +12,9 @@ import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
 interface ScannerTabProps {
     shopId: string
 }
+
 let searchTimeoutId: ReturnType<typeof setTimeout>;
+
 export function RestockScannerTab({ shopId }: ScannerTabProps) {
     // 🚀 Component States
     // 'camera'  -> live camera / viewfinder
@@ -93,22 +95,26 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
         });
     };
 
-    const handleScannerCapture = (
-        file: File,
-        previewUrl: string,
-        matchedName: string,
-        unitOfMeasure: string,
-        confidence?: number // 🚀 NEW optional param — pass through from ProductScannerCamera if available
-    ) => {
-        setCapturedImagePreview(previewUrl); // 🚀 Saves the captured thumbnail link right into local component state
-        setSearchQuery(matchedName);
-        setGroupedProducts([]);
+    const handleScannerCapture = (outcome: ScanOutcome) => {
+        setCapturedImagePreview(outcome.previewUrl);
         setShowUnitDropdown(false);
-        setPredictionConfidence(confidence ?? null);
         clearTimeout(searchTimeoutId);
-        // 🚀 NOTE: scannerStep intentionally stays 'camera' here.
-        // runSearch decides whether to move to 'result' (match found) or 'search' (no match).
-        runSearch(matchedName, true);
+
+        if (outcome.status === 'matched') {
+            setSelectedProduct(outcome.product);
+            setSearchQuery(outcome.product.itemName);
+            setGroupedProducts(outcome.variants);
+            setQuantity(outcome.product.stockQuantity === 0 ? 0 : 1);
+            setShowDropdown(false);
+            setScannerStep('result');
+        } else {
+            // No DB match for the predicted name: fall back to the existing
+            // manual search form so the user can search/edit themselves.
+            setSearchQuery(outcome.suggestedName);
+            setSelectedProduct(null);
+            setGroupedProducts([]);
+            setScannerStep('search');
+        }
     };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,6 +299,12 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
         setQuantity(prev => Math.max(1, Number(prev) - 1));
     };
 
+
+    // 🚀 CHANGED: receives the camera's fully-resolved ScanOutcome instead of
+    // raw (name, unitOfMeasure) — no search call needed here anymore, the
+    // camera already did it.
+
+
     return (
         <div className="flex flex-col flex-1 h-full w-full bg-bg-primary min-h-0">
             {/* 🚀 Camera stays mounted (and the feed stays live) for BOTH 'camera' and 'result'
@@ -302,6 +314,8 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
             {(scannerStep === 'camera' || scannerStep === 'result') && (
                 <div className="flex flex-col relative isolate flex-1 w-auto mx-0 md:mx-2 rounded-t-2xl md:rounded-[20px] my-0 md:my-2 overflow-hidden bg-bg-primary">
                     <ProductScannerCamera
+                        shopId={shopId}
+                        isSubscribed={isSubscribed}
                         onCaptureComplete={handleScannerCapture}
                         hasResult={scannerStep === 'result'}
                         onRetry={handleGoBackToCamera}

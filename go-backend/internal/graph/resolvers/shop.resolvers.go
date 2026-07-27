@@ -592,6 +592,14 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		}
 	}
 
+	// NEW: visual_class_keys — nil becomes an explicit empty array so the
+	// text[] parameter binds cleanly (a nil Go slice would otherwise send
+	// SQL NULL, which array operators like && treat as "no rows match").
+	visualClassKeys := input.VisualClassKeys
+	if visualClassKeys == nil {
+		visualClassKeys = []string{}
+	}
+
 	// 3. PERSIST RECORD TO POSTGRES — CHANGED: id is now supplied explicitly
 	// (the same value the folder above was built from), instead of letting
 	// the column's own DEFAULT gen_random_uuid() assign a different one.
@@ -599,9 +607,9 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		INSERT INTO inventory_items (
 			id, shop_id, item_name, description, barcode, category, 
 			unit_of_measure, photo, cost_price, selling_price, 
-			stock_quantity, reorder_level, updated_at
+			stock_quantity, reorder_level, visual_class_keys, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 0.00), COALESCE($10, 0.00), COALESCE($11, 0), COALESCE($12, 5), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 0.00), COALESCE($10, 0.00), COALESCE($11, 0), COALESCE($12, 5), $13, NOW())
 		RETURNING id, cost_price, selling_price, stock_quantity, reorder_level, updated_at
 	`
 
@@ -612,7 +620,7 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 
 	err = r.Resolver.DB.QueryRow(ctx, query,
 		itemID, input.ShopID, input.ItemName, input.Description, input.Barcode, input.Category,
-		input.UnitOfMeasure, finalProductPhoto, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel,
+		input.UnitOfMeasure, finalProductPhoto, input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel, visualClassKeys,
 	).Scan(&insertedID, &costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &updatedAt)
 
 	if err == nil {
@@ -636,19 +644,20 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	}
 
 	return &model.OwnerInventoryItem{
-		ID:            insertedID,
-		ShopID:        input.ShopID,
-		ItemName:      input.ItemName,
-		Description:   input.Description,
-		Barcode:       input.Barcode,
-		Category:      input.Category,
-		UnitOfMeasure: input.UnitOfMeasure,
-		Photo:         &finalProductPhoto,
-		CostPrice:     &costPrice,
-		SellingPrice:  &sellingPrice,
-		StockQuantity: &stockQuantity,
-		ReorderLevel:  &reorderLevel,
-		UpdatedAt:     updatedAt.Format(time.RFC3339),
+		ID:              insertedID,
+		ShopID:          input.ShopID,
+		ItemName:        input.ItemName,
+		Description:     input.Description,
+		Barcode:         input.Barcode,
+		Category:        input.Category,
+		UnitOfMeasure:   input.UnitOfMeasure,
+		Photo:           &finalProductPhoto,
+		CostPrice:       &costPrice,
+		SellingPrice:    &sellingPrice,
+		StockQuantity:   &stockQuantity,
+		ReorderLevel:    &reorderLevel,
+		VisualClassKeys: visualClassKeys,
+		UpdatedAt:       updatedAt.Format(time.RFC3339),
 	}, nil
 }
 
@@ -733,22 +742,28 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	// =========================================================================
 	// 2. PERSIST AND EXECUTE SQL DATABASE UPDATE MATRIX — unchanged
 	// =========================================================================
+	// NEW: visual_class_keys are APPENDED, never overwritten. Passing nil/empty
+	// here (an ordinary field edit that isn't a scan correction) is a no-op —
+	// COALESCE($11::text[], '{}'::text[]) turns a NULL param into an empty
+	// array before the concat+dedup, so existing keys survive untouched.
 	updateQuery := `
 		UPDATE inventory_items 
 		SET item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5, photo = $6,
-		    cost_price = COALESCE($7, 0.00), selling_price = COALESCE($8, 0.00), stock_quantity = COALESCE($9, 0), reorder_level = COALESCE($10, 5), updated_at = NOW() 
-		WHERE id = $11
-		RETURNING id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, updated_at
+		    cost_price = COALESCE($7, 0.00), selling_price = COALESCE($8, 0.00), stock_quantity = COALESCE($9, 0), reorder_level = COALESCE($10, 5),
+		    visual_class_keys = (SELECT ARRAY(SELECT DISTINCT unnest(visual_class_keys || COALESCE($11::text[], '{}'::text[])))),
+		    updated_at = NOW() 
+		WHERE id = $12
+		RETURNING id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, visual_class_keys, updated_at
 	`
 	var item model.OwnerInventoryItem
 	var updatedAt time.Time
 
 	err = r.Resolver.DB.QueryRow(ctx, updateQuery,
 		input.ItemName, input.Description, input.Barcode, input.Category, input.UnitOfMeasure, finalPhoto,
-		input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel, input.ItemID,
+		input.CostPrice, input.SellingPrice, input.StockQuantity, input.ReorderLevel, input.VisualClassKeys, input.ItemID,
 	).Scan(
 		&item.ID, &item.ShopID, &item.ItemName, &item.Description, &item.Barcode, &item.Category,
-		&item.UnitOfMeasure, &item.Photo, &item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &updatedAt,
+		&item.UnitOfMeasure, &item.Photo, &item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &item.VisualClassKeys, &updatedAt,
 	)
 	if err != nil {
 		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEINVENTORYITEM: %v", err)
@@ -762,6 +777,19 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		ItemName:        item.ItemName,
 		Action:          "edited item",
 	})
+
+	// NEW: this edit carried fresh visual keys, which only happens when it's
+	// a scan-correction save — log it as retraining signal.
+	if len(input.VisualClassKeys) > 0 {
+		itemIDCopy := item.ID
+		itemNameCopy := item.ItemName
+		_ = utils.RecordItemScanEvent(ctx, r.Resolver.DB, utils.ItemScanEventInput{
+			ShopID:          item.ShopID,
+			InventoryItemID: &itemIDCopy,
+			ResolvedName:    &itemNameCopy,
+			MatchType:       "manual_correction",
+		})
+	}
 
 	// =========================================================================
 	// 3. SECURE R2 CLEANUP — unchanged logic, folder just changed above
@@ -1461,6 +1489,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 
 		var finalItemID string
 		var deletedPhoto string
+		var finalVisualClassKeys []string
 
 		if item.IsServerSynced {
 			var oldPhoto *string
@@ -1471,18 +1500,21 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			}
 
 			// FIX: AND deleted_at IS NULL — same reasoning as the shops UPDATE above.
+			// NEW: visual_class_keys appended (deduped) via the same COALESCE
+			// pattern as UpdateInventoryItem — nil/empty input is a no-op.
 			query := `
 				UPDATE inventory_items SET 
 					item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5,
-					cost_price = $6, selling_price = $7, stock_quantity = $8, reorder_level = $9, photo = $10
-				WHERE id = $11 AND shop_id = $12 AND deleted_at IS NULL
-				RETURNING id
+					cost_price = $6, selling_price = $7, stock_quantity = $8, reorder_level = $9, photo = $10,
+					visual_class_keys = (SELECT ARRAY(SELECT DISTINCT unnest(visual_class_keys || COALESCE($11::text[], '{}'::text[]))))
+				WHERE id = $12 AND shop_id = $13 AND deleted_at IS NULL
+				RETURNING id, visual_class_keys
 			`
 			err = tx.QueryRow(ctx, query,
 				item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
-				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto,
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto, item.VisualClassKeys,
 				item.LocalID, targetShopID,
-			).Scan(&finalItemID)
+			).Scan(&finalItemID, &finalVisualClassKeys)
 
 			// FIX: item was already soft-deleted elsewhere — report as a
 			// deletion instead of silently reviving it or erroring the batch.
@@ -1506,17 +1538,22 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			// different one. Mirrors AddInventoryItem's new behavior, and
 			// means finalItemID == item.LocalID for every item created
 			// through batch sync from here on.
+			seedVisualClassKeys := item.VisualClassKeys
+			if seedVisualClassKeys == nil {
+				seedVisualClassKeys = []string{}
+			}
+
 			query := `
 				INSERT INTO inventory_items (
 					id, shop_id, item_name, description, barcode, category, unit_of_measure, 
-					cost_price, selling_price, stock_quantity, reorder_level, photo
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-				RETURNING id
+					cost_price, selling_price, stock_quantity, reorder_level, photo, visual_class_keys
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+				RETURNING id, visual_class_keys
 			`
 			err = tx.QueryRow(ctx, query,
 				item.LocalID, targetShopID, item.ItemName, item.Description, item.Barcode, item.Category, item.UnitOfMeasure,
-				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto,
-			).Scan(&finalItemID)
+				item.CostPrice, item.SellingPrice, item.StockQuantity, item.ReorderLevel, finalPhoto, seedVisualClassKeys,
+			).Scan(&finalItemID, &finalVisualClassKeys)
 		}
 
 		if err != nil {
@@ -1533,20 +1570,25 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		}
 
 		upsertedInventory = append(upsertedInventory, map[string]any{
-			"id":            finalItemID,
-			"localId":       item.LocalID,
-			"shopId":        targetShopID,
-			"itemName":      item.ItemName,
-			"description":   item.Description,
-			"barcode":       item.Barcode,
-			"category":      item.Category,
-			"unitOfMeasure": item.UnitOfMeasure,
-			"costPrice":     item.CostPrice,
-			"sellingPrice":  item.SellingPrice,
-			"stockQuantity": item.StockQuantity,
-			"reorderLevel":  item.ReorderLevel,
-			"photo":         finalPhoto, // CHANGED: was item.Photo — now the R2-resolved URL
-			"updatedAt":     time.Now().Format(time.RFC3339),
+			"id":              finalItemID,
+			"localId":         item.LocalID,
+			"shopId":          targetShopID,
+			"itemName":        item.ItemName,
+			"description":     item.Description,
+			"barcode":         item.Barcode,
+			"category":        item.Category,
+			"unitOfMeasure":   item.UnitOfMeasure,
+			"costPrice":       item.CostPrice,
+			"sellingPrice":    item.SellingPrice,
+			"stockQuantity":   item.StockQuantity,
+			"reorderLevel":    item.ReorderLevel,
+			"photo":           finalPhoto,           // CHANGED: was item.Photo — now the R2-resolved URL
+			"visualClassKeys": finalVisualClassKeys, // NEW — so the pushing client's own
+			// TinyBase/Redux copy picks up the
+			// server-merged key set immediately,
+			// same reasoning as the cascade-delete
+			// echo-back further up this file.
+			"updatedAt": time.Now().Format(time.RFC3339),
 		})
 	}
 
@@ -1826,7 +1868,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 
 	itemChangeRows, err := tx.Query(ctx, `
 		SELECT i.id, i.shop_id, i.item_name, i.description, i.barcode, i.category, i.unit_of_measure,
-		       i.cost_price, i.selling_price, i.stock_quantity, i.reorder_level, i.photo, i.server_updated_at
+		       i.cost_price, i.selling_price, i.stock_quantity, i.reorder_level, i.photo, i.visual_class_keys, i.server_updated_at
 		FROM inventory_items i
 		JOIN shops s ON i.shop_id = s.id
 		WHERE s.owner_id = $1 AND i.deleted_at IS NULL AND i.server_updated_at > $2
@@ -1842,11 +1884,12 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				costPrice, sellingPrice                       float64
 				stockQuantity, reorderLevel                   int
 				photo                                         sql.NullString
+				visualClassKeys                               []string
 				updatedAt                                     time.Time
 			)
 			scanErr := itemChangeRows.Scan(
 				&id, &shopID, &itemName, &description, &barcode, &category, &unitOfMeasure,
-				&costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &photo, &updatedAt,
+				&costPrice, &sellingPrice, &stockQuantity, &reorderLevel, &photo, &visualClassKeys, &updatedAt,
 			)
 			if scanErr != nil {
 				log.Printf("🔴 BATCH SYNC: inventory pull row scan failed: %v", scanErr)
@@ -1857,19 +1900,20 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			}
 
 			upsertedInventory = append(upsertedInventory, map[string]any{
-				"id":            id,
-				"shopId":        shopID,
-				"itemName":      itemName,
-				"description":   description.String,
-				"barcode":       barcode.String,
-				"category":      category.String,
-				"unitOfMeasure": unitOfMeasure.String,
-				"costPrice":     costPrice,
-				"sellingPrice":  sellingPrice,
-				"stockQuantity": stockQuantity,
-				"reorderLevel":  reorderLevel,
-				"photo":         photo.String,
-				"updatedAt":     updatedAt.Format(time.RFC3339),
+				"id":              id,
+				"shopId":          shopID,
+				"itemName":        itemName,
+				"description":     description.String,
+				"barcode":         barcode.String,
+				"category":        category.String,
+				"unitOfMeasure":   unitOfMeasure.String,
+				"costPrice":       costPrice,
+				"sellingPrice":    sellingPrice,
+				"stockQuantity":   stockQuantity,
+				"reorderLevel":    reorderLevel,
+				"photo":           photo.String,
+				"visualClassKeys": visualClassKeys,
+				"updatedAt":       updatedAt.Format(time.RFC3339),
 			})
 		}
 		itemChangeRows.Close()
@@ -2012,6 +2056,33 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		},
 		ServerTime: serverCheckpointTime,
 	}, nil
+}
+
+// RecordScanEvent is the resolver for the recordScanEvent field.
+func (r *mutationResolver) RecordScanEvent(ctx context.Context, input model.RecordScanEventInput) (bool, error) {
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "Unauthorized access",
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
+		})
+		return false, nil
+	}
+	if err := utils.EnsureShopOwnership(ctx, r.Resolver.DB, input.ShopID, currentUser.ID); err != nil {
+		utils.AddHistoryGraphQLError(ctx, err)
+		return false, nil
+	}
+
+	err := utils.RecordItemScanEvent(ctx, r.Resolver.DB, utils.ItemScanEventInput{
+		ShopID:             input.ShopID,
+		InventoryItemID:    input.InventoryItemID,
+		TopVisualCandidate: input.TopVisualCandidate,
+		VisualDistance:     input.VisualDistance,
+		OcrText:            input.OcrText,
+		ResolvedName:       input.ResolvedName,
+		MatchType:          input.MatchType,
+	})
+	return err == nil, nil
 }
 
 // GetMyShops is the resolver for the getMyShops field.
@@ -2640,13 +2711,99 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 }
 
 // SearchShopProducts is the resolver for the searchShopProducts field.
-func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int) (*model.PaginatedPublicProducts, error) {
-	// 1. Get total items matching item name or category string within a specific shop - 🚀 ADDED AND deleted_at IS NULL
+func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int, visualCandidates []string) (*model.PaginatedPublicProducts, error) {
+	normalizedQuery := utils.NormalizeSearchText(query)
+
+	// -------------------------------------------------------------------
+	// LAYER 1: exact match against stable visual recognition keys.
+	// These are bound once per item (see AddInventoryItem / UpdateInventoryItem)
+	// from the vision model's own candidate names, so they're immune to the
+	// shop owner renaming the item's display name later. Tried first because
+	// it's a deterministic match, not a fuzzy guess.
+	// -------------------------------------------------------------------
+	if len(visualCandidates) > 0 {
+		var visualCount int64
+		visualCountQuery := `
+			SELECT COUNT(*) FROM inventory_items
+			WHERE shop_id = $1 AND deleted_at IS NULL AND visual_class_keys && $2
+		`
+		if err := r.Resolver.DB.QueryRow(ctx, visualCountQuery, shopID, visualCandidates).Scan(&visualCount); err != nil {
+			log.Printf("🔴 SearchShopProducts: visual key count failed: %v", err)
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "internal server error: shop product search count failure",
+				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+			})
+			return nil, nil
+		}
+
+		if visualCount > 0 {
+			visualSelectQuery := `
+				SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity
+				FROM inventory_items
+				WHERE shop_id = $1 AND deleted_at IS NULL AND visual_class_keys && $2
+				ORDER BY item_name ASC
+				LIMIT $3 OFFSET $4
+			`
+			rows, err := r.Resolver.DB.Query(ctx, visualSelectQuery, shopID, visualCandidates, limit, offset)
+			if err != nil {
+				log.Printf("🔴 SearchShopProducts: visual key select failed: %v", err)
+				graphql.AddError(ctx, &gqlerror.Error{
+					Message:    "internal server error: shop product collection search failure",
+					Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+				})
+				return nil, nil
+			}
+			defer rows.Close()
+
+			var products []*model.PublicProduct
+			for rows.Next() {
+				var prod model.PublicProduct
+				if err := rows.Scan(
+					&prod.ID, &prod.ShopID, &prod.ItemName, &prod.Description, &prod.Category,
+					&prod.UnitOfMeasure, &prod.Photo, &prod.SellingPrice, &prod.StockQuantity,
+				); err != nil {
+					graphql.AddError(ctx, &gqlerror.Error{
+						Message:    "internal server error: shop item decoding failure",
+						Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+					})
+					return nil, nil
+				}
+				score := 1.0
+				matchType := "visual_key"
+				prod.MatchScore = &score
+				prod.MatchType = &matchType
+				products = append(products, &prod)
+			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
+
+			return &model.PaginatedPublicProducts{
+				Products:    products,
+				TotalCount:  int(visualCount),
+				HasNextPage: int64(offset+limit) < visualCount,
+			}, nil
+		}
+		// No visual key hit — fall through to Layer 2 below rather than
+		// returning empty, since the item may exist but just hasn't had a
+		// key bound to it yet (e.g. it was created manually, never scanned).
+	}
+
+	// -------------------------------------------------------------------
+	// LAYER 2: fuzzy text fallback — trigram similarity + substring match.
+	// Used when no visualCandidates were supplied at all (manual typing),
+	// or Layer 1 found nothing (new/never-seen product, or one without a
+	// bound visual key yet).
+	// -------------------------------------------------------------------
+	const similarityThreshold = 0.2
+
 	var totalCount int64
-	countQuery := "SELECT COUNT(*) FROM inventory_items WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2) AND deleted_at IS NULL"
-	searchPattern := "%" + query + "%"
-	err := r.Resolver.DB.QueryRow(ctx, countQuery, shopID, searchPattern).Scan(&totalCount)
-	if err != nil {
+	countQuery := `
+		SELECT COUNT(*) FROM inventory_items
+		WHERE shop_id = $1 AND deleted_at IS NULL
+		  AND (item_name ILIKE '%' || $2 || '%' OR category ILIKE '%' || $2 || '%' OR similarity(item_name, $2) > $3)
+	`
+	if err := r.Resolver.DB.QueryRow(ctx, countQuery, shopID, normalizedQuery, similarityThreshold).Scan(&totalCount); err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: shop product search count failure",
 			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
@@ -2654,15 +2811,16 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 		return nil, nil
 	}
 
-	// 2. Fetch public fields only from the specific shop - 🚀 ADDED AND deleted_at IS NULL
 	selectQuery := `
-		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity 
-		FROM inventory_items 
-		WHERE shop_id = $1 AND (item_name ILIKE $2 OR category ILIKE $2) AND deleted_at IS NULL
-		ORDER BY item_name ASC 
-		LIMIT $3 OFFSET $4
+		SELECT id, shop_id, item_name, description, category, unit_of_measure, photo, selling_price, stock_quantity,
+		       GREATEST(similarity(item_name, $2), CASE WHEN item_name ILIKE '%' || $2 || '%' THEN 0.99 ELSE 0 END) AS score
+		FROM inventory_items
+		WHERE shop_id = $1 AND deleted_at IS NULL
+		  AND (item_name ILIKE '%' || $2 || '%' OR category ILIKE '%' || $2 || '%' OR similarity(item_name, $2) > $3)
+		ORDER BY score DESC, item_name ASC
+		LIMIT $4 OFFSET $5
 	`
-	rows, err := r.Resolver.DB.Query(ctx, selectQuery, shopID, searchPattern, limit, offset)
+	rows, err := r.Resolver.DB.Query(ctx, selectQuery, shopID, normalizedQuery, similarityThreshold, limit, offset)
 	if err != nil {
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: shop product collection search failure",
@@ -2675,36 +2833,30 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 	var products []*model.PublicProduct
 	for rows.Next() {
 		var prod model.PublicProduct
-		err := rows.Scan(
-			&prod.ID,
-			&prod.ShopID,
-			&prod.ItemName,
-			&prod.Description,
-			&prod.Category,
-			&prod.UnitOfMeasure,
-			&prod.Photo,
-			&prod.SellingPrice,
-			&prod.StockQuantity,
-		)
-		if err != nil {
+		var score float64
+		if err := rows.Scan(
+			&prod.ID, &prod.ShopID, &prod.ItemName, &prod.Description, &prod.Category,
+			&prod.UnitOfMeasure, &prod.Photo, &prod.SellingPrice, &prod.StockQuantity, &score,
+		); err != nil {
 			graphql.AddError(ctx, &gqlerror.Error{
 				Message:    "internal server error: shop item decoding failure",
 				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
 			})
 			return nil, nil
 		}
+		matchType := "trgm_fallback"
+		prod.MatchScore = &score
+		prod.MatchType = &matchType
 		products = append(products, &prod)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	hasNextPage := int64(offset+limit) < totalCount
 	return &model.PaginatedPublicProducts{
 		Products:    products,
 		TotalCount:  int(totalCount),
-		HasNextPage: hasNextPage,
+		HasNextPage: int64(offset+limit) < totalCount,
 	}, nil
 }
 

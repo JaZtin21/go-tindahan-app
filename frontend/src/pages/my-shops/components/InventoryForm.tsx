@@ -11,7 +11,7 @@ import {
     updateInventoryItem as updateInventoryItemAction
 } from "~/store/inventorySlice";
 import { Check, X, XIcon } from 'lucide-react';
-import { ProductScannerCamera } from './ProductScannerCamera';
+import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { useAddInventoryItem, useUpdateInventoryItem } from '~/api/queries';
 import { resizeAndConvertToWebPFile } from '~/utils/imageUtils';
 
@@ -27,6 +27,15 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
     const isSubscribed = false;
+
+    // 🚀 NEW: recognition keys from the scan that produced this form's current
+    // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this
+    // item (or its correction) gets bound in the backend's visual_class_keys
+    // column. Stays [] for manual-tab entries (never touched by a scan) and
+    // for scans the camera itself decided weren't confident enough to bind
+    // (ProductScannerCamera already applies shouldBindVisualClassKeys before
+    // handing this back — nothing to re-check here).
+    const [visualClassKeys, setVisualClassKeys] = useState<string[]>([]);
 
 
 
@@ -94,6 +103,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         });
         setPhoto(null);
         setPhotoPreview('');
+        setVisualClassKeys([]);
         setScannerStep('camera');
 
         if (shoudClose)
@@ -230,7 +240,17 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 //     offline base64 data: URI — useUpdateInventoryItem/syncEngine
                 //     both already know how to handle either case)
                 //   - user explicitly removed the photo -> send '' to clear it
-                const updateInput: any = { ...mutationPayload, itemId: item.id };
+                const updateInput: any = {
+                    ...mutationPayload,
+                    itemId: item.id,
+                    // 🚀 NEW: only non-empty when this edit followed a scan (either
+                    // the "AI Image Scanner" tab, or a future flow that opens this
+                    // form pre-filled from a scan). visualClassKeys is APPENDED to
+                    // the item's existing keys server-side, never overwritten — see
+                    // RESOLVER_CHANGES.md — so leaving it [] here for an ordinary
+                    // manual edit is a safe no-op, not a wipe.
+                    visualClassKeys,
+                };
 
                 if (photo) {
                     updateInput.newPhoto = photo;
@@ -248,7 +268,14 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 });
             } else {
                 await addInventoryItem({
-                    variables: { input: { ...mutationPayload, shopId: shopId, photo: photo || null } }
+                    variables: {
+                        input: {
+                            ...mutationPayload,
+                            shopId: shopId,
+                            photo: photo || null,
+                            visualClassKeys, // 🚀 NEW — [] for manual-tab entries, populated for confident scans
+                        }
+                    }
                 });
             }
             // 👇 EXECUTE APOLLO MUTATION LAYER PIPELINE
@@ -297,6 +324,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const handleGoBackToCamera = () => {
         setPhoto(null);
         setPhotoPreview('');
+        setVisualClassKeys([]);
         setScannerStep('camera');
     };
 
@@ -475,13 +503,29 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                     {scannerStep === 'camera' && (
                                         <div className="flex flex-col relative isolate flex-1 w-auto mx-2 rounded-[20px] my-2 overflow-hidden bg-[var(--color-bg-secondary)] ">
                                             <ProductScannerCamera
-                                                onCaptureComplete={(file, previewUrl, matchedName, unitOfMeasure) => {
-                                                    setPhoto(file);
-                                                    setPhotoPreview(previewUrl);
+                                                shopId={shopId as string}
+                                                isSubscribed={isSubscribed}
+                                                onCaptureComplete={(outcome: ScanOutcome) => {
+                                                    setPhoto(outcome.file);
+                                                    setPhotoPreview(outcome.previewUrl);
+                                                    setVisualClassKeys(outcome.visualCandidateKeys);
+
+                                                    // 🚀 Per your call: ignore outcome.status entirely here — even
+                                                    // when the camera found an existing match in inventory, this
+                                                    // form still just prefills and lets the "Add Item" flow proceed
+                                                    // as before. (visualClassKeys still gets carried through above,
+                                                    // so the binding/retraining benefit isn't lost either way.)
+                                                    const name = outcome.status === 'matched'
+                                                        ? outcome.product.itemName
+                                                        : outcome.suggestedName;
+                                                    const unit = outcome.status === 'matched'
+                                                        ? (outcome.product.unitOfMeasure || '')
+                                                        : outcome.unitOfMeasure;
+
                                                     setFormData({
                                                         ...formData,
-                                                        unitOfMeasure: unitOfMeasure,
-                                                        itemName: matchedName,
+                                                        unitOfMeasure: unit,
+                                                        itemName: name,
                                                     });
 
                                                     setScannerStep('form');

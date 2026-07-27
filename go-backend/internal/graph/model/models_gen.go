@@ -7,17 +7,18 @@ import (
 )
 
 type AddInventoryItemInput struct {
-	ShopID        string          `json:"shopId"`
-	ItemName      string          `json:"itemName"`
-	Description   *string         `json:"description,omitempty"`
-	Barcode       *string         `json:"barcode,omitempty"`
-	Category      *string         `json:"category,omitempty"`
-	UnitOfMeasure *string         `json:"unitOfMeasure,omitempty"`
-	CostPrice     *float64        `json:"costPrice,omitempty"`
-	SellingPrice  *float64        `json:"sellingPrice,omitempty"`
-	StockQuantity *int            `json:"stockQuantity,omitempty"`
-	ReorderLevel  *int            `json:"reorderLevel,omitempty"`
-	Photo         *graphql.Upload `json:"photo,omitempty"`
+	ShopID          string          `json:"shopId"`
+	ItemName        string          `json:"itemName"`
+	Description     *string         `json:"description,omitempty"`
+	Barcode         *string         `json:"barcode,omitempty"`
+	Category        *string         `json:"category,omitempty"`
+	UnitOfMeasure   *string         `json:"unitOfMeasure,omitempty"`
+	CostPrice       *float64        `json:"costPrice,omitempty"`
+	SellingPrice    *float64        `json:"sellingPrice,omitempty"`
+	StockQuantity   *int            `json:"stockQuantity,omitempty"`
+	ReorderLevel    *int            `json:"reorderLevel,omitempty"`
+	Photo           *graphql.Upload `json:"photo,omitempty"`
+	VisualClassKeys []string        `json:"visualClassKeys,omitempty"`
 }
 
 type AuthResponse struct {
@@ -180,6 +181,7 @@ type InventorySyncInput struct {
 	ReorderLevel    *int            `json:"reorderLevel,omitempty"`
 	Photo           *string         `json:"photo,omitempty"`
 	NewPhoto        *graphql.Upload `json:"newPhoto,omitempty"`
+	VisualClassKeys []string        `json:"visualClassKeys,omitempty"`
 }
 
 type ItemActionHistory struct {
@@ -218,6 +220,7 @@ type OwnerInventoryItem struct {
 	StockQuantity   *int     `json:"stockQuantity,omitempty"`
 	CostPrice       *float64 `json:"costPrice,omitempty"`
 	ReorderLevel    *int     `json:"reorderLevel,omitempty"`
+	VisualClassKeys []string `json:"visualClassKeys"`
 	UpdatedAt       string   `json:"updatedAt"`
 	DeletedAt       *string  `json:"deletedAt,omitempty"`
 	ServerUpdatedAt *string  `json:"serverUpdatedAt,omitempty"`
@@ -319,9 +322,21 @@ type PublicProduct struct {
 	Photo         *string  `json:"photo,omitempty"`
 	SellingPrice  *float64 `json:"sellingPrice,omitempty"`
 	StockQuantity *int     `json:"stockQuantity,omitempty"`
+	MatchScore    *float64 `json:"matchScore,omitempty"`
+	MatchType     *string  `json:"matchType,omitempty"`
 }
 
 type Query struct {
+}
+
+type RecordScanEventInput struct {
+	ShopID             string   `json:"shopId"`
+	InventoryItemID    *string  `json:"inventoryItemId,omitempty"`
+	TopVisualCandidate *string  `json:"topVisualCandidate,omitempty"`
+	VisualDistance     *float64 `json:"visualDistance,omitempty"`
+	OcrText            *string  `json:"ocrText,omitempty"`
+	ResolvedName       *string  `json:"resolvedName,omitempty"`
+	MatchType          string   `json:"matchType"`
 }
 
 type RefreshResponse struct {
@@ -417,18 +432,19 @@ type UnifiedBatchSyncPayload struct {
 }
 
 type UpdateInventoryItemInput struct {
-	ItemID        string          `json:"itemId"`
-	ItemName      string          `json:"itemName"`
-	Description   *string         `json:"description,omitempty"`
-	Barcode       *string         `json:"barcode,omitempty"`
-	Category      *string         `json:"category,omitempty"`
-	UnitOfMeasure *string         `json:"unitOfMeasure,omitempty"`
-	CostPrice     *float64        `json:"costPrice,omitempty"`
-	SellingPrice  *float64        `json:"sellingPrice,omitempty"`
-	StockQuantity *int            `json:"stockQuantity,omitempty"`
-	ReorderLevel  *int            `json:"reorderLevel,omitempty"`
-	Photo         *string         `json:"photo,omitempty"`
-	NewPhoto      *graphql.Upload `json:"newPhoto,omitempty"`
+	ItemID          string          `json:"itemId"`
+	ItemName        string          `json:"itemName"`
+	Description     *string         `json:"description,omitempty"`
+	Barcode         *string         `json:"barcode,omitempty"`
+	Category        *string         `json:"category,omitempty"`
+	UnitOfMeasure   *string         `json:"unitOfMeasure,omitempty"`
+	CostPrice       *float64        `json:"costPrice,omitempty"`
+	SellingPrice    *float64        `json:"sellingPrice,omitempty"`
+	StockQuantity   *int            `json:"stockQuantity,omitempty"`
+	ReorderLevel    *int            `json:"reorderLevel,omitempty"`
+	Photo           *string         `json:"photo,omitempty"`
+	NewPhoto        *graphql.Upload `json:"newPhoto,omitempty"`
+	VisualClassKeys []string        `json:"visualClassKeys,omitempty"`
 }
 
 type UpdatePostInput struct {

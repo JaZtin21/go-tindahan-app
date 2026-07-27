@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Product } from '~/types/item';
 import { ImageIcon, Minus, Plus, ChevronDown, Pencil, Sparkles } from 'lucide-react';
-import { ProductScannerCamera } from './ProductScannerCamera';
+import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ let searchTimeoutId: ReturnType<typeof setTimeout>;
 export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
     // 🚀 Component States
     // 'camera'  -> live camera / viewfinder
-    // 'result'  -> AI Result card shown over the captured image (NEW)
+    // 'result'  -> AI Result card shown over the captured image
     // 'search'  -> manual edit form (existing form UI)
     const [scannerStep, setScannerStep] = useState<'camera' | 'result' | 'search'>('camera');
     const [searchQuery, setSearchQuery] = useState('');
@@ -31,28 +31,24 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
 
-    // 🚀 NEW: model's confidence score for the AI Result card (optional, only shown if provided)
-    const [predictionConfidence, setPredictionConfidence] = useState<number | null>(null);
-
     // Grouped alternative variants states
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
     const [showUnitDropdown, setShowUnitDropdown] = useState(false);
 
-    console.log(groupedProducts, 'groupedProducts');
-
+    // 🚀 CHANGED: ProductScannerCamera now runs the scan-triggered search
+    // itself (visual keys first, text fallback second, server-side) and
+    // hands back a single matched/unmatched ScanOutcome — this hook is now
+    // ONLY used for the manual typing search inside the 'search' step below.
     const [searchProducts] = useSearchShopProducts(isSubscribed);
 
-    const runSearch = (text: string, isScannerCapture = false) => {
+    const runSearch = (text: string) => {
         if (!shopId || !text.trim()) {
             setSearchResults([]);
             setIsSearching(false);
             return;
         }
         setIsSearching(true);
-
-        if (!isScannerCapture) {
-            setShowDropdown(true);
-        }
+        setShowDropdown(true);
 
         searchProducts({
             variables: {
@@ -63,55 +59,36 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
             }
         }).then((result: any) => {
             setIsSearching(false);
-            const products = result.data?.searchShopProducts?.products || [];
-            setSearchResults(products);
-
-            if (isScannerCapture) {
-                if (products.length > 0) {
-                    // 🚀 Match found in DB from the model's predicted name:
-                    // go to the AI Result preview instead of straight to the form.
-                    const firstProduct = products[0];
-                    setSelectedProduct(firstProduct);
-
-                    const matchingItems = products.filter(
-                        (item: Product) => item.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
-                    );
-                    setGroupedProducts(matchingItems);
-                    setQuantity(firstProduct.stockQuantity === 0 ? 0 : 1);
-                    setShowDropdown(false);
-                    setScannerStep('result');
-                } else {
-                    // 🚀 No DB match for the predicted name: fall back to the
-                    // existing manual search form so the user can search/edit themselves.
-                    setScannerStep('search');
-                }
-            }
+            setSearchResults(result.data?.searchShopProducts?.products || []);
         }).catch(err => {
             setIsSearching(false);
             console.error("Search failed:", err);
-            if (isScannerCapture) {
-                // Search failed outright — don't strand the user on the camera view.
-                setScannerStep('search');
-            }
         });
     };
 
-    const handleScannerCapture = (
-        file: File,
-        previewUrl: string,
-        matchedName: string,
-        unitOfMeasure: string,
-        confidence?: number // 🚀 NEW optional param — pass through from ProductScannerCamera if available
-    ) => {
-        setCapturedImagePreview(previewUrl); // 🚀 Saves the captured thumbnail link right into local component state
-        setSearchQuery(matchedName);
-        setGroupedProducts([]);
+    // 🚀 CHANGED: receives the camera's fully-resolved ScanOutcome instead of
+    // raw (name, unitOfMeasure) — no search call needed here anymore, the
+    // camera already did it.
+    const handleScannerCapture = (outcome: ScanOutcome) => {
+        setCapturedImagePreview(outcome.previewUrl);
         setShowUnitDropdown(false);
-        setPredictionConfidence(confidence ?? null);
         clearTimeout(searchTimeoutId);
-        // 🚀 NOTE: scannerStep intentionally stays 'camera' here.
-        // runSearch decides whether to move to 'result' (match found) or 'search' (no match).
-        runSearch(matchedName, true);
+
+        if (outcome.status === 'matched') {
+            setSelectedProduct(outcome.product);
+            setSearchQuery(outcome.product.itemName);
+            setGroupedProducts(outcome.variants);
+            setQuantity(outcome.product.stockQuantity === 0 ? 0 : 1);
+            setShowDropdown(false);
+            setScannerStep('result');
+        } else {
+            // No DB match for the predicted name: fall back to the existing
+            // manual search form so the user can search/edit themselves.
+            setSearchQuery(outcome.suggestedName);
+            setSelectedProduct(null);
+            setGroupedProducts([]);
+            setScannerStep('search');
+        }
     };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +109,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         }
 
         searchTimeoutId = setTimeout(() => {
-            runSearch(value, false);
+            runSearch(value);
         }, 500);
     };
 
@@ -229,7 +206,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setGroupedProducts([]);
     };
 
-    // 🚀 NEW: Add-to-cart action triggered from the AI Result card (not the form).
+    // 🚀 Add-to-cart action triggered from the AI Result card (not the form).
     // Adds the currently-selected (model-matched) product, then resets back to camera
     // so the user is ready to scan the next item.
     const handleAddFromResult = () => {
@@ -258,11 +235,10 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         if (wasSuccessfulAdd) {
             setScannerStep('camera');
             setCapturedImagePreview(null);
-            setPredictionConfidence(null);
         }
     };
 
-    // 🚀 NEW: Edit button on the AI Result card — this is the ONLY path from
+    // 🚀 Edit button on the AI Result card — this is the ONLY path from
     // 'result' into the manual edit form.
     const handleEditResult = () => {
         setScannerStep('search');
@@ -276,7 +252,6 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
         setSelectedProduct(null);
         setGroupedProducts([]);
         setCapturedImagePreview(null); // Resets photo canvas wrapper references
-        setPredictionConfidence(null);
         setShowDropdown(false);
         setShowUnitDropdown(false);
     };
@@ -324,6 +299,8 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
             {(scannerStep === 'camera' || scannerStep === 'result') && (
                 <div className="flex flex-col relative isolate flex-1 w-auto mx-0 md:mx-2 rounded-t-2xl md:rounded-[20px] my-0 md:my-2 overflow-hidden bg-bg-primary">
                     <ProductScannerCamera
+                        shopId={shopId}
+                        isSubscribed={isSubscribed}
                         onCaptureComplete={handleScannerCapture}
                         hasResult={scannerStep === 'result'}
                         onRetry={handleGoBackToCamera}
@@ -390,14 +367,9 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
 
                                     )}
                                     <span className="text-brand-green font-bold">₱{selectedProduct.sellingPrice.toFixed(2)}</span>
-                                    {/*predictionConfidence !== null && (
-                                        <span className="text-xs text-green-600 font-medium">
-                                            Confidence: {Math.round(predictionConfidence * 100)}%
-                                        </span>
-                                    )*/}
                                 </div>
 
-                                {/* 🚀 NEW: quantity stepper on the result card itself */}
+                                {/* 🚀 quantity stepper on the result card itself */}
                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                     <button
                                         type="button"

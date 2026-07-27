@@ -2,11 +2,67 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import { initScannerAssets, getCachedScannerAssets, clearScannerCache } from '~/utils/scannerModelManager';
 import { isOcrEngineReady, recognizeProductText, imageElementToCanvas } from '~/utils/ocrEngine';
-import { resolveProductIdentity, type VisualMatch } from '~/utils/productMatching';
+import {
+    resolveProductIdentity,
+    getTopVisualCandidateNames,
+    shouldBindVisualClassKeys,
+    type VisualMatch,
+    type ConfidenceTier,
+} from '~/utils/productMatching';
 import { TriangleAlert, ImageIcon, RotateCcw, WifiOff } from 'lucide-react';
+import { useSearchShopProducts } from '~/api/queries';
+import type { Product } from '~/types/item';
+
+// ============================================================================
+// SCAN OUTCOME CONTRACT
+// ============================================================================
+// The camera now owns the full "photo in -> identity -> DB lookup" pipeline,
+// not just identification. Callers no longer run their own searchShopProducts
+// call after getting a name back — they get told directly whether the scan
+// matched something already in this shop's inventory.
+//
+//  - 'matched'   : the resolved identity found an existing product in this
+//                  shop. `variants` is every product sharing that same
+//                  itemName (same grouping ScannerTab used to compute itself
+//                  from the raw search results), for unit-of-measure capsule
+//                  UI. `product` is the first/primary one.
+//  - 'unmatched' : nothing found. `suggestedName`/`unitOfMeasure` are what
+//                  resolveProductIdentity came up with, for prefilling a
+//                  manual form.
+//
+// Both variants carry `visualCandidateKeys` and `confidenceTier`. The keys
+// array is ALREADY gated by shouldBindVisualClassKeys — callers that persist
+// it (e.g. AddInventoryItem/UpdateInventoryItem's `visualClassKeys` input)
+// don't need to re-check the tier themselves; it'll simply be empty when the
+// scan wasn't confident enough to bind. `confidenceTier` is still exposed in
+// case a caller wants to log a low-confidence scan for retraining (e.g. via
+// the optional recordScanEvent mutation) or show the user a "not sure about
+// this one" hint.
+// ============================================================================
+export type ScanOutcome =
+    | {
+        status: 'matched';
+        product: Product;
+        variants: Product[];
+        file: File;
+        previewUrl: string;
+        visualCandidateKeys: string[];
+        confidenceTier: ConfidenceTier;
+    }
+    | {
+        status: 'unmatched';
+        file: File;
+        previewUrl: string;
+        suggestedName: string;
+        unitOfMeasure: string;
+        visualCandidateKeys: string[];
+        confidenceTier: ConfidenceTier;
+    };
 
 interface ProductScannerCameraProps {
-    onCaptureComplete: (file: File, previewUrl: string, matchedName: string, unitOfMeasure: string) => void;
+    shopId: string;
+    isSubscribed: boolean;
+    onCaptureComplete: (outcome: ScanOutcome) => void;
     hasResult?: boolean;
     onRetry?: () => void;
 }
@@ -14,8 +70,10 @@ interface ProductScannerCameraProps {
 const IMG_SIZE = 224;
 const COLOR_WEIGHT = 1.5;
 const TOP_N_CANDIDATES = 10;
+const VISUAL_CANDIDATE_KEY_LIMIT = 5;
+const SEARCH_RESULT_LIMIT = 7;
 
-export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onRetry }: ProductScannerCameraProps) => {
+export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, hasResult = false, onRetry }: ProductScannerCameraProps) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
@@ -24,6 +82,8 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
     const [loadProgress, setLoadProgress] = useState(0);
     const [retryCount, setRetryCount] = useState(0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const [searchProducts] = useSearchShopProducts(isSubscribed);
 
     const assets = getCachedScannerAssets();
     const isReady = assets.isLoaded;
@@ -182,12 +242,13 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
     };
 
     /**
-     * Runs the visual model and OCR in parallel off the same decoded image element,
-     * then resolves the final product name + unit of measure from both results.
+     * Runs the visual model and OCR in parallel off the same decoded image
+     * element, resolves the final product identity, THEN searches this shop's
+     * inventory for it — visual keys first, text fallback second (handled
+     * server-side by searchShopProducts). Returns a single ScanOutcome so
+     * callers never touch the search API themselves.
      */
-    const identifyProduct = async (
-        imgElement: HTMLImageElement
-    ): Promise<{ name: string; unitOfMeasure: string }> => {
+    const identifyAndSearch = async (file: File, previewUrl: string, imgElement: HTMLImageElement): Promise<ScanOutcome> => {
         const ocrCanvas = imageElementToCanvas(imgElement);
 
         const [topCandidates, ocrText] = await Promise.all([
@@ -198,7 +259,72 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
         console.log('[Identify] Visual top candidates:', topCandidates.map(c => `${c.name} (${c.distance.toFixed(3)})`));
         console.log('[Identify] OCR text:', ocrText);
 
-        return resolveProductIdentity(topCandidates, ocrText);
+        const { name: suggestedName, unitOfMeasure, confidenceTier } = resolveProductIdentity(topCandidates, ocrText);
+
+        // Send the full candidate list for SEARCH regardless of tier — a bad
+        // guess here just fails to match and falls through to server-side
+        // text search, no harm done. WRITING these as visual_class_keys is a
+        // separate, stricter decision made below via shouldBindVisualClassKeys.
+        const searchCandidateKeys = getTopVisualCandidateNames(topCandidates, VISUAL_CANDIDATE_KEY_LIMIT);
+        const visualCandidateKeys = shouldBindVisualClassKeys(confidenceTier) ? searchCandidateKeys : [];
+
+        if (!shopId) {
+            // No shop context to search against (shouldn't normally happen,
+            // but don't crash the scan over it) — treat as unmatched.
+            return {
+                status: 'unmatched',
+                file,
+                previewUrl,
+                suggestedName,
+                unitOfMeasure,
+                visualCandidateKeys,
+                confidenceTier,
+            };
+        }
+
+        try {
+            const result: any = await searchProducts({
+                variables: {
+                    shopId: String(shopId),
+                    query: suggestedName,
+                    limit: SEARCH_RESULT_LIMIT,
+                    offset: 0,
+                    visualCandidates: searchCandidateKeys,
+                },
+            });
+
+            const products: Product[] = result?.data?.searchShopProducts?.products || [];
+
+            if (products.length > 0) {
+                const firstProduct = products[0];
+                const variants = products.filter(
+                    (p) => p.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
+                );
+
+                return {
+                    status: 'matched',
+                    product: firstProduct,
+                    variants,
+                    file,
+                    previewUrl,
+                    visualCandidateKeys,
+                    confidenceTier,
+                };
+            }
+        } catch (err) {
+            console.error('[Identify] Post-scan inventory search failed:', err);
+            // Fall through to 'unmatched' below — don't strand the user.
+        }
+
+        return {
+            status: 'unmatched',
+            file,
+            previewUrl,
+            suggestedName,
+            unitOfMeasure,
+            visualCandidateKeys,
+            confidenceTier,
+        };
     };
 
     const handleCameraCapture = () => {
@@ -251,12 +377,10 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
             const tempImg = new Image();
             tempImg.src = previewUrl;
             tempImg.onload = async () => {
-                const { name: cleanName, unitOfMeasure } = await identifyProduct(tempImg);
-
                 // 🚀 Camera intentionally left running — behind the AI Result card.
-
+                const outcome = await identifyAndSearch(capturedFile, previewUrl, tempImg);
                 setIsPredicting(false);
-                onCaptureComplete(capturedFile, previewUrl, cleanName, unitOfMeasure);
+                onCaptureComplete(outcome);
             };
         }, 'image/jpeg', 0.85);
     };
@@ -286,12 +410,10 @@ export const ProductScannerCamera = ({ onCaptureComplete, hasResult = false, onR
         const tempImg = new Image();
         tempImg.src = previewUrl;
         tempImg.onload = async () => {
-            const { name: cleanName, unitOfMeasure } = await identifyProduct(tempImg);
-
             // 🚀 Camera intentionally left running — same as handleCameraCapture above.
-
+            const outcome = await identifyAndSearch(file, previewUrl, tempImg);
             setIsPredicting(false);
-            onCaptureComplete(file, previewUrl, cleanName, unitOfMeasure);
+            onCaptureComplete(outcome);
         };
     };
 

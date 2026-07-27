@@ -130,6 +130,7 @@ type ComplexityRoot struct {
 		LoginWithGoogle     func(childComplexity int, input model.GoogleLoginInput) int
 		Logout              func(childComplexity int) int
 		Ping                func(childComplexity int) int
+		RecordScanEvent     func(childComplexity int, input model.RecordScanEventInput) int
 		RefreshToken        func(childComplexity int) int
 		UnifiedBatchSync    func(childComplexity int, input model.UnifiedBatchSyncInput) int
 		UpdateInventoryItem func(childComplexity int, input model.UpdateInventoryItemInput) int
@@ -153,6 +154,7 @@ type ComplexityRoot struct {
 		StockQuantity   func(childComplexity int) int
 		UnitOfMeasure   func(childComplexity int) int
 		UpdatedAt       func(childComplexity int) int
+		VisualClassKeys func(childComplexity int) int
 	}
 
 	OwnerShop struct {
@@ -239,6 +241,8 @@ type ComplexityRoot struct {
 		Description   func(childComplexity int) int
 		ID            func(childComplexity int) int
 		ItemName      func(childComplexity int) int
+		MatchScore    func(childComplexity int) int
+		MatchType     func(childComplexity int) int
 		Photo         func(childComplexity int) int
 		SellingPrice  func(childComplexity int) int
 		ShopID        func(childComplexity int) int
@@ -259,7 +263,7 @@ type ComplexityRoot struct {
 		Ping                    func(childComplexity int) int
 		SearchProduct           func(childComplexity int, query string, limit int, offset int) int
 		SearchShop              func(childComplexity int, query string, limit int, offset int) int
-		SearchShopProducts      func(childComplexity int, shopID string, query string, limit int, offset int) int
+		SearchShopProducts      func(childComplexity int, shopID string, query string, limit int, offset int, visualCandidates []string) int
 	}
 
 	RefreshResponse struct {
@@ -359,6 +363,7 @@ type MutationResolver interface {
 	DecrementStock(ctx context.Context, input model.DecrementStockInput) (*model.OwnerInventoryItem, error)
 	CheckoutCart(ctx context.Context, input model.CheckoutCartInput) (*model.CheckoutBatch, error)
 	UnifiedBatchSync(ctx context.Context, input model.UnifiedBatchSyncInput) (*model.UnifiedBatchSyncPayload, error)
+	RecordScanEvent(ctx context.Context, input model.RecordScanEventInput) (bool, error)
 }
 type QueryResolver interface {
 	Ping(ctx context.Context) (string, error)
@@ -371,7 +376,7 @@ type QueryResolver interface {
 	GetItemActionHistory(ctx context.Context, shopID string, limit int, offset int) (*model.PaginatedItemActionHistory, error)
 	SearchShop(ctx context.Context, query string, limit int, offset int) (*model.PaginatedShops, error)
 	SearchProduct(ctx context.Context, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
-	SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int) (*model.PaginatedPublicProducts, error)
+	SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int, visualCandidates []string) (*model.PaginatedPublicProducts, error)
 	GetShopDashboardMetrics(ctx context.Context, shopID string) (*model.ShopDashboardMetrics, error)
 	Me(ctx context.Context) (*model.User, error)
 }
@@ -803,6 +808,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.Ping(childComplexity), true
+	case "Mutation.recordScanEvent":
+		if e.ComplexityRoot.Mutation.RecordScanEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_recordScanEvent_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RecordScanEvent(childComplexity, args["input"].(model.RecordScanEventInput)), true
 	case "Mutation.refreshToken":
 		if e.ComplexityRoot.Mutation.RefreshToken == nil {
 			break
@@ -944,6 +960,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OwnerInventoryItem.UpdatedAt(childComplexity), true
+	case "OwnerInventoryItem.visualClassKeys":
+		if e.ComplexityRoot.OwnerInventoryItem.VisualClassKeys == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OwnerInventoryItem.VisualClassKeys(childComplexity), true
 
 	case "OwnerShop.address":
 		if e.ComplexityRoot.OwnerShop.Address == nil {
@@ -1273,6 +1295,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.PublicProduct.ItemName(childComplexity), true
+	case "PublicProduct.matchScore":
+		if e.ComplexityRoot.PublicProduct.MatchScore == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PublicProduct.MatchScore(childComplexity), true
+	case "PublicProduct.matchType":
+		if e.ComplexityRoot.PublicProduct.MatchType == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PublicProduct.MatchType(childComplexity), true
 	case "PublicProduct.photo":
 		if e.ComplexityRoot.PublicProduct.Photo == nil {
 			break
@@ -1437,7 +1471,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.SearchShopProducts(childComplexity, args["shopId"].(string), args["query"].(string), args["limit"].(int), args["offset"].(int)), true
+		return e.ComplexityRoot.Query.SearchShopProducts(childComplexity, args["shopId"].(string), args["query"].(string), args["limit"].(int), args["offset"].(int), args["visualCandidates"].([]string)), true
 
 	case "RefreshResponse.accessToken":
 		if e.ComplexityRoot.RefreshResponse.AccessToken == nil {
@@ -1759,6 +1793,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputInventorySyncInput,
 		ec.unmarshalInputItemActionHistorySyncInput,
 		ec.unmarshalInputPaymentMethodsInput,
+		ec.unmarshalInputRecordScanEventInput,
 		ec.unmarshalInputShopSyncInput,
 		ec.unmarshalInputSocialMediaInput,
 		ec.unmarshalInputUnifiedBatchSyncInput,
@@ -2035,6 +2070,8 @@ func (ec *executionContext) childFields_OwnerInventoryItem(ctx context.Context, 
 		return ec.fieldContext_OwnerInventoryItem_costPrice(ctx, field)
 	case "reorderLevel":
 		return ec.fieldContext_OwnerInventoryItem_reorderLevel(ctx, field)
+	case "visualClassKeys":
+		return ec.fieldContext_OwnerInventoryItem_visualClassKeys(ctx, field)
 	case "updatedAt":
 		return ec.fieldContext_OwnerInventoryItem_updatedAt(ctx, field)
 	case "deletedAt":
@@ -2223,6 +2260,10 @@ func (ec *executionContext) childFields_PublicProduct(ctx context.Context, field
 		return ec.fieldContext_PublicProduct_sellingPrice(ctx, field)
 	case "stockQuantity":
 		return ec.fieldContext_PublicProduct_stockQuantity(ctx, field)
+	case "matchScore":
+		return ec.fieldContext_PublicProduct_matchScore(ctx, field)
+	case "matchType":
+		return ec.fieldContext_PublicProduct_matchType(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PublicProduct", field.Name)
 }
@@ -2631,6 +2672,20 @@ func (ec *executionContext) field_Mutation_loginWithGoogle_args(ctx context.Cont
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_recordScanEvent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.RecordScanEventInput, error) {
+			return ec.unmarshalNRecordScanEventInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐRecordScanEventInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_unifiedBatchSync_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2966,6 +3021,14 @@ func (ec *executionContext) field_Query_searchShopProducts_args(ctx context.Cont
 		return nil, err
 	}
 	args["offset"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "visualCandidates",
+		func(ctx context.Context, v any) ([]string, error) {
+			return ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["visualCandidates"] = arg4
 	return args, nil
 }
 
@@ -5007,6 +5070,63 @@ func (ec *executionContext) fieldContext_Mutation_unifiedBatchSync(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_recordScanEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_recordScanEvent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RecordScanEvent(ctx, fc.Args["input"].(model.RecordScanEventInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_recordScanEvent(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_recordScanEvent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _OwnerInventoryItem_id(ctx context.Context, field graphql.CollectedField, obj *model.OwnerInventoryItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5281,6 +5401,29 @@ func (ec *executionContext) _OwnerInventoryItem_reorderLevel(ctx context.Context
 }
 func (ec *executionContext) fieldContext_OwnerInventoryItem_reorderLevel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("OwnerInventoryItem", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _OwnerInventoryItem_visualClassKeys(ctx context.Context, field graphql.CollectedField, obj *model.OwnerInventoryItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OwnerInventoryItem_visualClassKeys(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VisualClassKeys, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OwnerInventoryItem_visualClassKeys(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OwnerInventoryItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _OwnerInventoryItem_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.OwnerInventoryItem) (ret graphql.Marshaler) {
@@ -6830,6 +6973,52 @@ func (ec *executionContext) fieldContext_PublicProduct_stockQuantity(_ context.C
 	return graphql.NewScalarFieldContext("PublicProduct", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
+func (ec *executionContext) _PublicProduct_matchScore(ctx context.Context, field graphql.CollectedField, obj *model.PublicProduct) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PublicProduct_matchScore(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MatchScore, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_PublicProduct_matchScore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PublicProduct", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _PublicProduct_matchType(ctx context.Context, field graphql.CollectedField, obj *model.PublicProduct) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PublicProduct_matchType(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MatchType, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_PublicProduct_matchType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PublicProduct", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Query_ping(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7324,7 +7513,7 @@ func (ec *executionContext) _Query_searchShopProducts(ctx context.Context, field
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().SearchShopProducts(ctx, fc.Args["shopId"].(string), fc.Args["query"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
+			return ec.Resolvers.Query().SearchShopProducts(ctx, fc.Args["shopId"].(string), fc.Args["query"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int), fc.Args["visualCandidates"].([]string))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedPublicProducts) graphql.Marshaler {
@@ -9829,7 +10018,7 @@ func (ec *executionContext) unmarshalInputAddInventoryItemInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"shopId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo"}
+	fieldsInOrder := [...]string{"shopId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "visualClassKeys"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9913,6 +10102,13 @@ func (ec *executionContext) unmarshalInputAddInventoryItemInput(ctx context.Cont
 				return it, err
 			}
 			it.Photo = data
+		case "visualClassKeys":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("visualClassKeys"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VisualClassKeys = data
 		}
 	}
 	return it, nil
@@ -10471,7 +10667,7 @@ func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"localId", "shopId", "isDeleted", "isServerSynced", "clientCreatedAt", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto"}
+	fieldsInOrder := [...]string{"localId", "shopId", "isDeleted", "isServerSynced", "clientCreatedAt", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto", "visualClassKeys"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10590,6 +10786,13 @@ func (ec *executionContext) unmarshalInputInventorySyncInput(ctx context.Context
 				return it, err
 			}
 			it.NewPhoto = data
+		case "visualClassKeys":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("visualClassKeys"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VisualClassKeys = data
 		}
 	}
 	return it, nil
@@ -10713,6 +10916,78 @@ func (ec *executionContext) unmarshalInputPaymentMethodsInput(ctx context.Contex
 				return it, err
 			}
 			it.Card = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRecordScanEventInput(ctx context.Context, obj any) (model.RecordScanEventInput, error) {
+	var it model.RecordScanEventInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"shopId", "inventoryItemId", "topVisualCandidate", "visualDistance", "ocrText", "resolvedName", "matchType"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "shopId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shopId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShopID = data
+		case "inventoryItemId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inventoryItemId"))
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.InventoryItemID = data
+		case "topVisualCandidate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("topVisualCandidate"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TopVisualCandidate = data
+		case "visualDistance":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("visualDistance"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VisualDistance = data
+		case "ocrText":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ocrText"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OcrText = data
+		case "resolvedName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("resolvedName"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ResolvedName = data
+		case "matchType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("matchType"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MatchType = data
 		}
 	}
 	return it, nil
@@ -10966,7 +11241,7 @@ func (ec *executionContext) unmarshalInputUpdateInventoryItemInput(ctx context.C
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"itemId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto"}
+	fieldsInOrder := [...]string{"itemId", "itemName", "description", "barcode", "category", "unitOfMeasure", "costPrice", "sellingPrice", "stockQuantity", "reorderLevel", "photo", "newPhoto", "visualClassKeys"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11057,6 +11332,13 @@ func (ec *executionContext) unmarshalInputUpdateInventoryItemInput(ctx context.C
 				return it, err
 			}
 			it.NewPhoto = data
+		case "visualClassKeys":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("visualClassKeys"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VisualClassKeys = data
 		}
 	}
 	return it, nil
@@ -11967,6 +12249,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "recordScanEvent":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_recordScanEvent(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12058,6 +12347,11 @@ func (ec *executionContext) _OwnerInventoryItem(ctx context.Context, sel ast.Sel
 		case "reorderLevel":
 			out.Values[i] = ec._OwnerInventoryItem_reorderLevel(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "visualClassKeys":
+			out.Values[i] = ec._OwnerInventoryItem_visualClassKeys(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "updatedAt":
@@ -12725,6 +13019,16 @@ func (ec *executionContext) _PublicProduct(ctx context.Context, sel ast.Selectio
 			}
 		case "stockQuantity":
 			out.Values[i] = ec._PublicProduct_stockQuantity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "matchScore":
+			out.Values[i] = ec._PublicProduct_matchScore(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "matchType":
+			out.Values[i] = ec._PublicProduct_matchType(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -14688,6 +14992,11 @@ func (ec *executionContext) marshalNPublicProduct2ᚖgoᚑbackendᚋinternalᚋg
 		return graphql.Null
 	}
 	return ec._PublicProduct(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNRecordScanEventInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐRecordScanEventInput(ctx context.Context, v any) (model.RecordScanEventInput, error) {
+	res, err := ec.unmarshalInputRecordScanEventInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNRefreshResponse2goᚑbackendᚋinternalᚋgraphᚋmodelᚐRefreshResponse(ctx context.Context, sel ast.SelectionSet, v model.RefreshResponse) graphql.Marshaler {

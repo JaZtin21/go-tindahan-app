@@ -373,10 +373,40 @@ const resolveUnitOfMeasure = (chosenName: string, ocrText: string): UnitResoluti
     return { unit: ocrUnitStr, source: 'ocr-conflicts-with-name', ocrUnit: ocrUnitStr, nameUnit: nameUnitStr };
 };
 
+// ---------- confidence tiers — governs whether a scan is trustworthy
+// enough to bind as a visual_class_keys recognition key ----------
+
+/**
+ * Which of the four resolution paths produced the final identity:
+ *  - 'ocr_confirmed'    : a top-N candidate was independently corroborated by
+ *                        OCR text. Highest trust — two signals agree.
+ *  - 'visual_confident' : OCR gave nothing usable, but the vision model
+ *                        clearly separated its #1 pick from the rest.
+ *  - 'ocr_fallback'     : OCR found real text, but it matched none of the
+ *                        top-N candidates well, AND the vision model itself
+ *                        wasn't confident either. This is the "probably not
+ *                        in the training set" case — chosenName came from
+ *                        raw OCR text, not from any candidate.
+ *  - 'weak_fallback'    : neither signal gave anything usable. Worst case.
+ */
+export type ConfidenceTier = 'ocr_confirmed' | 'visual_confident' | 'ocr_fallback' | 'weak_fallback';
+
+/**
+ * Whether this tier is trustworthy enough to bind visual_class_keys against
+ * an inventory item. Only 'ocr_confirmed' and 'visual_confident' qualify —
+ * binding on 'ocr_fallback' or 'weak_fallback' would teach the database
+ * "this untrained/ambiguous photo = this item," which creates false-positive
+ * matches on future unrelated scans instead of preventing them. Those two
+ * tiers are exactly the ones worth logging to item_scan_events for
+ * retraining instead — see RESOLVER_CHANGES.md's RecordScanEvent.
+ */
+export const shouldBindVisualClassKeys = (tier: ConfidenceTier): boolean =>
+    tier === 'ocr_confirmed' || tier === 'visual_confident';
+
 export const resolveProductIdentity = (
     candidates: VisualMatch[],
     ocrText: string
-): { name: string; unitOfMeasure: string } => {
+): { name: string; unitOfMeasure: string; confidenceTier: ConfidenceTier } => {
     const best = pickBestCandidate(candidates, ocrText);
     const ocrConcatLength = normalizeConcat(ocrText).length;
 
@@ -389,28 +419,33 @@ export const resolveProductIdentity = (
 
     let chosenName: string;
     let source: string;
+    let confidenceTier: ConfidenceTier;
 
     if (best) {
         chosenName = best.name;
         source = `OCR-confirmed match (score ${best.score.toFixed(2)})`;
+        confidenceTier = 'ocr_confirmed';
     } else if (visualIsConfident) {
         // Vision model clearly distinguished this product from its alternatives
         // (margin-based, not an absolute distance cutoff) — trust it over
         // unreadable/garbled OCR text rather than defaulting to raw OCR.
         chosenName = candidates[0]?.name ?? 'Captured Item';
         source = `visual model fallback (confident — margin ${margin.toFixed(3)}, distance ${topDistance?.toFixed(3)})`;
+        confidenceTier = 'visual_confident';
     } else if (ocrConcatLength >= MIN_OCR_LENGTH_FOR_RAW_FALLBACK) {
         chosenName = ocrText;
         source = `raw OCR text (substantial text, no match, visual model also uncertain — margin ${margin.toFixed(3)})`;
+        confidenceTier = 'ocr_fallback';
     } else {
         chosenName = candidates[0]?.name ?? 'Captured Item';
         source = ocrText.trim()
             ? 'visual model fallback (OCR text too sparse to trust alone)'
             : 'visual model fallback (OCR found no text at all)';
+        confidenceTier = 'weak_fallback';
     }
 
     if (MATCH_DEBUG_LOGGING) {
-        console.log(`%c[Match] Chosen: "${chosenName}" via ${source}`, 'color: #a855f7; font-weight: bold');
+        console.log(`%c[Match] Chosen: "${chosenName}" via ${source} — tier: ${confidenceTier}`, 'color: #a855f7; font-weight: bold');
     }
 
     // Resolve the unit of measure by checking the matched candidate name's measurement
@@ -432,5 +467,22 @@ export const resolveProductIdentity = (
 
     const finalName = stripUnitOfMeasure(chosenName);
 
-    return { name: finalName, unitOfMeasure };
+    return { name: finalName, unitOfMeasure, confidenceTier };
 };
+
+// ---------- stable recognition keys for backend matching ----------
+
+/**
+ * Top-N raw candidate class names straight from the vision model's embedding
+ * gallery, ranked closest-first. Unlike `resolveProductIdentity`'s output,
+ * these are NOT cleaned/renamed/OCR-blended — they're the model's own
+ * vocabulary, which is exactly why they're useful as a stable lookup key:
+ * they don't change when a shop owner renames the item's display name.
+ *
+ * Safe to send for SEARCH regardless of confidence tier (a bad guess just
+ * fails to match and falls through to text search). Only gate on
+ * `shouldBindVisualClassKeys` when deciding whether to WRITE these as
+ * visual_class_keys on save.
+ */
+export const getTopVisualCandidateNames = (candidates: VisualMatch[], limit = 5): string[] =>
+    candidates.slice(0, limit).map(c => c.name);

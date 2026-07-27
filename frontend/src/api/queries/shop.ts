@@ -193,6 +193,12 @@ function toItemRow(item: Partial<Item>) {
         stockQuantity: item.stockQuantity ?? 0,
         costPrice: item.costPrice ?? 0,
         reorderLevel: item.reorderLevel ?? 0,
+        // NEW: mirrors whatever visualClassKeys the caller passed in (server
+        // response on the online path, or ProductScannerCamera's
+        // visualCandidateKeys via InventoryForm on the offline path). Missing
+        // entirely -> '[]', never null/undefined, so JSON.parse downstream
+        // never has to guard against a bad value.
+        visualClassKeysJson: JSON.stringify(item.visualClassKeys ?? []),
         updatedAt: new Date().toISOString(),
     };
 }
@@ -211,6 +217,8 @@ function fromItemRow(id: string, row: any): Item {
         stockQuantity: row.stockQuantity,
         costPrice: row.costPrice,
         reorderLevel: row.reorderLevel,
+        // NEW
+        visualClassKeys: JSON.parse(row.visualClassKeysJson || '[]'),
         updatedAt: row.updatedAt,
     };
 }
@@ -567,11 +575,22 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 query: string;
                 limit: number;
                 offset: number;
+                // NEW: the scanner's top vision-model candidate names, passed
+                // through from ProductScannerCamera. Optional — manual typed
+                // search (ScannerTab's handleSearchChange) omits it entirely.
+                visualCandidates?: string[];
             };
         }) => {
-            const { shopId, query, limit, offset } = options.variables;
+            const { shopId, query, limit, offset, visualCandidates } = options.variables;
 
             if (!isSubscribed) {
+                // OFFLINE PATH: still regex-on-itemName only for now — the
+                // visual_class_keys layered lookup is a server-side (Postgres
+                // array-overlap + trigram) feature. Deliberately NOT porting
+                // that logic into TinyBase yet; this is the "offline query
+                // function" step you're doing as a follow-up once the online
+                // path is confirmed working. visualCandidates is accepted
+                // here but intentionally ignored — nothing to wire it to yet.
                 const re = new RegExp(query, 'i');
                 const inventoryTable = store.getTable('inventory');
 
@@ -597,7 +616,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
             try {
                 const { data } = await client.query({
                     query: SEARCH_SHOP_PRODUCTS_QUERY,
-                    variables: { shopId, query, limit, offset },
+                    variables: { shopId, query, limit, offset, visualCandidates },
                     fetchPolicy: 'no-cache',
                 });
 

@@ -118,6 +118,7 @@ export const ADD_INVENTORY_ITEM_MUTATION = gql`
       costPrice
       sellingPrice
       stockQuantity
+      visualClassKeys   # NEW
       reorderLevel
       updatedAt
     }
@@ -425,8 +426,8 @@ export const SEARCH_PRODUCT_QUERY = gql`
 `;
 
 export const SEARCH_SHOP_PRODUCTS_QUERY = gql`
-  query SearchShopProducts($shopId: ID!, $query: String!, $limit: Int!, $offset: Int!) {
-    searchShopProducts(shopId: $shopId, query: $query, limit: $limit, offset: $offset) {
+  query SearchShopProducts($shopId: ID!, $query: String!, $limit: Int!, $offset: Int!, $visualCandidates: [String!]) {
+    searchShopProducts(shopId: $shopId, query: $query, limit: $limit, offset: $offset,  visualCandidates: $visualCandidates) {
       totalCount
       hasNextPage
       products {
@@ -439,6 +440,8 @@ export const SEARCH_SHOP_PRODUCTS_QUERY = gql`
         photo
         sellingPrice
         stockQuantity
+        matchScore   # NEW, optional — nice to have for future UI/debugging
+        matchType    # NEW, optional
       }
     }
   }

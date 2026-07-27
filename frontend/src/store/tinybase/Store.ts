@@ -45,6 +45,10 @@ export function createShopStore(): Store {
             stockQuantity: { type: 'number' },
             costPrice: { type: 'number' },
             reorderLevel: { type: 'number' },
+            // NEW: JSON-stringified string[] — TinyBase cells only hold
+            // string/number/boolean, same reason coordinatesJson/photosJson
+            // exist on the shops table. Packed/unpacked in toItemRow/fromItemRow.
+            visualClassKeysJson: { type: 'string' },
             updatedAt: { type: 'string' },
             _dirty: { type: 'boolean', default: false },
             _serverSynced: { type: 'boolean', default: false },

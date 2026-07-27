@@ -113,7 +113,13 @@ type PublicProduct {
   unitOfMeasure: String  
   photo: String          
   sellingPrice: Float    
-  stockQuantity: Int     
+  stockQuantity: Int
+  matchScore: Float       # NEW: 0-1 confidence for this search result. Set by
+                          # searchShopProducts (1.0 for an exact visual_class_keys
+                          # hit, similarity score for trigram fallback). Null for
+                          # resolvers that don't compute a score (e.g. public
+                          # customer-facing searchProduct).
+  matchType: String       # NEW: "visual_key" | "trgm_fallback" | null
 }
 
 # 🔐 OWNER PRODUCT TYPE: For store management (Contains sensitive financials)
@@ -130,6 +136,10 @@ type OwnerInventoryItem {
   stockQuantity: Int     
   costPrice: Float       
   reorderLevel: Int      
+  visualClassKeys: [String!]!  # NEW: stable recognition keys bound from the
+                                # vision model's top candidate name(s). Survives
+                                # renames — this is what the scanner matches
+                                # against first, before falling back to text search.
   updatedAt: String!
   deletedAt: String       
   serverUpdatedAt: String 
@@ -269,7 +279,10 @@ input AddInventoryItemInput {
   sellingPrice: Float    
   stockQuantity: Int     
   reorderLevel: Int
-  photo: Upload          
+  photo: Upload
+  visualClassKeys: [String!]  # NEW: top vision-model candidate name(s) from the
+                               # scan that created this item, if it came from
+                               # the AI scanner. Omit/empty for manual entries.
 }
 
 input IncrementStockInput {
@@ -323,6 +336,13 @@ input UpdateInventoryItemInput {
   reorderLevel: Int
   photo: String
   newPhoto: Upload
+  visualClassKeys: [String!]  # NEW: if this edit is a correction of a scan
+                               # result (i.e. the AI misread the item and the
+                               # owner renamed it to match an existing product),
+                               # pass the scan's top candidate name(s) here.
+                               # They get APPENDED to the item's existing keys
+                               # (deduped), never overwritten — omit/leave empty
+                               # for ordinary edits that aren't scan corrections.
 }
 
 
@@ -397,6 +417,9 @@ input InventorySyncInput {
   reorderLevel: Int
   photo: String
   newPhoto: Upload   # NEW — fresh file binary for the product photo
+  visualClassKeys: [String!]  # NEW — same semantics as UpdateInventoryItemInput:
+                               # appended (deduped) to existing keys on update,
+                               # seeded as-is on create. Empty/omit = no-op.
 }
 
 input CheckoutBatchSyncInput {
@@ -441,6 +464,20 @@ type UnifiedBatchSyncPayload {
   serverTime: String! 
 }
 
+# NEW: lightweight telemetry input for the retraining/drift queue. Optional —
+# not called anywhere by default; wire it in from the scanner whenever a scan
+# resolves with low confidence or no match, so you can query item_scan_events
+# later to find which real-world products the model is weak on.
+input RecordScanEventInput {
+  shopId: ID!
+  inventoryItemId: ID
+  topVisualCandidate: String
+  visualDistance: Float
+  ocrText: String
+  resolvedName: String
+  matchType: String!   # "visual_key" | "trgm_fallback" | "no_match" | "manual_correction"
+}
+
 # --- EXTENSIONS ---
 
 extend type Query {
@@ -454,7 +491,12 @@ extend type Query {
   # --- 🌐 CUSTOMER PUBLIC INTERFACES (Returns Public Types) ---
   searchShop(query: String!, limit: Int!, offset: Int!): PaginatedShops!
   searchProduct(query: String!, limit: Int!, offset: Int!): PaginatedPublicProducts!
-  searchShopProducts(shopId: ID!, query: String!, limit: Int!, offset: Int!): PaginatedPublicProducts!
+  searchShopProducts(shopId: ID!, query: String!, limit: Int!, offset: Int!, visualCandidates: [String!]): PaginatedPublicProducts!
+  # NEW arg: visualCandidates — the scanner's top-N vision-model candidate
+  # names, ranked closest-first. When present, the resolver tries an exact
+  # visual_class_keys overlap match FIRST (immune to renames), and only
+  # falls back to fuzzy text search against `query` if that finds nothing.
+  # Omit entirely for manual typed search (unaffected, same as before).
 
   getShopDashboardMetrics(shopId: ID!): ShopDashboardMetrics! @isAuthenticated
 }
@@ -470,4 +512,5 @@ extend type Mutation {
   decrementStock(input: DecrementStockInput!): OwnerInventoryItem! @isAuthenticated
   checkoutCart(input: CheckoutCartInput!): CheckoutBatch! @isAuthenticated
   unifiedBatchSync(input: UnifiedBatchSyncInput!): UnifiedBatchSyncPayload! @isAuthenticated
+  recordScanEvent(input: RecordScanEventInput!): Boolean! @isAuthenticated  # NEW, optional
 }

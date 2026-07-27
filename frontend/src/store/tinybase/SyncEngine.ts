@@ -175,6 +175,11 @@ export async function syncAll(store: Store): Promise<void> {
                 reorderLevel: Number(row.reorderLevel || 0),
                 photo,
                 newPhoto,
+                // NEW — the backend appends+dedupes these against whatever's
+                // already bound server-side (see UpdateInventoryItem /
+                // UnifiedBatchSync's inventory branch), so pushing this
+                // every sync is always safe, never a wipe.
+                visualClassKeys: JSON.parse(row.visualClassKeysJson || '[]'),
             });
         }
 
@@ -351,7 +356,6 @@ export async function syncAll(store: Store): Promise<void> {
                 } else {
                     store.delRow('inventory', realId);
                 }
-
                 if (WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED) {
                     store.setRow('inventory', realId, {
                         shopId: item.shopId,
@@ -365,6 +369,12 @@ export async function syncAll(store: Store): Promise<void> {
                         stockQuantity: item.stockQuantity,
                         costPrice: item.costPrice,
                         reorderLevel: item.reorderLevel,
+                        // NEW — writes back the SERVER-MERGED key set (already
+                        // deduped/appended server-side), not just an echo of
+                        // what this client pushed. Important for the case
+                        // where another device's scan bound a different key
+                        // to the same item between syncs.
+                        visualClassKeysJson: JSON.stringify(item.visualClassKeys || []),
                         updatedAt: item.updatedAt,
                         _dirty: false,
                         _serverSynced: true,

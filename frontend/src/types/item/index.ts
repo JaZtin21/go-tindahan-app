@@ -11,6 +11,7 @@ export interface Item {
   photo?: string | File | null;
   sellingPrice: number;
   stockQuantity: number;
+  visualClassKeys?: string[];
   costPrice: number;
   reorderLevel: number;
   updatedAt: string;
