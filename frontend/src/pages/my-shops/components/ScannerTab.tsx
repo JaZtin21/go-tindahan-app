@@ -26,7 +26,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = false;
+    const isSubscribed = true;
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);

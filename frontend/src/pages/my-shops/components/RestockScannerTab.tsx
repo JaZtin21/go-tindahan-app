@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Product } from '~/types/item';
-import { useDebounce } from '~/utils';
 import { ImageIcon, Minus, Plus, ChevronDown, Pencil, Sparkles } from 'lucide-react';
 import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { Modal } from '~/components';
@@ -27,13 +26,11 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = true;
+    const isSubscribed = false;
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
 
-    // 🚀 NEW: model's confidence score for the AI Result card (optional, only shown if provided)
-    const [predictionConfidence, setPredictionConfidence] = useState<number | null>(null);
 
     // Grouped alternative variants states
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
@@ -41,17 +38,14 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
 
     const [searchProducts] = useSearchShopProducts(isSubscribed);
 
-    const runSearch = (text: string, isScannerCapture = false) => {
+    const runSearch = (text: string) => {
         if (!shopId || !text.trim()) {
             setSearchResults([]);
             setIsSearching(false);
             return;
         }
         setIsSearching(true);
-
-        if (!isScannerCapture) {
-            setShowDropdown(true);
-        }
+        setShowDropdown(true);
 
         searchProducts({
             variables: {
@@ -62,36 +56,10 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
             }
         }).then((result: any) => {
             setIsSearching(false);
-            const products = result.data?.searchShopProducts?.products || [];
-            setSearchResults(products);
-
-            if (isScannerCapture) {
-                if (products.length > 0) {
-                    // 🚀 Match found in DB from the model's predicted name:
-                    // go to the AI Result preview instead of straight to the form.
-                    const firstProduct = products[0];
-                    setSelectedProduct(firstProduct);
-
-                    const matchingItems = products.filter(
-                        (item: Product) => item.itemName.toLowerCase() === firstProduct.itemName.toLowerCase()
-                    );
-                    setGroupedProducts(matchingItems);
-                    setQuantity(firstProduct.stockQuantity === 0 ? 0 : 1);
-                    setShowDropdown(false);
-                    setScannerStep('result');
-                } else {
-                    // 🚀 No DB match for the predicted name: fall back to the
-                    // existing manual search form so the user can search/edit themselves.
-                    setScannerStep('search');
-                }
-            }
+            setSearchResults(result.data?.searchShopProducts?.products || []);
         }).catch(err => {
             setIsSearching(false);
             console.error("Search failed:", err);
-            if (isScannerCapture) {
-                // Search failed outright — don't strand the user on the camera view.
-                setScannerStep('search');
-            }
         });
     };
 
@@ -135,7 +103,7 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
         }
 
         searchTimeoutId = setTimeout(() => {
-            runSearch(value, false);
+            runSearch(value);   // was: runSearch(value, false)
         }, 500);
     };
 
@@ -263,7 +231,6 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
         setSelectedProduct(null);
         setGroupedProducts([]);
         setCapturedImagePreview(null); // Resets photo canvas wrapper references
-        setPredictionConfidence(null);
         setShowDropdown(false);
         setShowUnitDropdown(false);
     };
