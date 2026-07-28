@@ -92,7 +92,7 @@ export const SalesHistoryPage: React.FC = () => {
 
         {activeTab === 'checkout' && (
           <div className="flex flex-col gap-4 border-t border-border-main pt-6">
-            {isLoading ? (
+            {isLoading && (checkoutData?.batches?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">Loading checkout history...</div>
             ) : (checkoutData?.batches?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">No checkout batches recorded yet.</div>
@@ -173,7 +173,7 @@ export const SalesHistoryPage: React.FC = () => {
 
         {activeTab === 'actions' && (
           <div className="flex flex-col gap-4 border-t border-border-main pt-6">
-            {isLoading ? (
+            {isLoading || (actionData?.records?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">Loading item action history...</div>
             ) : (actionData?.records?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">No item action history recorded yet.</div>
@@ -211,7 +211,7 @@ export const SalesHistoryPage: React.FC = () => {
                 <div className="hidden md:block overflow-x-auto border border-border-main rounded-2xl ">
                   <table className="w-full min-w-[900px] text-left border-collapse px-4">
                     <thead>
-                      <tr className="border-b bg-brand-gold/30 border-border-sub text-text-muted text-xs font-bold uppercase tracking-wider h-12 ">
+                      <tr className="border-b bg-brand-gold/30 border-none text-text-main text-xs font-bold uppercase tracking-wider h-12 ">
                         <th className="pl-4">Action</th>
                         <th>Item Name</th>
                         <th>Quantity</th>

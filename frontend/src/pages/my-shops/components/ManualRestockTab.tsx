@@ -21,7 +21,7 @@ export const ManualRestockTab = ({ shopId }: ManualSearchTabProps) => {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = false;
+    const isSubscribed = true;
 
     // 🚀 Stores all alternative items sharing the exact same name
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
