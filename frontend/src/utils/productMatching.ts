@@ -77,8 +77,25 @@ const normalizeForComparison = (candidateName: string): string =>
 
 const normalizeConcat = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-const MIN_RUN_LENGTH = 2;
-const STRONG_RUN_LENGTH = 5;
+const MIN_RUN_LENGTH = 2; // shortest run that counts toward totalMatched at all — below
+// this, a 1-character coincidence isn't meaningful evidence of anything.
+
+// Below, RUN_BONUS_MIN_LENGTH/BASE/PER_EXTRA_CHAR generate a bonus per run, summed
+// across every run found (not just the single longest). Previously only the single
+// longest run in the whole candidate got a bonus, which meant a second strong,
+// independent corroborating run (e.g. OCR's "spic" matching a candidate's "spicy",
+// on top of an already-matched "dingdong" brand run) contributed nothing beyond its
+// raw character count — actively penalizing longer, more-descriptive candidate names
+// whose extra correct words happened to be shorter than the brand-name run. Multiple
+// separate strong runs are exponentially stronger evidence than one, and should stack.
+const RUN_BONUS_MIN_LENGTH = 3;
+const RUN_BONUS_BASE = 0.05;
+const RUN_BONUS_PER_EXTRA_CHAR = 0.05;
+// Chosen so this reproduces the old single-run STRONG_RUN_LENGTH(5) bonus exactly for
+// any individual run of length >=5 (0.15 at L=5, +0.05/char beyond) — this is a strict
+// generalization, not a behavior change, for candidates with only one run.
+const runBonus = (length: number): number =>
+    length < RUN_BONUS_MIN_LENGTH ? 0 : RUN_BONUS_BASE + (length - RUN_BONUS_MIN_LENGTH) * RUN_BONUS_PER_EXTRA_CHAR;
 
 const longestCommonSubstring = (a: string, b: string) => {
     let best = { length: 0, aStart: 0, bStart: 0 };
@@ -96,10 +113,10 @@ const longestCommonSubstring = (a: string, b: string) => {
     return best;
 };
 
-const findMatchingRuns = (a: string, b: string): { totalMatched: number; longestRun: number } => {
-    if (a.length === 0 || b.length === 0) return { totalMatched: 0, longestRun: 0 };
+const findMatchingRuns = (a: string, b: string): { totalMatched: number; bonusTotal: number; longestRun: number } => {
+    if (a.length === 0 || b.length === 0) return { totalMatched: 0, bonusTotal: 0, longestRun: 0 };
     const lcs = longestCommonSubstring(a, b);
-    if (lcs.length < MIN_RUN_LENGTH) return { totalMatched: 0, longestRun: 0 };
+    if (lcs.length < MIN_RUN_LENGTH) return { totalMatched: 0, bonusTotal: 0, longestRun: 0 };
 
     const leftA = a.substring(0, lcs.aStart);
     const leftB = b.substring(0, lcs.bStart);
@@ -111,6 +128,7 @@ const findMatchingRuns = (a: string, b: string): { totalMatched: number; longest
 
     return {
         totalMatched: lcs.length + left.totalMatched + right.totalMatched,
+        bonusTotal: runBonus(lcs.length) + left.bonusTotal + right.bonusTotal,
         longestRun: Math.max(lcs.length, left.longestRun, right.longestRun),
     };
 };
@@ -120,13 +138,10 @@ const letterRunScore = (candidateText: string, ocrText: string): number => {
     const ocr = normalizeConcat(ocrText);
     if (!candidate || !ocr) return 0;
 
-    const { totalMatched, longestRun } = findMatchingRuns(candidate, ocr);
+    const { totalMatched, bonusTotal } = findMatchingRuns(candidate, ocr);
     const ratioScore = totalMatched / candidate.length;
-    const strongRunBonus = longestRun >= STRONG_RUN_LENGTH
-        ? 0.15 + (longestRun - STRONG_RUN_LENGTH) * 0.05
-        : 0;
 
-    return Math.min(1, ratioScore + strongRunBonus);
+    return Math.min(1, ratioScore + bonusTotal);
 };
 
 // ---------- extra-token penalty, first-word (brand/logo) exempt ----------

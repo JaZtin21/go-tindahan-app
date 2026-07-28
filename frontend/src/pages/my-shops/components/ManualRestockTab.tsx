@@ -330,7 +330,8 @@ export const ManualRestockTab = ({ shopId }: ManualSearchTabProps) => {
                             type="number"
                             value={quantity}
                             onChange={handleQuantityInputChange}
-
+                            onFocus={(e) => e.target.select()}
+                            disabled={!selectedProduct}
                             min={selectedProduct?.stockQuantity === 0 ? 0 : 1}
                             className="w-full px-4 py-2  border border-border-main rounded-lg bg-bg-primary text-text-main focus:outline-none focus:border-brand-gold disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />

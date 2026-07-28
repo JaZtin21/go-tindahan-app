@@ -202,7 +202,7 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="border-2 border-brand-gold/20 bg-brand-gold/10  rounded-3xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
+            <div className="border-2 border-brand-gold/20 bg-brand-gold/10  rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
                 <div className="flex items-center  justify-between gap-12 min-w-[1300px] w-full px-8 py-4 ">
 

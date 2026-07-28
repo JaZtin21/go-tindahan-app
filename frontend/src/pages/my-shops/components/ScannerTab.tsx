@@ -528,6 +528,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
                                     <input
                                         type="number"
                                         value={quantity}
+                                        onFocus={(e) => e.target.select()}
                                         onChange={handleQuantityInputChange}
                                         disabled={!selectedProduct || selectedProduct.stockQuantity === 0}
                                         min={selectedProduct?.stockQuantity === 0 ? 0 : 1}

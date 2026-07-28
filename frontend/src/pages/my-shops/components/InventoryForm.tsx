@@ -26,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = false;
+    const isSubscribed = true;
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this
@@ -391,6 +391,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
                                             <input
                                                 type="number"
+                                                onFocus={(e) => e.target.select()}
                                                 step="0.01"
                                                 value={formData.costPrice}
                                                 onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
@@ -402,6 +403,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
                                             <input
                                                 type="number"
+                                                onFocus={(e) => e.target.select()}
                                                 step="0.01"
                                                 value={formData.sellingPrice}
                                                 onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
@@ -417,6 +419,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <label className="text-xs font-semibold text-[var(--color-text-sub)]">Stock Quantity</label>
                                             <input
                                                 type="number"
+                                                onFocus={(e) => e.target.select()}
                                                 value={formData.stockQuantity}
                                                 onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
                                                 className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
@@ -428,6 +431,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <input
                                                 type="text"
                                                 value={formData.unitOfMeasure}
+                                                onFocus={(e) => e.target.select()}
                                                 onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
                                                 className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
                                                 placeholder="1g, 1kg, 12pcs etc"
@@ -555,7 +559,8 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     <label className="text-xs font-semibold text-[var(--color-text-sub)]">Cost Price</label>
                                                     <input
                                                         type="number"
-                                                        step="0.01"
+                                                        step="0.1"
+                                                        onFocus={(e) => e.target.select()}
                                                         value={formData.costPrice}
                                                         onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
                                                         className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none  focus:border-border-muted"
@@ -566,7 +571,8 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     <label className="text-xs font-semibold text-[var(--color-text-sub)]">Selling Price</label>
                                                     <input
                                                         type="number"
-                                                        step="0.01"
+                                                        step="0.1"
+                                                        onFocus={(e) => e.target.select()}
                                                         value={formData.sellingPrice}
                                                         onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
                                                         className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
@@ -582,6 +588,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     <input
                                                         type="number"
                                                         value={formData.stockQuantity}
+                                                        onFocus={(e) => e.target.select()}
                                                         onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
                                                         className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
                                                         placeholder="0"
@@ -591,6 +598,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     <label className="text-xs font-semibold text-[var(--color-text-sub)]">Measurement (1g,1kg, 12pcs etc)</label>
                                                     <input
                                                         type="text"
+                                                        onFocus={(e) => e.target.select()}
                                                         value={formData.unitOfMeasure}
                                                         onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
                                                         className="w-full px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"

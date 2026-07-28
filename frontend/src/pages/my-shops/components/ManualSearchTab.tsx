@@ -350,6 +350,7 @@ export const ManualSearchTab = ({ shopId, updateCart }: ManualSearchTabProps) =>
                             type="number"
                             value={quantity}
                             onChange={handleQuantityInputChange}
+                            onFocus={(e) => e.target.select()}
                             disabled={!selectedProduct || selectedProduct.stockQuantity === 0}
                             min={selectedProduct?.stockQuantity === 0 ? 0 : 1}
                             max={selectedProduct?.stockQuantity || 0}
