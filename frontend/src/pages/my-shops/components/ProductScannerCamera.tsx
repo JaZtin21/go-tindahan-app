@@ -65,6 +65,10 @@ interface ProductScannerCameraProps {
     onCaptureComplete: (outcome: ScanOutcome) => void;
     hasResult?: boolean;
     onRetry?: () => void;
+    // NEW: false for flows where a match is meaningless (Add Item — the
+    // whole point is the item doesn't exist yet). Defaults true so
+    // ScannerTab/RestockScannerTab need no changes.
+    searchInventory?: boolean;
 }
 
 const IMG_SIZE = 224;
@@ -73,7 +77,7 @@ const TOP_N_CANDIDATES = 10;
 const VISUAL_CANDIDATE_KEY_LIMIT = 5;
 const SEARCH_RESULT_LIMIT = 7;
 
-export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, hasResult = false, onRetry }: ProductScannerCameraProps) => {
+export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, hasResult = false, onRetry, searchInventory = true }: ProductScannerCameraProps) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
@@ -268,9 +272,7 @@ export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, 
         const searchCandidateKeys = getTopVisualCandidateNames(topCandidates, VISUAL_CANDIDATE_KEY_LIMIT);
         const visualCandidateKeys = shouldBindVisualClassKeys(confidenceTier) ? searchCandidateKeys : [];
 
-        if (!shopId) {
-            // No shop context to search against (shouldn't normally happen,
-            // but don't crash the scan over it) — treat as unmatched.
+        if (!searchInventory || !shopId) {
             return {
                 status: 'unmatched',
                 file,

@@ -152,7 +152,7 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
             )}
 
-            <div className={`${isLoading ? 'hidden' : ''} flex items-center justify-end gap-2`}>
+            <div className={`${isLoading || (checkoutData?.batches?.length || 0) === 0 ? 'hidden' : ''} flex items-center justify-end gap-2`}>
               <button
                 disabled={checkoutOffset === 0}
                 onClick={() => setCheckoutOffset((prev) => Math.max(0, prev - PAGE_LIMIT))}
@@ -234,7 +234,7 @@ export const SalesHistoryPage: React.FC = () => {
             )}
 
             {/* PAGINATION CONTROLS */}
-            <div className={`flex items-center justify-end gap-2 ${isLoading ? 'hidden' : ''}`}>
+            <div className={`flex items-center justify-end gap-2 ${isLoading || (actionData?.records?.length || 0) === 0 ? 'hidden' : ''}`}>
               <button
                 disabled={actionsOffset === 0}
                 onClick={() => setActionsOffset((prev) => Math.max(0, prev - PAGE_LIMIT))}

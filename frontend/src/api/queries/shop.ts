@@ -181,6 +181,7 @@ function fromShopRow(id: string, row: any): Shop {
 }
 
 function toItemRow(item: Partial<Item>) {
+
     return {
         shopId: item.shopId ?? '',
         itemName: item.itemName ?? '',
@@ -198,12 +199,22 @@ function toItemRow(item: Partial<Item>) {
         // visualCandidateKeys via InventoryForm on the offline path). Missing
         // entirely -> '[]', never null/undefined, so JSON.parse downstream
         // never has to guard against a bad value.
-        visualClassKeysJson: JSON.stringify(item.visualClassKeys ?? []),
+        visualClassKeysJson: JSON.stringify(item.visualClassKeys || []),
         updatedAt: new Date().toISOString(),
     };
 }
 
 function fromItemRow(id: string, row: any): Item {
+    let parsedKeys: string[] = [];
+
+    if (row.visualClassKeysJson) {
+        try {
+            // Unpack the string storage layer back into a usable JavaScript Array
+            parsedKeys = JSON.parse(row.visualClassKeysJson);
+        } catch (e) {
+            console.error("Failed to parse visualClassKeysJson", e);
+        }
+    }
     return {
         id,
         shopId: row.shopId,
@@ -218,7 +229,7 @@ function fromItemRow(id: string, row: any): Item {
         costPrice: row.costPrice,
         reorderLevel: row.reorderLevel,
         // NEW
-        visualClassKeys: JSON.parse(row.visualClassKeysJson || '[]'),
+        visualClassKeys: parsedKeys,
         updatedAt: row.updatedAt,
     };
 }
@@ -591,7 +602,6 @@ function offlineTextScore(itemName: string, query: string): number {
 // anything regardless of its value, which was the actual inconsistency.
 export function useSearchShopProducts(isSubscribed: boolean) {
     const store = useStore() as Store;
-    const persistLocally = shouldPersistLocally(isSubscribed);
     const [result, setResult] = useState<{ loading: boolean; error: any; data?: any }>({
         loading: false,
         error: null,
@@ -671,13 +681,6 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                     fetchPolicy: 'no-cache',
                 });
 
-                if (persistLocally) {
-                    const products = data?.searchShopProducts?.products ?? [];
-                    products.forEach((item: any) => {
-                        upsertServerRow(store, 'inventory', item.id, toItemRow(item));
-                    });
-                }
-
                 setResult({ loading: false, error: null, data });
                 return { data };
             } catch (error) {
@@ -685,7 +688,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 throw error;
             }
         },
-        [isSubscribed, store, persistLocally]
+        [isSubscribed, store]
     );
 
     return [search, result] as const;

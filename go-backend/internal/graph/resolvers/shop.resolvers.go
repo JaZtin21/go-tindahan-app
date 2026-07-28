@@ -2370,7 +2370,7 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 
 	// 2. Fetch complete list including sensitive details (cost_price, reorder_level)
 	selectQuery := fmt.Sprintf(`
-		SELECT id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, stock_quantity, reorder_level, updated_at
+		SELECT id, shop_id, item_name, description, barcode, category, unit_of_measure, photo, cost_price, selling_price, visual_class_keys, stock_quantity, reorder_level, updated_at
 		FROM inventory_items
 		%s
 		ORDER BY %s %s
@@ -2393,8 +2393,20 @@ func (r *queryResolver) GetShopInventory(ctx context.Context, shopID string, lim
 		var item model.OwnerInventoryItem
 		var updatedAt time.Time
 		err := rows.Scan(
-			&item.ID, &item.ShopID, &item.ItemName, &item.Description, &item.Barcode, &item.Category, &item.UnitOfMeasure, &item.Photo,
-			&item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &updatedAt,
+			&item.ID,
+			&item.ShopID,
+			&item.ItemName,
+			&item.Description,
+			&item.Barcode,
+			&item.Category,
+			&item.UnitOfMeasure,
+			&item.Photo,
+			&item.CostPrice,
+			&item.SellingPrice,
+			&item.VisualClassKeys, // 11th - Matches visual_class_keys
+			&item.StockQuantity,   // 12th - Matches stock_quantity
+			&item.ReorderLevel,    // 13th - Matches reorder_level
+			&updatedAt,            // 14th - Matches updated_at
 		)
 		if err != nil {
 			graphql.AddError(ctx, &gqlerror.Error{

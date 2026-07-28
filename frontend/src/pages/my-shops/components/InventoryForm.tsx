@@ -26,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = true;
+    const isSubscribed = false;
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this
@@ -232,9 +232,9 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         // to surface in later searches for a completely different product.
         // scanSuggestedName is '' for manual-tab entries, so this is a no-op
         // (nameWasCorrected stays false) whenever the item wasn't scanned at all.
-        const nameWasCorrected =
-            scanSuggestedName.trim() !== '' &&
-            formData.itemName.trim() !== scanSuggestedName.trim();
+
+        console.log('scanSuggestedName:', scanSuggestedName, formData.itemName, visualClassKeys);
+        const nameWasCorrected = scanSuggestedName !== formData.itemName;
         const visualClassKeysToSend = nameWasCorrected ? visualClassKeys : [];
 
         const mutationPayload = {
@@ -533,9 +533,12 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <ProductScannerCamera
                                                 shopId={shopId as string}
                                                 isSubscribed={isSubscribed}
+                                                searchInventory={false}
                                                 onCaptureComplete={(outcome: ScanOutcome) => {
                                                     setPhoto(outcome.file);
                                                     setPhotoPreview(outcome.previewUrl);
+
+                                                    console.log(outcome, outcome.visualCandidateKeys);
                                                     setVisualClassKeys(outcome.visualCandidateKeys);
 
                                                     // 🚀 Per your call: ignore outcome.status entirely here — even

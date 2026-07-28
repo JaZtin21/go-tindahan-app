@@ -118,7 +118,7 @@ export const ADD_INVENTORY_ITEM_MUTATION = gql`
       costPrice
       sellingPrice
       stockQuantity
-      visualClassKeys   # NEW
+      visualClassKeys 
       reorderLevel
       updatedAt
     }
@@ -139,6 +139,7 @@ export const UPDATE_INVENTORY_ITEM_MUTATION = gql`
       costPrice
       sellingPrice
       stockQuantity
+      visualClassKeys
       reorderLevel
       updatedAt
     }
@@ -326,6 +327,7 @@ export const GET_SHOP_INVENTORY_QUERY = gql`
         costPrice
         sellingPrice
         stockQuantity
+        visualClassKeys  
         reorderLevel
         updatedAt
       }
