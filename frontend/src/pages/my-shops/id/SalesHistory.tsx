@@ -184,10 +184,10 @@ export const SalesHistoryPage: React.FC = () => {
                   {actionData?.records.map((record) => (
                     <div
                       key={record.id}
-                      className="flex flex-col gap-2 p-4 border border-border-main rounded-2xl bg-bg-primary hover:bg-item-hover/5 transition-colors"
+                      className="flex flex-col gap-2 p-4 border border-border-main rounded-lg bg-bg-primary hover:bg-item-hover/5 transition-colors"
                     >
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold uppercase tracking-wider text-brand-gold bg-brand-gold/10 px-2.5 py-1 rounded-full border border-brand-gold/20 font-sans capitalize">
+                        <span className="text-xs font-bold uppercase tracking-wider text-brand-gold bg-brand-gold/10 px-2.5 py-1 rounded-md border border-brand-gold/20 font-sans capitalize">
                           {record.action}
                         </span>
                         <span className="text-xs text-text-muted">
