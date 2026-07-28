@@ -1703,7 +1703,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// unchanged — no photos on action history rows
 	pushedHistoryIDs := make(map[string]bool)
-
 	for _, h := range input.ActionHistories {
 		targetShopID := h.ShopID
 		if realShopID, exists := shopIDMap[h.ShopID]; exists {
@@ -1726,12 +1725,34 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			createdAtAnchor = parsedTime
 		}
 
+		// 🟢 Step 1: SELF-HEALING GUARD
+		// If a history log points to a valid ID, check if it actually exists in Postgres
+		if resolvedItemID != nil {
+			var itemExists bool
+			checkQuery := `SELECT EXISTS(SELECT 1 FROM inventory_items WHERE id = $1)`
+
+			checkItemErr := tx.QueryRow(ctx, checkQuery, *resolvedItemID).Scan(&itemExists)
+			if checkItemErr != nil {
+				log.Printf("🔴 BATCH SYNC: Critical validation check failure for item %s: %v", *resolvedItemID, checkItemErr)
+				return nil, checkItemErr
+			}
+
+			// If the item doesn't exist anywhere (ghost offline item), skip it safely!
+			// This stops the foreign key constraint from breaking your entire batch update.
+			if !itemExists {
+				log.Printf("🧹 BATCH SYNC: Safely skipped ghost action log for missing item ID: %s", *resolvedItemID)
+				continue
+			}
+		}
+
+		// Step 2: Run your normal INSERT statement.
+		// This is now 100% safe because Step 1 guarantees the item is in the DB!
 		var historyID string
 		query := `
-			INSERT INTO item_action_history (shop_id, inventory_item_id, item_name, action, quantity, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			RETURNING id
-		`
+        INSERT INTO item_action_history (shop_id, inventory_item_id, item_name, action, quantity, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+    `
 		err = tx.QueryRow(ctx, query, targetShopID, resolvedItemID, h.ItemName, h.Action, h.Quantity, createdAtAnchor).Scan(&historyID)
 		if err != nil {
 			log.Printf("🔴 BATCH SYNC: Failed appending history log for local ID %s: %v", h.LocalID, err)
