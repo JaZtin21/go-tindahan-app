@@ -26,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = false;
+    const isSubscribed = true;
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this

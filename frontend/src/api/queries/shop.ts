@@ -554,6 +554,35 @@ export function useShopInventory(opts: {
     }, [localItems, offset, itemsPerPage, state.loading, state.error, isSubscribed, persistLocally, remoteOnly]);
 }
 
+
+// ---------- offline fuzzy text scoring (Layer 2 fallback) ----------
+// Not trying to replicate productMatching.ts's full letter-run scorer or the
+// backend's pg_trgm similarity — just enough to find things while offline.
+// The backend's real layered search takes over the instant the shop is back
+// online and re-syncs.
+
+const OFFLINE_SEARCH_MIN_SCORE = 0.34; // roughly "at least 1 in 3 query words found"
+
+function normalizeForOfflineSearch(str: string): string {
+    return str.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function offlineTextScore(itemName: string, query: string): number {
+    const normItem = normalizeForOfflineSearch(itemName);
+    const normQuery = normalizeForOfflineSearch(query);
+    if (!normQuery) return 0;
+
+    // Substring hit (handles "type ahead" partial queries) — highest confidence.
+    if (normItem.includes(normQuery)) return 1;
+
+    const itemTokens = new Set(normItem.split(' ').filter(Boolean));
+    const queryTokens = normQuery.split(' ').filter(Boolean);
+    if (queryTokens.length === 0) return 0;
+
+    const matchedCount = queryTokens.filter((t) => itemTokens.has(t)).length;
+    return matchedCount / queryTokens.length;
+}
+
 // ---- 3. useSearchShopProducts (SEARCH_SHOP_PRODUCTS_QUERY) ----
 // Search results ARE inventory rows (same shape as useShopInventory's),
 // so this now mirrors them into TinyBase on the online path too, gated by
@@ -575,7 +604,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 query: string;
                 limit: number;
                 offset: number;
-                // NEW: the scanner's top vision-model candidate names, passed
+                // The scanner's top vision-model candidate names, passed
                 // through from ProductScannerCamera. Optional — manual typed
                 // search (ScannerTab's handleSearchChange) omits it entirely.
                 visualCandidates?: string[];
@@ -584,27 +613,49 @@ export function useSearchShopProducts(isSubscribed: boolean) {
             const { shopId, query, limit, offset, visualCandidates } = options.variables;
 
             if (!isSubscribed) {
-                // OFFLINE PATH: still regex-on-itemName only for now — the
-                // visual_class_keys layered lookup is a server-side (Postgres
-                // array-overlap + trigram) feature. Deliberately NOT porting
-                // that logic into TinyBase yet; this is the "offline query
-                // function" step you're doing as a follow-up once the online
-                // path is confirmed working. visualCandidates is accepted
-                // here but intentionally ignored — nothing to wire it to yet.
-                const re = new RegExp(query, 'i');
                 const inventoryTable = store.getTable('inventory');
-
-                const allResults = Object.entries(inventoryTable)
+                const shopItems = Object.entries(inventoryTable)
                     .filter(([, row]: any) => !row._deleted)
                     .map(([id, row]) => fromItemRow(id, row))
-                    .filter((i) => i.shopId === shopId && re.test(i.itemName));
+                    .filter((i) => i.shopId === shopId);
 
-                const slicedResults = allResults.slice(offset, offset + limit);
+                // LAYER 1: exact visual_class_keys overlap — mirrors the
+                // backend's Postgres array && check. A bound key survives
+                // renames, so try this first.
+                if (visualCandidates && visualCandidates.length > 0) {
+                    const candidateSet = new Set(visualCandidates);
+                    const visualMatches = shopItems.filter((i) =>
+                        (i.visualClassKeys ?? []).some((k) => candidateSet.has(k))
+                    );
+
+                    if (visualMatches.length > 0) {
+                        const sorted = [...visualMatches].sort((a, b) => a.itemName.localeCompare(b.itemName));
+                        const slicedResults = sorted.slice(offset, offset + limit);
+                        const data = {
+                            searchShopProducts: {
+                                products: slicedResults,
+                                totalCount: sorted.length,
+                            },
+                        };
+                        setResult({ loading: false, error: null, data });
+                        return { data };
+                    }
+                    // No visual key hit — fall through to Layer 2, same as
+                    // the backend (item may just not have a key bound yet).
+                }
+
+                // LAYER 2: lightweight fuzzy fallback.
+                const scored = shopItems
+                    .map((i) => ({ item: i, score: offlineTextScore(i.itemName, query) }))
+                    .filter(({ score }) => score >= OFFLINE_SEARCH_MIN_SCORE)
+                    .sort((a, b) => b.score - a.score || a.item.itemName.localeCompare(b.item.itemName));
+
+                const slicedResults = scored.slice(offset, offset + limit).map(({ item }) => item);
 
                 const data = {
                     searchShopProducts: {
                         products: slicedResults,
-                        totalCount: allResults.length,
+                        totalCount: scored.length,
                     },
                 };
 
@@ -639,6 +690,7 @@ export function useSearchShopProducts(isSubscribed: boolean) {
 
     return [search, result] as const;
 }
+
 
 // ---- 4. useCheckoutHistory (GET_CHECKOUT_HISTORY_QUERY) ----
 export function useCheckoutHistory(opts: {

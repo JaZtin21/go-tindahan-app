@@ -31,7 +31,7 @@ export const InventoryPage = () => {
     const { shopId } = useParams<{ shopId: string }>();
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const isSubscribed = true;
+    const isSubscribed = false;
 
     // 1. PAGINATION SETUP: 10 items per page limit matrix footprint
     const itemsPerPage = 10;
