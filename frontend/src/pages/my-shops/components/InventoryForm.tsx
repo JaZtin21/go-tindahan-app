@@ -37,6 +37,13 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     // handing this back — nothing to re-check here).
     const [visualClassKeys, setVisualClassKeys] = useState<string[]>([]);
 
+    // 🚀 NEW: the exact name the scanner suggested (or the matched item's name)
+    // for the current capture, captured verbatim at the moment onCaptureComplete
+    // fires. This is compared against formData.itemName at submit time to tell
+    // whether the user actually corrected the model's guess — see
+    // handleInventoryFormSubmit for why that distinction matters.
+    const [scanSuggestedName, setScanSuggestedName] = useState<string>('');
+
 
 
 
@@ -104,6 +111,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         setPhoto(null);
         setPhotoPreview('');
         setVisualClassKeys([]);
+        setScanSuggestedName('');
         setScannerStep('camera');
 
         if (shoudClose)
@@ -214,6 +222,21 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
 
         console.log('handled')
 
+        // 🚀 NEW: only send visualClassKeys when the user actually corrected the
+        // scanner's suggested name. If they accepted it as-is (or only touched
+        // unit/price/stock — measurement edits don't count as a name correction),
+        // the model was already right and there's nothing to teach the system.
+        // Binding here unconditionally used to tie this item to whatever else
+        // happened to be in the vision model's top-N guesses for this photo —
+        // including unrelated candidates — which is what caused unrelated items
+        // to surface in later searches for a completely different product.
+        // scanSuggestedName is '' for manual-tab entries, so this is a no-op
+        // (nameWasCorrected stays false) whenever the item wasn't scanned at all.
+        const nameWasCorrected =
+            scanSuggestedName.trim() !== '' &&
+            formData.itemName.trim() !== scanSuggestedName.trim();
+        const visualClassKeysToSend = nameWasCorrected ? visualClassKeys : [];
+
         const mutationPayload = {
             itemName: formData.itemName,
             description: formData.description,
@@ -243,13 +266,13 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 const updateInput: any = {
                     ...mutationPayload,
                     itemId: item.id,
-                    // 🚀 NEW: only non-empty when this edit followed a scan (either
-                    // the "AI Image Scanner" tab, or a future flow that opens this
-                    // form pre-filled from a scan). visualClassKeys is APPENDED to
-                    // the item's existing keys server-side, never overwritten — see
+                    // 🚀 NEW: only non-empty when this edit followed a scan AND the
+                    // user actually corrected the suggested name (see
+                    // nameWasCorrected above). visualClassKeys is APPENDED to the
+                    // item's existing keys server-side, never overwritten — see
                     // RESOLVER_CHANGES.md — so leaving it [] here for an ordinary
-                    // manual edit is a safe no-op, not a wipe.
-                    visualClassKeys,
+                    // manual edit, or an accepted-as-is scan, is a safe no-op.
+                    visualClassKeys: visualClassKeysToSend,
                 };
 
                 if (photo) {
@@ -273,7 +296,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                             ...mutationPayload,
                             shopId: shopId,
                             photo: photo || null,
-                            visualClassKeys, // 🚀 NEW — [] for manual-tab entries, populated for confident scans
+                            visualClassKeys: visualClassKeysToSend, // 🚀 NEW — [] unless the user corrected a wrong scan
                         }
                     }
                 });
@@ -325,6 +348,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         setPhoto(null);
         setPhotoPreview('');
         setVisualClassKeys([]);
+        setScanSuggestedName('');
         setScannerStep('camera');
     };
 
@@ -525,6 +549,10 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     const unit = outcome.status === 'matched'
                                                         ? (outcome.product.unitOfMeasure || '')
                                                         : outcome.unitOfMeasure;
+
+                                                    // 🚀 NEW: remember exactly what the scanner suggested for the
+                                                    // name, so submit-time can tell whether the user corrected it.
+                                                    setScanSuggestedName(name);
 
                                                     setFormData({
                                                         ...formData,
