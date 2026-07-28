@@ -258,11 +258,13 @@ export const withCachedFetch = async <T>(shouldCache: UrlMatcher, fn: () => Prom
         const cacheKey = `fetch:${url}`;
 
         try {
-            const cachedBuf = await getAsset<ArrayBuffer>(cacheKey);
-            if (cachedBuf && cachedBuf.byteLength > 0) {
-                return new Response(cachedBuf);
+            const cached = await getAsset<{ buf: ArrayBuffer; contentType: string }>(cacheKey);
+            if (cached?.buf && cached.buf.byteLength > 0) {
+                return new Response(cached.buf, {
+                    headers: { 'Content-Type': cached.contentType || 'application/octet-stream' },
+                });
             }
-            if (cachedBuf) {
+            if (cached) {
                 console.warn(`[assetStore] Cached fetch "${url}" was empty — refetching.`);
                 await deleteAsset(cacheKey).catch(() => { });
             }
@@ -277,7 +279,8 @@ export const withCachedFetch = async <T>(shouldCache: UrlMatcher, fn: () => Prom
         if (response.ok) {
             const buf = await response.clone().arrayBuffer();
             if (buf.byteLength > 0) {
-                await setAsset(cacheKey, buf).catch((err) => {
+                const contentType = response.headers.get('content-type') || 'application/octet-stream';
+                await setAsset(cacheKey, { buf, contentType }).catch((err) => {
                     console.warn(`[assetStore] Failed to persist fetch "${url}" — will refetch next load.`, err);
                 });
             }

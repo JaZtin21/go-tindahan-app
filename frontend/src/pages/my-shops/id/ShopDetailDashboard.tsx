@@ -450,7 +450,7 @@ export const ShopDetailDashboard = () => {
 
                 {/* 4. View Inquiries (Subroute Navigation Anchor) */}
                 <a
-                    onClick={() => navigate(`/my-shops/${shopId}/inquiries`)}
+                    onClick={() => { }}
                     className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
                     <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
