@@ -202,34 +202,34 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center">
+            {/* FIXED: Reduced padding and min-height on mobile (p-3 min-h-[300px]) but preserves your original desktop style (md:p-5 md:min-h-[380px]) */}
+            <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl p-3 md:p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[300px] md:min-h-[380px] flex items-center">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
-                <div className="flex items-center justify-start gap-12 min-w-[1300px] w-full px-8 py-4 box-border">
+                {/* FIXED: Drop min-width on mobile to prevent extreme empty scrollable tracks (min-w-[960px] vs md:min-w-[1300px]) */}
+                <div className="flex items-center justify-start gap-6 md:gap-12 min-w-[960px] md:min-w-[1300px] w-full px-3 md:px-8 py-2 md:py-4 box-border">
 
                     {/* SECTION 1: MASTER RECHARTS RADIAL BAR (Today's Gross Sales) */}
-                    <div className="flex items-center gap-6 shrink-0 w-[420px]">
-                        <div className="w-80 h-80 relative flex items-center justify-center shrink-0">
+                    {/* FIXED: Adjusted wrapper width for mobile (w-[310px] vs md:w-[420px]) */}
+                    <div className="flex items-center gap-3 md:gap-6 shrink-0 w-[310px] md:w-[420px]">
+                        {/* FIXED: Made the chart smaller on mobile (w-56 h-56 vs your original md:w-80 md:h-80) */}
+                        <div className="w-56 h-56 md:w-80 md:h-80 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius="80%"
-                                    outerRadius="100%"
-                                    barSize={20}
-                                    data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-green)' }]}
-                                    startAngle={90}
-                                    endAngle={-270}
-                                >
+                                <RadialBarChart cx="50%" cy="50%" innerRadius="80%" outerRadius="100%" barSize={20} data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270} >
                                     <RadialBar background={{ fill: 'var(--color-brand-green)', opacity: 0.1 }} dataKey="value" cornerRadius={10} />
                                     <Legend layout="vertical" verticalAlign="middle" align="center" content={() => (
-                                        <div className="text-center flex flex-col items-center justify-center select-none">
-                                            <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1 mt-[-2rem]">
+                                        <div className="text-center flex flex-col items-center justify-center select-none px-2">
+                                            {/* 1. STORE NAME STACKED ON TOP */}
+                                            {/* FIXED: Scales text and handles layout margin shifts down for smaller circles */}
+                                            <span className="text-xs md:text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[120px] md:max-w-[160px] mb-1 mt-[-1.5rem] md:mt-[-2rem]">
                                                 {shop?.shopName}
                                             </span>
-                                            <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
+                                            {/* 2. LIVE TODAY REVENUE TRACKER */}
+                                            {/* FIXED: Text scales cleanly to avoid bleeding (text-2xl vs md:text-4xl) */}
+                                            <span className="text-2xl md:text-4xl font-black text-text-main tracking-tighter leading-none mt-1 md:mt-2">
                                                 {formatCurrency(todaysGrossSales)}
                                             </span>
-                                            <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
+                                            {/* 3. TREND COMPARISON FOOTER */}
+                                            <p className={`text-[10px] md:text-xs font-extrabold mt-1 md:mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
                                                 {formatGrowthRate(todaysSalesGrowthPct)}
                                             </p>
                                         </div>
@@ -238,80 +238,85 @@ export const ShopDetailDashboard = () => {
                             </ResponsiveContainer>
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-2xl font-black text-text-main tracking-tight">Today's Sales</span>
-                            <span className="text-sm font-bold text-text-muted mt-1.5">Primary revenue scale</span>
+                            {/* FIXED: Scaled font labels down on mobile devices */}
+                            <span className="text-lg md:text-2xl font-black text-text-main tracking-tight leading-tight">Today's Sales</span>
+                            <span className="text-xs md:text-sm font-bold text-text-muted mt-1">Primary revenue scale</span>
                         </div>
                     </div>
 
                     {/* SECTION 2: VERTICALLY STACKED RECHARTS RADIAL BARS */}
-                    <div className="flex flex-col gap-10 shrink-0 justify-center">
-                        <div className="flex items-center gap-6">
-                            <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
+                    {/* FIXED: Tighter stack layout gap spaces on mobile screen views (gap-6 vs md:gap-10) */}
+                    <div className="flex flex-col gap-6 md:gap-10 shrink-0 justify-center">
+                        {/* Upper Stack Ring (7-Day Growth Index) */}
+                        <div className="flex items-center gap-4 md:gap-6">
+                            {/* FIXED: Scales ring charts layout framework on small screen displays (w-24 h-24 vs md:w-35 md:h-35) */}
+                            <div className="w-24 h-24 md:w-35 md:h-35 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-gold)' }]} startAngle={90} endAngle={-270}>
                                         <RadialBar background={{ fill: 'var(--color-brand-gold)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
                                     </RadialBarChart>
                                 </ResponsiveContainer>
-                                <span className="absolute text-base font-black text-text-main">{weeklyRevenueGrowthIndex.toFixed(0)}%</span>
+                                <span className="absolute text-xs md:text-base font-black text-text-main">{weeklyRevenueGrowthIndex.toFixed(0)}%</span>
                             </div>
-                            <span className="text-lg font-black text-text-sub tracking-tight">7-Day Growth Index</span>
+                            <span className="text-sm md:text-lg font-black text-text-sub tracking-tight">7-Day Growth Index</span>
                         </div>
 
-                        <div className="flex items-center gap-6">
-                            <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
+                        {/* Lower Stack Ring (Average Ticket Size / Basket Value) */}
+                        <div className="flex items-center gap-4 md:gap-6">
+                            <div className="w-24 h-24 md:w-35 md:h-35 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: 100, fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270}>
                                         <RadialBar background={{ fill: 'var(--color-brand-red)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
                                     </RadialBarChart>
                                 </ResponsiveContainer>
-                                <span className="absolute text-xs font-black text-text-main">{formatCurrency(averageTicketSize)}</span>
+                                <span className="absolute text-[10px] md:text-xs font-black text-text-main scale-90 md:scale-100">{formatCurrency(averageTicketSize)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-lg font-black text-text-sub tracking-tight">Customer spent avg. of</span>
-                                <span className="text-xs text-text-muted font-bold mt-2">{formatCurrency(averageTicketSize)} pesos</span>
+                                <span className="text-sm md:text-lg font-black text-text-sub tracking-tight leading-tight">Customer spent avg. of</span>
+                                <span className="text-[11px] md:text-xs text-text-muted font-bold mt-1">{formatCurrency(averageTicketSize)} pesos</span>
                             </div>
                         </div>
                     </div>
 
                     {/* SECTION 3: RECHARTS UNIFIED 7-DAY HYBRID REVENUE MATRIX */}
-                    <div className="flex flex-col shrink-0 justify-center h-44 px-8 w-[320px] border-r-2 border-border-white/40">
+                    {/* FIXED: Modified section widths down gracefully for clean inline rendering rows (w-[260px] vs md:w-[320px]) */}
+                    <div className="flex flex-col shrink-0 justify-center h-36 md:h-44 px-4 md:px-8 w-[260px] md:w-[320px] border-r-2 border-border-white/40">
                         <div className="w-full h-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={weeklySalesTrend} margin={{ top: 15, right: 5, left: 5, bottom: 5 }} >
-                                    <XAxis dataKey="dayName" axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: '800' }} dy={8} />
+                                <ComposedChart data={weeklySalesTrend} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} >
+                                    <XAxis dataKey="dayName" axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10, fontWeight: '800' }} dy={6} />
                                     <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.04)', radius: 6 }} content={({ active, payload }) => { if (active && payload && payload.length) { const data = payload[0].payload; return (<div className="p-3 bg-white rounded-xl border border-slate-200 font-bold flex flex-col gap-1 shadow-md select-none text-xs"> <p className="text-text-muted font-black mb-0.5">{data.formattedDate}</p> <p className="text-slate-800">Sales: {formatCurrency(data.grossSale)}</p> <p className="text-brand-green">Profit: {formatCurrency(data.grossProfit)}</p> </div>); } return null; }} />
-                                    <Bar dataKey="grossSale" fill="var(--color-brand-green)" radius={[4, 4, 0, 0]} barSize={20} />
-                                    <Line type="monotone" dataKey="grossSale" stroke='rgba(148, 163, 184, 0.2)' strokeWidth={2.5} dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 3 }} activeDot={{ r: 5 }} />
+                                    <Bar dataKey="grossSale" fill="var(--color-brand-green)" radius={[4, 4, 0, 0]} barSize={16} />
+                                    <Line type="monotone" dataKey="grossSale" stroke='rgba(148, 163, 184, 0.2)' strokeWidth={2} dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 2 }} activeDot={{ r: 4 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
-                        <p className="text-[10px] text-center font-bold text-text-muted mt-2 uppercase tracking-wider select-none">
+                        <p className="text-[9px] md:text-[10px] text-center font-bold text-text-muted mt-2 uppercase tracking-wider select-none">
                             7-Day Sales & Profit Trend
                         </p>
                     </div>
 
                     {/* SECTION 4: INTEGRATED DOUBLE-SLICE OPERATIONAL PROFIT & COST WHEEL */}
-                    {/* FIXED: Removed ml-auto and added pr-8 wrapper padding to force Recharts to respect the final layout frame boundary */}
-                    <div className="flex items-center gap-10 shrink-0 w-[450px] justify-end pr-8">
+                    {/* FIXED: Scales component structural container width and right margins safely across phone views (w-[320px] pr-4 vs md:w-[450px] md:pr-8) */}
+                    <div className="flex items-center gap-4 md:gap-10 shrink-0 w-[320px] md:w-[450px] justify-end pr-4 md:pr-8">
                         <div className="flex flex-col text-right select-none">
-                            <span className="text-2xl font-black text-text-main tracking-tight"> Expected Profit Yield </span>
-                            <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight"> {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value </span>
+                            <span className="text-lg md:text-2xl font-black text-text-main tracking-tight leading-tight"> Expected Profit Yield </span>
+                            <span className="text-[11px] md:text-xs font-bold text-text-muted mt-1 max-w-[140px] md:max-w-[200px] leading-tight"> {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value </span>
                         </div>
-                        <div className="w-52 h-52 relative flex items-center justify-center shrink-0">
+                        {/* FIXED: Made the pie chart smaller on mobile (w-36 h-36 vs your original md:w-52 md:h-52) */}
+                        <div className="w-36 h-36 md:w-52 md:h-52 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={[
-                                        { value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' },
-                                        { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }
-                                    ]} dataKey="value" cx="50%" cy="50%" innerRadius="75%" outerRadius="95%" startAngle={90} endAngle={-270} stroke="none" />
+                                    <Pie data={[{ value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' }, { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }]} dataKey="value" cx="50%" cy="50%" innerRadius="75%" outerRadius="95%" startAngle={90} endAngle={-270} stroke="none" />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <span className="absolute text-xl font-black text-text-main"> {(100 - inventoryCapitalRatio).toFixed(0)}% </span>
+                            <span className="absolute text-sm md:text-xl font-black text-text-main"> {(100 - inventoryCapitalRatio).toFixed(0)}% </span>
                         </div>
                     </div>
 
                 </div>
             </div>
+
 
 
 
