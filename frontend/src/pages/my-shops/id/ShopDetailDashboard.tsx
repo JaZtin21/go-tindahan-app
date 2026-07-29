@@ -212,7 +212,7 @@ export const ShopDetailDashboard = () => {
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* MAIN CONTAINER: Handles clear, scrollable layout blocks seamlessly */}
-            <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-8  p-4 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center">
+            <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-8 pl-6 p-4 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
                 <div className="flex items-center justify-start gap-12 min-w-[1300px] w-full box-border">
 
@@ -220,16 +220,100 @@ export const ShopDetailDashboard = () => {
                     <div className="flex items-center gap-6 shrink-0 w-[420px]">
                         <div className="w-80 h-80 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart cx="50%" cy="50%" innerRadius="80%" outerRadius="100%" barSize={20} data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270} >
-                                    <RadialBar background={{ fill: 'var(--color-brand-green)', opacity: 0.1 }} dataKey="value" cornerRadius={10} />
-                                    <Legend layout="vertical" verticalAlign="middle" align="center" content={() => (
-                                        <div className="text-center flex flex-col items-center justify-center select-none">
-                                            <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1 mt-[-2rem]"> {shop?.shopName} </span>
-                                            <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2"> {formatCurrency(todaysGrossSales)} </span>
-                                            <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}> {formatGrowthRate(todaysSalesGrowthPct)} </p> </div>)} />
-                                </RadialBarChart>
+                                <PieChart>
+                                    {/* LAYER 1: The Base Track */}
+                                    <Pie
+                                        data={[{ value: 100 }]}
+                                        dataKey="value"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius="84%"
+                                        outerRadius="100%"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="none"
+                                        /* 
+                                          FIXED: Only stay fully gray if you have absolute ZERO sales.
+                                          If you have sales, but last week was 0 (todaysSalesGrowthPct === 0), 
+                                          keep the background track gray so your green progress bar can climb over it!
+                                        */
+                                        fill={
+                                            todaysGrossSales === 0 || todaysSalesGrowthPct === -100
+                                                ? 'var(--color-text-muted)'
+                                                : todaysSalesGrowthPct === 0
+                                                    ? 'var(--color-text-muted)' // Muted gray base track for starting weeks
+                                                    : 'var(--color-text-muted)' // Active warning red for real data deficits
+                                        }
+                                        opacity={
+                                            todaysGrossSales === 0 || todaysSalesGrowthPct === -100 || todaysSalesGrowthPct === 0
+                                                ? 0.2
+                                                : 0.2
+                                        }
+                                        cornerRadius={10}
+                                    />
+
+                                    {/* LAYER 2: The Green Track Overlay */}
+                                    <Pie
+                                        /* 
+                                          FIXED PROGRESS MATH OVERRIDE:
+                                          1. If absolute zero sales -> Progress is 0.
+                                          2. If last week was zero (growth === 0) -> Dynamically fill the green bar based on current sales 
+                                             (e.g., todaysGrossSales / 1000 * 100), clamping it cleanly so it won't exceed 100%.
+                                          3. Normal operations -> Use your standard historical comparison formula.
+                                        */
+                                        data={[{
+                                            value: todaysGrossSales === 0
+                                                ? 0
+                                                : todaysSalesGrowthPct === 0
+                                                    ? Math.min((todaysGrossSales / 1000) * 100, 100) // ₱54.00 will smoothly fill up 5.4% green!
+                                                    : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
+                                        }]}
+                                        dataKey="value"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius="84%"
+                                        outerRadius="100%"
+                                        startAngle={90}
+                                        /* Dynamic angle mapping using the exact same inline progress calculation */
+                                        endAngle={90 - (360 * ((
+                                            todaysGrossSales === 0
+                                                ? 0
+                                                : todaysSalesGrowthPct === 0
+                                                    ? Math.min((todaysGrossSales / 1000) * 100, 100)
+                                                    : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
+                                        ) / 100))}
+                                        stroke="none"
+                                        /* Show the standard green overlay if there is any sales activity */
+                                        fill={todaysGrossSales === 0 ? 'transparent' : 'var(--color-brand-green)'}
+                                        cornerRadius={10}
+                                    />
+                                </PieChart>
                             </ResponsiveContainer>
+
+
+                            {/* FIXED CENTRAL TYPOGRAPHY STRUCTURE */}
+                            <div className="absolute text-center flex flex-col items-center justify-center select-none pointer-events-none">
+                                <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1">
+                                    {shop?.shopName}
+                                </span>
+
+                                <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
+                                    {formatCurrency(todaysGrossSales)}
+                                </span>
+
+                                <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
+                                    {/* 
+      FIXED: If it's a new shop with no history, format the current cash amount 
+      as a positive increase (+ ₱XX.XX) instead of displaying a flat 0.0%.
+    */}
+                                    {todaysSalesGrowthPct === 0 && todaysGrossSales > 0
+                                        ? `+${formatCurrency(todaysGrossSales)} vs last week`
+                                        : formatGrowthRate(todaysSalesGrowthPct)}
+                                </p>
+                            </div>
+
                         </div>
+
                         <div className="flex flex-col">
                             {/* ADDED: Mini Context Icon above typography header */}
                             <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
