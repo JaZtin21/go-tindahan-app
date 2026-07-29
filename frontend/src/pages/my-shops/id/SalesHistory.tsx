@@ -94,7 +94,7 @@ export const SalesHistoryPage: React.FC = () => {
           <div className="flex flex-col gap-4 border-t border-border-main pt-6">
             {isLoading && (checkoutData?.batches?.length || 0) === 0 ? (
               <div className="text-sm text-text-muted py-8 text-center">Loading checkout history...</div>
-            ) : (checkoutData?.batches?.length || 0) === 0 ? (
+            ) : (checkoutData?.batches?.length || 0) === 0 && !isLoading ? (
               <div className="text-sm text-text-muted py-8 text-center">No checkout batches recorded yet.</div>
             ) : (
               <div className="flex flex-col gap-6">
@@ -173,9 +173,9 @@ export const SalesHistoryPage: React.FC = () => {
 
         {activeTab === 'actions' && (
           <div className="flex flex-col gap-4 border-t border-border-main pt-6">
-            {isLoading || (actionData?.records?.length || 0) === 0 ? (
-              <div className="text-sm text-text-muted py-8 text-center">Loading item action history...</div>
-            ) : (actionData?.records?.length || 0) === 0 ? (
+            {isLoading && (actionData?.records?.length || 0) === 0 ? (
+              <div className="text-sm text-text-muted py-8 text-center"> Loading item action history...</div>
+            ) : (actionData?.records?.length || 0) === 0 && !isLoading ? (
               <div className="text-sm text-text-muted py-8 text-center">No item action history recorded yet.</div>
             ) : (
               <>

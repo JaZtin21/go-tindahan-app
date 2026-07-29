@@ -65,13 +65,5 @@ export const decryptToJson = async <T = unknown>(encrypted: ArrayBuffer): Promis
     const text = new TextDecoder('utf-8').decode(plainBuf);
     const parsed = JSON.parse(text) as T;
 
-    // TEMP: confirms decryption actually ran and produced valid JSON.
-    // Remove or gate behind a dev flag before shipping to prod.
-    console.log('[cryptoAssets] Decrypted payload OK:', {
-        encryptedBytes: encrypted.byteLength,
-        decryptedBytes: plainBuf.byteLength,
-        preview: JSON.stringify(parsed).slice(0, 100) + '...',
-    });
-
     return parsed;
 };
