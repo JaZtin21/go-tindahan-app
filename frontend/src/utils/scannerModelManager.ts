@@ -10,6 +10,8 @@ import {
     OfflineRequiredError,
     isOnline,
 } from '~/utils/assetStore';
+import { decryptToJson, isValidEncryptedShape } from '~/utils/cryptoAssets';
+
 
 interface LoadingProgress {
     phase: 'model' | 'names' | 'embeddings' | 'ocr' | 'ready' | 'error' | 'offline';
@@ -106,18 +108,29 @@ export const initScannerAssets = (onProgress: (status: LoadingProgress) => void)
             }
 
             onProgress({ phase: 'names', progress: 25 });
-            const namesData = await cachedTrackDownload(
-                '/reference_class_names.json',
-                'reference_class_names.json',
+            const encryptedNames = await cachedTrackDownload(
+                '/ref-a1.bin',
+                'ref-a1.bin',
                 (pct) => {
                     const scaledProgress = 25 + Math.round((pct / 100) * 25);
                     onProgress({ phase: 'names', progress: Math.min(scaledProgress, 50) });
                 },
-                // A corrupted/truncated cached JSON record would still "exist"
-                // in IndexedDB — this catches that case and forces a redownload.
-                (data) => Array.isArray(data?.class_names) && data.class_names.length > 0
-                    && typeof data?.num_classes === 'number' && typeof data?.embedding_dim === 'number'
+                isValidEncryptedShape
             );
+
+            const namesData = await decryptToJson<{
+                class_names: string[];
+                num_classes: number;
+                embedding_dim: number;
+            }>(encryptedNames);
+
+            if (
+                !Array.isArray(namesData?.class_names) || namesData.class_names.length === 0 ||
+                typeof namesData?.num_classes !== 'number' || typeof namesData?.embedding_dim !== 'number'
+            ) {
+                throw new Error('Decrypted reference_class_names payload failed shape validation');
+            }
+
             namesCache = namesData.class_names;
             onProgress({ phase: 'names', progress: 50 });
 
