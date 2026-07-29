@@ -202,12 +202,12 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="border-2 border-brand-gold/70 bg-brand-gold/10  rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
+            <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
-                <div className="flex items-center  justify-between gap-12 min-w-[1300px] w-full px-8 py-4 ">
+                <div className="flex items-center justify-start gap-12 min-w-[1300px] w-full px-8 py-4 box-border">
 
                     {/* SECTION 1: MASTER RECHARTS RADIAL BAR (Today's Gross Sales) */}
-                    <div className="flex items-center gap-6 shrink-0 flex-1 max-w-md">
+                    <div className="flex items-center gap-6 shrink-0 w-[420px]">
                         <div className="w-80 h-80 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadialBarChart
@@ -223,15 +223,12 @@ export const ShopDetailDashboard = () => {
                                     <RadialBar background={{ fill: 'var(--color-brand-green)', opacity: 0.1 }} dataKey="value" cornerRadius={10} />
                                     <Legend layout="vertical" verticalAlign="middle" align="center" content={() => (
                                         <div className="text-center flex flex-col items-center justify-center select-none">
-                                            {/* 1. STORE NAME STACKED ON TOP */}
                                             <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1 mt-[-2rem]">
                                                 {shop?.shopName}
                                             </span>
-                                            {/* 2. LIVE TODAY REVENUE TRACKER */}
                                             <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
                                                 {formatCurrency(todaysGrossSales)}
                                             </span>
-                                            {/* 3. TREND COMPARISON FOOTER */}
                                             <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
                                                 {formatGrowthRate(todaysSalesGrowthPct)}
                                             </p>
@@ -247,8 +244,7 @@ export const ShopDetailDashboard = () => {
                     </div>
 
                     {/* SECTION 2: VERTICALLY STACKED RECHARTS RADIAL BARS */}
-                    <div className="flex flex-col gap-10 shrink-0 justify-center flex-1">
-                        {/* Upper Stack Ring (7-Day Growth Index) */}
+                    <div className="flex flex-col gap-10 shrink-0 justify-center">
                         <div className="flex items-center gap-6">
                             <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -261,7 +257,6 @@ export const ShopDetailDashboard = () => {
                             <span className="text-lg font-black text-text-sub tracking-tight">7-Day Growth Index</span>
                         </div>
 
-                        {/* Lower Stack Ring (Average Ticket Size / Basket Value) */}
                         <div className="flex items-center gap-6">
                             <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -278,58 +273,15 @@ export const ShopDetailDashboard = () => {
                         </div>
                     </div>
 
-                    {/* SECTION 3: RECHARTS UNIFIED 7-DAY VOLUME REVENUE TREND GRAPH (REPLACED OLD HOURLY BARS) */}
-                    {/* SECTION 3: RECHARTS UNIFIED 7-DAY HYBRID REVENUE MATRIX (BARS + ZIGZAG TRENDLINE) */}
-                    <div className="flex flex-col flex-1 justify-center h-44 px-8 min-w-[280px] max-w-sm border-r-2 border-border-main/30">
+                    {/* SECTION 3: RECHARTS UNIFIED 7-DAY HYBRID REVENUE MATRIX */}
+                    <div className="flex flex-col shrink-0 justify-center h-44 px-8 w-[320px] border-r-2 border-border-white/40">
                         <div className="w-full h-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                {/* 1. Swap BarChart out for ComposedChart to unlock multi-type drawing lanes */}
-                                <ComposedChart
-                                    data={weeklySalesTrend}
-                                    margin={{ top: 15, right: 5, left: 5, bottom: 5 }}
-                                >
-                                    <XAxis
-                                        dataKey="dayName"
-                                        axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }}
-                                        tickLine={false}
-                                        tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: '800' }}
-                                        dy={8}
-                                    />
-
-                                    <Tooltip
-                                        cursor={{ fill: 'rgba(148, 163, 184, 0.04)', radius: 6 }}
-                                        content={({ active, payload }) => {
-                                            if (active && payload && payload.length) {
-                                                const data = payload[0].payload;
-                                                return (
-                                                    <div className="p-3 bg-white rounded-xl border border-slate-200 font-bold flex flex-col gap-1 shadow-md select-none text-xs">
-                                                        <p className="text-text-muted font-black mb-0.5">{data.formattedDate}</p>
-                                                        <p className="text-slate-800">Sales: {formatCurrency(data.grossSale)}</p>
-                                                        <p className="text-brand-green">Profit: {formatCurrency(data.grossProfit)}</p>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        }}
-                                    />
-
-                                    {/* 2. The Background Columns (Tracking Total Revenue Volume) */}
-                                    <Bar
-                                        dataKey="grossSale"
-                                        fill="var(--color-brand-green)"
-                                        radius={[4, 4, 0, 0]}
-                                        barSize={20}
-                                    />
-
-                                    {/* 3. The Zigzag Overlay Line (Tracking Net Earning Trajectories) */}
-                                    <Line
-                                        type="monotone"
-                                        dataKey="grossSale"  // Change this from grossProfit to grossSale
-                                        stroke='rgba(148, 163, 184, 0.2)'
-                                        strokeWidth={2.5}
-                                        dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 3 }}
-                                        activeDot={{ r: 5 }}
-                                    />
+                                <ComposedChart data={weeklySalesTrend} margin={{ top: 15, right: 5, left: 5, bottom: 5 }} >
+                                    <XAxis dataKey="dayName" axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: '800' }} dy={8} />
+                                    <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.04)', radius: 6 }} content={({ active, payload }) => { if (active && payload && payload.length) { const data = payload[0].payload; return (<div className="p-3 bg-white rounded-xl border border-slate-200 font-bold flex flex-col gap-1 shadow-md select-none text-xs"> <p className="text-text-muted font-black mb-0.5">{data.formattedDate}</p> <p className="text-slate-800">Sales: {formatCurrency(data.grossSale)}</p> <p className="text-brand-green">Profit: {formatCurrency(data.grossProfit)}</p> </div>); } return null; }} />
+                                    <Bar dataKey="grossSale" fill="var(--color-brand-green)" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Line type="monotone" dataKey="grossSale" stroke='rgba(148, 163, 184, 0.2)' strokeWidth={2.5} dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 3 }} activeDot={{ r: 5 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -338,52 +290,29 @@ export const ShopDetailDashboard = () => {
                         </p>
                     </div>
 
-
                     {/* SECTION 4: INTEGRATED DOUBLE-SLICE OPERATIONAL PROFIT & COST WHEEL */}
-                    <div className="flex items-center gap-10 shrink-0  flex-1 max-w-md justify-end">
+                    {/* FIXED: Removed ml-auto and added pr-8 wrapper padding to force Recharts to respect the final layout frame boundary */}
+                    <div className="flex items-center gap-10 shrink-0 w-[450px] justify-end pr-8">
                         <div className="flex flex-col text-right select-none">
-                            <span className="text-2xl font-black text-text-main tracking-tight">
-                                Expected Profit Yield
-                            </span>
-                            {/* Clean text explanation detailing your pocket value gains */}
-                            <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight">
-                                {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value
-                            </span>
+                            <span className="text-2xl font-black text-text-main tracking-tight"> Expected Profit Yield </span>
+                            <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight"> {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value </span>
                         </div>
-
                         <div className="w-52 h-52 relative flex items-center justify-center shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                {/* Switching over to a PieChart system lets us slice multiple data variables into one ring */}
                                 <PieChart>
-                                    <Pie
-                                        data={[
-                                            // SLICE 1: Your expected take-home markup (Gold / Green)
-                                            { value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' },
-                                            // SLICE 2: Your locked wholesale supplier buying costs (Red)
-                                            { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }
-                                        ]}
-                                        dataKey="value"
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius="75%"
-                                        outerRadius="95%"
-                                        startAngle={90}
-                                        endAngle={-270}
-                                        stroke="none"
-                                    />
+                                    <Pie data={[
+                                        { value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' },
+                                        { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }
+                                    ]} dataKey="value" cx="50%" cy="50%" innerRadius="75%" outerRadius="95%" startAngle={90} endAngle={-270} stroke="none" />
                                 </PieChart>
                             </ResponsiveContainer>
-
-                            {/* Center Typography Absolute Readout */}
-                            <span className="absolute text-xl font-black text-text-main">
-                                {(100 - inventoryCapitalRatio).toFixed(0)}%
-                            </span>
+                            <span className="absolute text-xl font-black text-text-main"> {(100 - inventoryCapitalRatio).toFixed(0)}% </span>
                         </div>
                     </div>
 
-
                 </div>
             </div>
+
 
 
 

@@ -17,6 +17,8 @@
     /* Border for prominent edges, cards, inputs */
     --color-border-sub: #f3f4f6;
     --color-border-muted: #c0c2c7;
+    --color-border-white: #d1d5db;
+
     /* Soft subtle border for structural dividers */
 
     /* Text Sizing Hierarchy - Light Environments */
@@ -52,6 +54,7 @@
     /* Subtle border for dark panels */
     --color-border-sub: #1f1f1f;
     --color-border-muted: #c0c2c7;
+    --color-border-white: #d1d5db;
     /* Extra soft divider line */
 
     /* Text Sizing Hierarchy - Dark Environments */
