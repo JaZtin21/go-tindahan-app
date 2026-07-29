@@ -202,7 +202,7 @@ export const ShopDetailDashboard = () => {
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
-            <div className="border-2 border-brand-gold/20 bg-brand-gold/10  rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
+            <div className="border-2 border-brand-gold/70 bg-brand-gold/10  rounded-2xl p-5 shadow-sm mb-8 w-full overflow-x-auto min-h-[380px] flex items-center ">
                 {/* Explicit min-width prevents container squishing, allowing clean native horizontal scrolling */}
                 <div className="flex items-center  justify-between gap-12 min-w-[1300px] w-full px-8 py-4 ">
 
@@ -398,110 +398,160 @@ export const ShopDetailDashboard = () => {
                 {/* 1. Someone is buying (Modal Trigger) */}
                 <div
                     onClick={handleOpenCheckoutModal}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10  rounded-2xl p-5 shadow-sm transition-all duration-300   cursor-pointer "
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/1.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    {/* Centered Asset Representation Box matching your shop card geometry layout */}
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <ShoppingCart className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Someone is buying</h3>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
+
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <ShoppingCart className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Someone is buying</h3>
+                        </div>
                     </div>
                 </div>
+
 
                 {/* 2. Add Items in Inventory (Modal Trigger) */}
                 <div
                     onClick={handleOpenInventoryModal}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300  hover:bg-bg-primary-hover cursor-pointer "
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/2.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <PlusCircle className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Add Items in Inventory</h3>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
+
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <PlusCircle className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Add Items in Inventory</h3>
+                        </div>
                     </div>
                 </div>
 
+
                 {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
-                <a
+                <div
                     onClick={handleOpenRestockModal}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/3.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <Package className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Restock Items</h3>
-                    </div>
-                </a>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
 
-                {/* 3. Manage Inventory (Subroute Navigation Anchor) */}
-                <a
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <Package className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Restock Items</h3>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div
                     onClick={() => navigate(`/my-shops/${shopId}/inventory`)}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/7.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <Package className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Manage Inventory</h3>
-                    </div>
-                </a>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
 
-                {/* 4. View Inquiries (Subroute Navigation Anchor) */}
-                <a
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <Package className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Manage Inventory</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div
                     onClick={() => { }}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/4.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <MessageSquare className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">View Inquiries</h3>
-                    </div>
-                </a>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
 
-                {/* 5. Sales History */}
-                <a
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <MessageSquare className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">View Inquiries</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div
                     onClick={() => navigate(`/my-shops/${shopId}/sales-history`)}
-                    className="group flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline"
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/6.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <History className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Sales History</h3>
-                    </div>
-                </a>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
 
-                {/* 6. Edit Shop Info (Modal Trigger) */}
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <History className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Sales History</h3>
+                        </div>
+                    </div>
+                </div>
+
                 <div
                     onClick={() => triggerModalAction('Edit Shop Info')}
-                    className="group  flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/5.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <Store className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Edit Shop Info</h3>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
+
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <Store className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Edit Shop Info</h3>
+                        </div>
                     </div>
                 </div>
 
-                {/* 6. Edit Shop Info (Modal Trigger) */}
                 <div
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenDeletePrompt(shopId)
-                    }}
-                    className="group  flex flex-col border-1 border-border-sub hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer "
+                    onClick={(e) => { e.stopPropagation(); handleOpenDeletePrompt(shopId) }}
+                    className="relative overflow-hidden bg-clip-padding group flex flex-col border-b-4 md:border-b-8 border-brand-gold/70 hover:bg-brand-gold/10 bg-[url('/images/8.png')] bg-cover bg-center bg-no-repeat rounded-2xl p-5 shadow-sm transition-all duration-300 cursor-pointer"
                 >
-                    <div className="w-full aspect-video bg-bg-secondary group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
-                        <Trash2 className="w-6 h-6 text-text-sub" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-sm font-bold text-text-main text-center">Delete Shop</h3>
+                    {/* The Absolute Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/60 pointer-events-none z-0" />
+
+                    {/* Card Content Wrapper */}
+                    <div className="relative z-10 flex flex-col w-full h-full">
+                        <div className="w-full aspect-video group-hover:bg-bg-black/40 transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center">
+                            <Trash2 className="w-6 h-6 md:w-8 md:h-8 text-text-white -mb-4" />
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="text-sm md:text-base font-semibold text-text-white text-center">Delete Shop</h3>
+                        </div>
                     </div>
                 </div>
+
+
 
             </div>
             <InventoryForm isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
