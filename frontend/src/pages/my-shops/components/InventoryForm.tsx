@@ -94,6 +94,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
 
     // Clean up all local string variables and close the view
     const handleCloseInventoryModal = (shoudClose?: boolean) => {
+        console.log('is closing')
         setFormData({
             itemName: '',
             description: '',
@@ -111,8 +112,11 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         setScanSuggestedName('');
         setScannerStep('camera');
 
-        if (shoudClose)
+
+        if (shoudClose) {
             onClose();
+        }
+
     };
 
     const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,10 +127,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         try {
             const optimizedWebpFile = await resizeAndConvertToWebPFile(file, 400, 0.7);
 
-            console.log("--- FRONTEND IMAGE VERIFICATION ---");
-            console.log("File Name:", optimizedWebpFile.name);        // Should end in .webp
-            console.log("Mime Type:", optimizedWebpFile.type);        // MUST be "image/webp"
-            console.log("Size on Wire:", (optimizedWebpFile.size / 1024).toFixed(2), "KB");
 
             setPhoto(optimizedWebpFile);
             setPhotoPreview(URL.createObjectURL(optimizedWebpFile));
@@ -217,8 +217,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const handleInventoryFormSubmit = async (e: any) => {
         e.preventDefault();
 
-        console.log('handled')
-
         // 🚀 NEW: only send visualClassKeys when the user actually corrected the
         // scanner's suggested name. If they accepted it as-is (or only touched
         // unit/price/stock — measurement edits don't count as a name correction),
@@ -230,7 +228,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         // scanSuggestedName is '' for manual-tab entries, so this is a no-op
         // (nameWasCorrected stays false) whenever the item wasn't scanned at all.
 
-        console.log('scanSuggestedName:', scanSuggestedName, formData.itemName, visualClassKeys);
         const nameWasCorrected = scanSuggestedName !== formData.itemName;
         const visualClassKeysToSend = nameWasCorrected ? visualClassKeys : [];
 
@@ -322,7 +319,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         <>
             <Modal
                 isOpen={isOpen}
-                onClose={handleCloseInventoryModal}
+                onClose={() => handleCloseInventoryModal(true)}
                 title={isEdit ? 'Update Item' : 'Add Item'}
                 subtitle={isEdit ? 'Update Items in your inventory' : 'Add Item to your inventory'}
             >
@@ -503,7 +500,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                     setPhoto(outcome.file);
                                                     setPhotoPreview(outcome.previewUrl);
 
-                                                    console.log(outcome, outcome.visualCandidateKeys);
+                                                    //console.log(outcome, outcome.visualCandidateKeys);
                                                     setVisualClassKeys(outcome.visualCandidateKeys);
 
                                                     // 🚀 Per your call: ignore outcome.status entirely here — even

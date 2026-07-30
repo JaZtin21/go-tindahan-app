@@ -56,8 +56,6 @@ export const ShopDetailDashboard = () => {
         state.myShops.shops.find((s: Shop) => s.id === id)
     );
 
-    console.log(shop, 'this is shop');
-
     // 2. RUN STANDALONE FALLBACK QUERY (Skips network roundtrips if shop is already cached in Redux)
     const { loading: isLoading, data, error } = useShopById(
         shopId,
@@ -70,8 +68,6 @@ export const ShopDetailDashboard = () => {
         isSubscribed
     )
 
-
-    console.log(metrics, 'this is metrics');
 
     // Format helper utility for financial readouts
     const formatCurrency = (value: number) => {
@@ -116,6 +112,8 @@ export const ShopDetailDashboard = () => {
 
 
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+
+    console.log(`isInventoryModalOpen: ${isInventoryModalOpen}`);
     const handleCloseInventoryModal = () => setIsInventoryModalOpen(false);
     const handleOpenInventoryModal = () => setIsInventoryModalOpen(true);
 
@@ -181,7 +179,7 @@ export const ShopDetailDashboard = () => {
         }
     };
 
-    const handleDeleteModalClose = ({ navigateBack }: { navigateBack: boolean }) => {
+    const handleDeleteModalClose = ({ navigateBack }: { navigateBack?: boolean }) => {
         setIsModalOpen(false);
         setIsSuccess(false);
         setIsConfirmingDelete(false);
@@ -620,7 +618,7 @@ export const ShopDetailDashboard = () => {
 
             <Modal
                 isOpen={isModalOpen}
-                onClose={handleDeleteModalClose}
+                onClose={() => handleDeleteModalClose({ navigateBack: false })}
                 title={isConfirmingDelete ? "Are you absolutely sure?" : (isSuccess ? "Success" : "Error")}
                 subtitle=""
                 isMobileVariant={false}
@@ -640,7 +638,7 @@ export const ShopDetailDashboard = () => {
 
                             <div className="flex gap-3 w-full mt-4">
                                 <button
-                                    onClick={handleDeleteModalClose}
+                                    onClick={() => handleDeleteModalClose({ navigateBack: false })}
                                     disabled={isDeleting}
                                     className="flex-1 px-4 py-2.5 bg-[var(--color-bg-primary-hover)] hover:bg-[var(--color-border-main)] text-[var(--color-text-sub)] border border-[var(--color-border-main)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
                                 >

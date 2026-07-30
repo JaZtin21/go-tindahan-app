@@ -31,6 +31,8 @@ const Modal = ({ isOpen, onClose, title, subtitle, children, isFullScreenModal, 
         exit: isMobile ? { y: '100%' } : { opacity: 0 }
     };
 
+    console.log('isopen', isOpen);
+
     if (typeof window === 'undefined') return null;
 
 
@@ -67,9 +69,11 @@ const Modal = ({ isOpen, onClose, title, subtitle, children, isFullScreenModal, 
 
                         // 👇 FIX 2: Set top elasticity to 0 to completely eliminate upward rubber-banding 
                         dragElastic={{ top: 0, bottom: 0.5 }}
-                        dragMomentum={false}
+                        dragMomentum={true}
                         onDragEnd={(_, info) => {
-                            if (info.offset.y > 140) onClose();
+                            if (info.offset.y > 140) {
+                                onClose();
+                            }
                         }}
                         className={`${unsetHeight ? 'unset' : 'h-full'} relative z-10 ${maxWidth ? maxWidth : 'md:max-w-lg'}  flex flex-col w-full overflow-hidden bg-bg-primary ${isFullScreenModal ? 'h-[100vh] md:h-[90vh]' : !isMobile ? 'max-h-[90vh] rounded-2xl' : 'max-h-[95vh] rounded-t-2xl'} md:rounded-2xl shadow-xl  pointer-events-auto `}
                     >
