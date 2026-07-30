@@ -2894,6 +2894,7 @@ func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, q
 }
 
 // GetShopDashboardMetrics is the resolver for the getShopDashboardMetrics field.
+// GetShopDashboardMetrics is the resolver for the getShopDashboardMetrics field.
 func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID string) (*model.ShopDashboardMetrics, error) {
 	// 1. SECURITY & AUTHN GATE
 	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
@@ -2905,7 +2906,7 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 		return nil, nil
 	}
 
-	// Verify the caller is the actual owner of the shop before executing intensive analytical scans
+	// Verify the caller is the actual owner of the shop
 	if err := utils.EnsureShopOwnership(ctx, r.Resolver.DB, shopID, currentUser.ID); err != nil {
 		utils.AddHistoryGraphQLError(ctx, err)
 		return nil, nil
@@ -2913,42 +2914,55 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 
 	var metrics model.ShopDashboardMetrics
 
-	// 2. WIDGET 1 & 2: CALCULATE TODAY'S GROSS SALES & GROWTH RATE VS SAME DAY LAST WEEK
-	// Compares today's running sales total to what was made during the exact same period 7 days ago.
+	// 2. WIDGET 1 & 2: CALCULATE MONDAY-TO-SUNDAY WEEKLY BREAKDOWNS + LOGGING VARIATION
+	// Compares running totals of the current week (from Monday to now) against the full previous Mon-Sun week block.
 	salesQuery := `
-		WITH metrics_today AS (
-			SELECT COALESCE(SUM(gross_sale), 0.0) as sales
-			FROM checkout_batches 
-			WHERE shop_id = $1 AND sold_at::timestamp >= CURRENT_DATE
-		),
-		metrics_last_week AS (
-			SELECT COALESCE(SUM(gross_sale), 0.0) as sales
+		WITH metrics_current_week AS (
+			SELECT COALESCE(SUM(gross_sale), 0.0) as sales 
 			FROM checkout_batches 
 			WHERE shop_id = $1 
-			  AND sold_at::timestamp >= CURRENT_DATE - INTERVAL '7 days'
-			  AND sold_at::timestamp < CURRENT_DATE - INTERVAL '6 days'
+			  AND sold_at::timestamp >= DATE_TRUNC('week', CURRENT_DATE)
+		),
+		metrics_last_week AS (
+			SELECT COALESCE(SUM(gross_sale), 0.0) as sales 
+			FROM checkout_batches 
+			WHERE shop_id = $1 
+			  AND sold_at::timestamp >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days'
+			  AND sold_at::timestamp < DATE_TRUNC('week', CURRENT_DATE)
 		)
-		SELECT t.sales, 
-		       CASE WHEN l.sales = 0 THEN 0.0 ELSE ((t.sales - l.sales) / l.sales) * 100.0 END
-		FROM metrics_today t, metrics_last_week l;
+		SELECT 
+			c.sales as this_week_sales,
+			l.sales as last_week_sales,
+			CASE WHEN l.sales = 0 THEN 0.0 ELSE ((c.sales - l.sales) / l.sales) * 100.0 END as growth_pct
+		FROM metrics_current_week c, metrics_last_week l;
 	`
+
+	var thisWeekSales, lastWeekSales float64
 	err := r.Resolver.DB.QueryRow(ctx, salesQuery, shopID).Scan(
-		&metrics.TodaysGrossSales,
+		&thisWeekSales,
+		&lastWeekSales,
 		&metrics.TodaysSalesGrowthPct,
 	)
 	if err != nil {
-		log.Printf("Error calculating daily revenue snapshot: %v", err)
+		log.Printf("[DASHBOARD LOG] Error calculating weekly revenue metrics: %v", err)
 		graphql.AddError(ctx, &gqlerror.Error{Message: "internal server error: revenue aggregation failure", Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"}})
 		return nil, nil
 	}
 
+	// Assign the tracked revenue parameter into the return struct
+	metrics.TodaysGrossSales = thisWeekSales
+
+	// ADDED DICTIONARY LOGGING: Displays performance matrices inside your console tracker
+	log.Printf("[DASHBOARD ANALYTICS] Shop ID: %s | This Week Total: ₱%.2f | Last Week Total: ₱%.2f | Computed Growth: %.2f%%",
+		shopID, thisWeekSales, lastWeekSales, metrics.TodaysSalesGrowthPct)
+
 	// 3. WIDGET 3: WEEKLY REVENUE GROWTH INDEX (This week vs Previous week)
-	// Balance Score metric. 100 means the store perfectly matched last week's raw performance.
 	weeklyQuery := `
 		WITH current_7_days AS (
 			SELECT COALESCE(SUM(gross_sale), 0.0) as total 
 			FROM checkout_batches 
-			WHERE shop_id = $1 AND sold_at::timestamp >= NOW() - INTERVAL '7 days'
+			WHERE shop_id = $1 
+			  AND sold_at::timestamp >= NOW() - INTERVAL '7 days'
 		),
 		previous_7_days AS (
 			SELECT COALESCE(SUM(gross_sale), 0.0) as total 
@@ -2957,7 +2971,7 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 			  AND sold_at::timestamp >= NOW() - INTERVAL '14 days' 
 			  AND sold_at::timestamp < NOW() - INTERVAL '7 days'
 		)
-		SELECT CASE WHEN p.total = 0 THEN 100.0 ELSE (c.total / p.total) * 100.0 END
+		SELECT CASE WHEN p.total = 0 THEN 100.0 ELSE (c.total / p.total) * 100.0 END 
 		FROM current_7_days c, previous_7_days p;
 	`
 	err = r.Resolver.DB.QueryRow(ctx, weeklyQuery, shopID).Scan(&metrics.WeeklyRevenueGrowthIndex)
@@ -2968,7 +2982,6 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 	}
 
 	// 4. WIDGET 4: AVERAGE TICKET SIZE (AOV)
-	// Calculates the average monetary transaction value passing through registers.
 	aovQuery := `
 		SELECT COALESCE(AVG(gross_sale), 0.0) 
 		FROM checkout_batches 
@@ -2982,14 +2995,14 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 	}
 
 	// 5. WIDGET 5: INVENTORY CAPITAL RATIO (Wholesale Cost vs Retail Value realization)
-	// Tracks how much capital liquidity is frozen in shelf stocks.
+	// FIXED: Wrapped the SUM computations inside COALESCE statements to catch NULL variables for empty shops safely.
 	capitalQuery := `
 		SELECT 
 			CASE 
-				WHEN SUM(selling_price * stock_quantity) = 0 THEN 0.0
-				ELSE (SUM(cost_price * stock_quantity) / SUM(selling_price * stock_quantity)) * 100.0 
-			END
-		FROM inventory_items
+				WHEN COALESCE(SUM(selling_price * stock_quantity), 0) = 0 THEN 0.0 
+				ELSE (COALESCE(SUM(cost_price * stock_quantity), 0.0) / COALESCE(SUM(selling_price * stock_quantity), 0.0)) * 100.0 
+			END 
+		FROM inventory_items 
 		WHERE shop_id = $1;
 	`
 	err = r.Resolver.DB.QueryRow(ctx, capitalQuery, shopID).Scan(&metrics.InventoryCapitalRatio)
@@ -3000,22 +3013,20 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 	}
 
 	// 6. WIDGET 6: PAST 7-DAY SALES HISTORY TREND ENGINE
-	// Generates a recursive calendar series sequence to output historical values or zero states.
 	trendQuery := `
 		WITH RECURSIVE days AS (
 			SELECT CURRENT_DATE - INTERVAL '6 days' AS calendar_day
 			UNION ALL
-			SELECT calendar_day + INTERVAL '1 day'
-			FROM days
-			WHERE calendar_day < CURRENT_DATE
+			SELECT calendar_day + INTERVAL '1 day' FROM days WHERE calendar_day < CURRENT_DATE
 		),
 		daily_sales AS (
 			SELECT 
 				sold_at::date AS sales_day,
 				COALESCE(SUM(gross_sale), 0.0) AS total_sales,
 				COALESCE(SUM(gross_profit), 0.0) AS total_profit
-			FROM checkout_batches
-			WHERE shop_id = $1 AND sold_at::timestamp >= CURRENT_DATE - INTERVAL '6 days'
+			FROM checkout_batches 
+			WHERE shop_id = $1 
+			  AND sold_at::timestamp >= CURRENT_DATE - INTERVAL '6 days'
 			GROUP BY sales_day
 		)
 		SELECT 
@@ -3056,6 +3067,5 @@ func (r *queryResolver) GetShopDashboardMetrics(ctx context.Context, shopID stri
 	}
 
 	metrics.WeeklySalesTrend = weeklySalesTrend
-
 	return &metrics, nil
 }

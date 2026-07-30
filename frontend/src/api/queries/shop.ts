@@ -973,13 +973,15 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
     const store = useStore() as Store;
     const inventoryTable = useTable('inventory', store);
     const checkoutTable = useTable('checkoutHistory', store);
-    const [remote, setRemote] = useState<{ loading: boolean; error: any; data?: any }>({ loading: false, error: null });
+    const [remote, setRemote] = useState<{ loading: boolean; error: any; data?: any }>({
+        loading: false,
+        error: null
+    });
 
     useEffect(() => {
         if (!isSubscribed || !shopId) return;
         let cancelled = false;
         setRemote({ loading: true, error: null });
-
         client
             .query({
                 query: GET_SHOP_DASHBOARD_METRICS_QUERY,
@@ -992,7 +994,6 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
             .catch((error: any) => {
                 if (!cancelled) setRemote({ loading: false, error });
             });
-
         return () => {
             cancelled = true;
         };
@@ -1005,24 +1006,46 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const todaysCheckouts = checkouts.filter((c) => new Date(c.soldAt) >= startOfToday);
-        const todaysGrossSales = todaysCheckouts.reduce((sum, c) => sum + (c.grossSale || 0), 0);
+        // =========================================================================
+        // MATCH BACKEND: CALCULATE MONDAY-START TIMESTAMPS (DATE_TRUNC('week'))
+        // =========================================================================
+        const currentDay = now.getDay();
+        // Convert Sunday (0) to 7 days back, otherwise use regular days since Monday
+        const daysSinceMonday = currentDay === 0 ? 6 : currentDay - 1;
 
-        const sevenDaysAgoStart = new Date(startOfToday);
-        sevenDaysAgoStart.setDate(sevenDaysAgoStart.getDate() - 7);
-        const sixDaysAgoStart = new Date(startOfToday);
-        sixDaysAgoStart.setDate(sixDaysAgoStart.getDate() - 6);
+        // This Week's Monday @ 12:00 AM
+        const thisWeekMondayStart = new Date(startOfToday);
+        thisWeekMondayStart.setDate(thisWeekMondayStart.getDate() - daysSinceMonday);
 
-        const sameDayLastWeekSales = checkouts
+        // Last Week's Monday @ 12:00 AM
+        const lastWeekMondayStart = new Date(thisWeekMondayStart);
+        lastWeekMondayStart.setDate(lastWeekMondayStart.getDate() - 7);
+
+        // =========================================================================
+        // MATCH BACKEND: REVENUE SNAPSHOT AGGREGATIONS
+        // =========================================================================
+
+        // 1. MATCH BACKEND: "todaysGrossSales" gets the full week-to-date sales (Monday to now)
+        const todaysGrossSales = checkouts
+            .filter((c) => new Date(c.soldAt) >= thisWeekMondayStart)
+            .reduce((sum, c) => sum + (c.grossSale || 0), 0);
+
+        // 2. Compute last week's complete Mon-Sun total performance snapshot
+        const lastWeekSalesTotal = checkouts
             .filter((c) => {
                 const d = new Date(c.soldAt);
-                return d >= sevenDaysAgoStart && d < sixDaysAgoStart;
+                return d >= lastWeekMondayStart && d < thisWeekMondayStart;
             })
             .reduce((sum, c) => sum + (c.grossSale || 0), 0);
 
-        const todaysSalesGrowthPct =
-            sameDayLastWeekSales === 0 ? 0 : ((todaysGrossSales - sameDayLastWeekSales) / sameDayLastWeekSales) * 100;
+        // 3. Compute growth rate using current week total progress vs last week total progress
+        const todaysSalesGrowthPct = lastWeekSalesTotal === 0
+            ? 0
+            : ((todaysGrossSales - lastWeekSalesTotal) / lastWeekSalesTotal) * 100;
 
+        // =========================================================================
+        // Rest of Layout Widgets Metrics Calculations
+        // =========================================================================
         const currentWeekStart = new Date(now);
         currentWeekStart.setDate(currentWeekStart.getDate() - 7);
         const previousWeekStart = new Date(now);
@@ -1031,6 +1054,7 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
         const current7DaysTotal = checkouts
             .filter((c) => new Date(c.soldAt) >= currentWeekStart)
             .reduce((sum, c) => sum + (c.grossSale || 0), 0);
+
         const previous7DaysTotal = checkouts
             .filter((c) => {
                 const d = new Date(c.soldAt);
@@ -1048,7 +1072,7 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
         const inventoryRetailValue = items.reduce((sum, i) => sum + (i.sellingPrice || 0) * (i.stockQuantity || 0), 0);
         const inventoryCapitalRatio = inventoryRetailValue > 0 ? (inventoryValue / inventoryRetailValue) * 100 : 0;
 
-        const weeklySalesTrend: DailySalesMetric[] = [];
+        const weeklySalesTrend: any[] = [];
         for (let i = 6; i >= 0; i--) {
             const dayStart = new Date(startOfToday);
             dayStart.setDate(dayStart.getDate() - i);
@@ -1068,9 +1092,9 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
             });
         }
 
-        const metrics: ShopDashboardMetrics = {
-            todaysGrossSales,
-            todaysSalesGrowthPct,
+        const metrics = {
+            todaysGrossSales,      // NOW MATCHES BACKEND: Holds the total weekly sales accumulated so far
+            todaysSalesGrowthPct,  // Recomputed to trace current week progress vs full last week
             weeklyRevenueGrowthIndex,
             averageTicketSize,
             inventoryCapitalRatio,
@@ -1080,8 +1104,10 @@ export function useShopDashboardMetrics(shopId: string, isSubscribed: boolean) {
         return { loading: false, error: null, data: { getShopDashboardMetrics: metrics } };
     }, [inventoryTable, checkoutTable, shopId]);
 
+
     return isSubscribed ? remote : offlineResult;
 }
+
 
 // =========================================================================
 // MUTATIONS — dual-write when isSubscribed (gated by

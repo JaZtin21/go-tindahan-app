@@ -82,14 +82,13 @@
     animation: wave-drift-front 6s linear infinite;
 }
 
-
 @keyframes wave-drift-back {
     from {
         transform: translateX(0);
     }
 
     to {
-        transform: translateX(-480px);
+        transform: translateX(-360px);
     }
 }
 
@@ -99,7 +98,7 @@
     }
 
     to {
-        transform: translateX(480px);
+        transform: translateX(360px);
     }
 }
 

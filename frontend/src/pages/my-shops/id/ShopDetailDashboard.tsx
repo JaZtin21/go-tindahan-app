@@ -283,6 +283,16 @@ export const ShopDetailDashboard = () => {
                                     <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
                                         {formatCurrency(todaysGrossSales)}
                                     </span>
+                                    <p className={`text-sm font-bold mt-2 ${(weeklySalesTrend.at(-1)?.grossSale || 0) === 0
+                                        ? 'text-text-muted'
+                                        : (weeklySalesTrend.at(-1)?.grossSale || 0) > 0
+                                            ? 'text-brand-green'
+                                            : 'text-brand-red'
+                                        }`}>
+                                        {/* Only show the "+" sign if sales are strictly greater than 0 */}
+                                        {(weeklySalesTrend.at(-1)?.grossSale || 0) > 0 && '+ '}
+                                        {formatCurrency(weeklySalesTrend.at(-1)?.grossSale || 0)} today
+                                    </p>
                                     <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
                                         {todaysSalesGrowthPct === 0 && todaysGrossSales > 0
                                             ? `+${formatCurrency(todaysGrossSales)} vs last week`
@@ -295,7 +305,7 @@ export const ShopDetailDashboard = () => {
                                 <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
                                     <TrendingUp className="w-4 h-4" />
                                 </div>
-                                <span className="text-2xl font-black text-text-main tracking-tight">Today's Sales</span>
+                                <span className="text-2xl font-black text-text-main tracking-tight">Weekly Sales</span>
                                 <span className="text-sm font-bold text-text-muted mt-1.5">Primary revenue scale</span>
                             </div>
                         </div>
@@ -389,16 +399,16 @@ export const ShopDetailDashboard = () => {
                 >
                     <g className="animate-wave-back-mobile">
                         <path
-                            d="M-720,80 C-480,30 -240,130 0,80 C240,30 480,130 720,80 C960,30 1200,130 1440,80 C1680,30 1920,130 2160,80 L2160,160 L-720,160 Z"
+                            d="M-720,65 C-480,25 -240,105 0,65 C240,25 480,105 720,65 C960,25 1200,105 1440,65 C1680,25 1920,105 2160,65 L2160,160 L-720,160 Z"
                             fill="var(--color-brand-gold)"
-                            opacity="0.10"
+                            opacity="0.14"
                         />
                     </g>
                     <g className="animate-wave-front-mobile">
                         <path
-                            d="M-720,100 C-480,150 -240,50 0,100 C240,150 480,50 720,100 C960,150 1200,50 1440,100 C1680,150 1920,50 2160,100 L2160,160 L-720,160 Z"
+                            d="M-720,105 C-480,145 -240,65 0,105 C240,145 480,65 720,105 C960,145 1200,65 1440,105 C1680,145 1920,65 2160,105 L2160,160 L-720,160 Z"
                             fill="var(--color-brand-gold)"
-                            opacity="0.18"
+                            opacity="0.25"
                         />
                     </g>
                 </svg>
@@ -412,16 +422,16 @@ export const ShopDetailDashboard = () => {
                 >
                     <g className="animate-wave-back">
                         <path
-                            d="M-480,80 C-360,30 -360,130 -240,80 C-120,30 -120,130 0,80 C120,30 120,130 240,80 C360,30 360,130 480,80 C600,30 600,130 720,80 C840,30 840,130 960,80 C1080,30 1080,130 1200,80 C1320,30 1320,130 1440,80 C1560,30 1560,130 1680,80 C1800,30 1800,130 1920,80 L1920,160 L-480,160 Z"
+                            d="M-480,65 C-360,25 -240,105 -120,65 C0,25 120,105 240,65 C360,25 480,105 600,65 C720,25 840,105 960,65 C1080,25 1200,105 1320,65 C1440,25 1560,105 1680,65 C1800,25 1920,105 2040,65 L2040,160 L-480,160 Z"
                             fill="var(--color-brand-gold)"
-                            opacity="0.10"
+                            opacity="0.14"
                         />
                     </g>
                     <g className="animate-wave-front">
                         <path
-                            d="M-480,110 C-360,160 -360,60 -240,110 C-120,160 -120,60 0,110 C120,160 120,60 240,110 C360,160 360,60 480,110 C600,160 600,60 720,110 C840,160 840,60 960,110 C1080,160 1080,60 1200,110 C1320,160 1320,60 1440,110 C1560,160 1560,60 1680,110 C1800,160 1800,60 1920,110 L1920,160 L-480,160 Z"
+                            d="M-480,105 C-360,145 -240,65 -120,105 C0,145 120,65 240,105 C360,145 480,65 600,105 C720,145 840,65 960,105 C1080,145 1200,65 1320,105 C1440,145 1560,65 1680,105 C1800,145 1920,65 2040,105 L2040,160 L-480,160 Z"
                             fill="var(--color-brand-gold)"
-                            opacity="0.18"
+                            opacity="0.25"
                         />
                     </g>
                 </svg>
