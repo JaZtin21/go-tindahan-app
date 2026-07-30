@@ -73,3 +73,60 @@
 
     --color-item-hover: #2a2a2a;
 }
+
+.animate-wave-back {
+    animation: wave-drift-back 4s linear infinite;
+}
+
+.animate-wave-front {
+    animation: wave-drift-front 6s linear infinite;
+}
+
+
+@keyframes wave-drift-back {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-480px);
+    }
+}
+
+@keyframes wave-drift-front {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(480px);
+    }
+}
+
+.animate-wave-back-mobile {
+    animation: wave-drift-back-mobile 4s linear infinite;
+}
+
+.animate-wave-front-mobile {
+    animation: wave-drift-front-mobile 6s linear infinite;
+}
+
+@keyframes wave-drift-back-mobile {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-720px);
+    }
+}
+
+@keyframes wave-drift-front-mobile {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(720px);
+    }
+}
