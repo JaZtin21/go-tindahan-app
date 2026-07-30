@@ -129,3 +129,24 @@
         transform: translateX(720px);
     }
 }
+
+@media (max-width: 767px) {
+
+    .font-black,
+    .font-extrabold,
+    .font-bold {
+        -webkit-text-stroke: 0.3px currentColor;
+        /* Dropped thickness down for cleaner mobile readability */
+        text-rendering: optimizeLegibility;
+    }
+}
+
+/* desktop view returns back to 100% clean rendering automatically */
+@media (min-width: 768px) {
+
+    .font-black,
+    .font-extrabold,
+    .font-bold {
+        -webkit-text-stroke: 0px transparent !important;
+    }
+}

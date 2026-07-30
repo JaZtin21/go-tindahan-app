@@ -12,9 +12,10 @@ import { useSearchShopProducts } from '~/api/queries';
 interface ScannerTabProps {
     shopId: string
     updateCart: () => void
+    isOpen?: boolean
 }
 let searchTimeoutId: ReturnType<typeof setTimeout>;
-export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
+export function ScannerTab({ shopId, updateCart, isOpen = true }: ScannerTabProps) {
     // 🚀 Component States
     // 'camera'  -> live camera / viewfinder
     // 'result'  -> AI Result card shown over the captured image
@@ -304,6 +305,7 @@ export function ScannerTab({ shopId, updateCart }: ScannerTabProps) {
                         onCaptureComplete={handleScannerCapture}
                         hasResult={scannerStep === 'result'}
                         onRetry={handleGoBackToCamera}
+                        active={isOpen}
                     />
 
                     {/* AI Result card, docked above the capture button row so both stay visible */}

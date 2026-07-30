@@ -216,12 +216,12 @@ export const ShopDetailDashboard = () => {
             <div className="relative overflow-hidden rounded-2xl mb-8">
 
                 {/* YOUR CARD — 100% as it was before any of this wave stuff, just remove mb-8 (wrapper has it now) */}
-                <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-8 pl-6 p-4 shadow-sm w-full overflow-x-auto min-h-[380px] flex items-center">
-                    <div className="flex items-center justify-start gap-12 min-w-[1300px] w-full box-border">
+                <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-10  p-4 shadow-sm w-full overflow-x-auto min-h-[180px] flex items-center">
+                    <div className="flex items-center justify-start md:gap-12 gap-3 min-w-[1300px] w-full box-border">
 
                         {/* SECTION 1 */}
-                        <div className="flex items-center gap-6 shrink-0 w-[420px]">
-                            <div className="w-80 h-80 relative flex items-center justify-center shrink-0">
+                        <div className="flex items-center gap-6 shrink-0 md:w-[420px] w-[unset]">
+                            <div className="w-65 h-65 md:w-80 md:h-80 relative flex items-center justify-center shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
@@ -283,7 +283,7 @@ export const ShopDetailDashboard = () => {
                                     <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
                                         {formatCurrency(todaysGrossSales)}
                                     </span>
-                                    <p className={`text-sm font-bold mt-2 ${(weeklySalesTrend.at(-1)?.grossSale || 0) === 0
+                                    <p className={`text-sm font-bold border-b-2 border-border-white/30 pb-1 mt-2 ${(weeklySalesTrend.at(-1)?.grossSale || 0) === 0
                                         ? 'text-text-muted'
                                         : (weeklySalesTrend.at(-1)?.grossSale || 0) > 0
                                             ? 'text-brand-green'
@@ -293,7 +293,7 @@ export const ShopDetailDashboard = () => {
                                         {(weeklySalesTrend.at(-1)?.grossSale || 0) > 0 && '+ '}
                                         {formatCurrency(weeklySalesTrend.at(-1)?.grossSale || 0)} today
                                     </p>
-                                    <p className={`text-xs font-extrabold mt-2 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
+                                    <p className={`text-xs font-extrabold mt-1 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
                                         {todaysSalesGrowthPct === 0 && todaysGrossSales > 0
                                             ? `+${formatCurrency(todaysGrossSales)} vs last week`
                                             : formatGrowthRate(todaysSalesGrowthPct)}
@@ -301,7 +301,7 @@ export const ShopDetailDashboard = () => {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col">
+                            <div className="flex flex-col max-w-[120px]">
                                 <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
                                     <TrendingUp className="w-4 h-4" />
                                 </div>
@@ -342,7 +342,7 @@ export const ShopDetailDashboard = () => {
                                 <div className="flex flex-col max-w-[200px]">
                                     <div className="flex gap-2">
                                         <ShoppingBag className="w-5 h-5 mt-1 text-brand-green" />
-                                        <span className="text-lg font-black text-text-sub tracking-tight">Customer spending avg. of</span>
+                                        <span className="text-lg font-black text-text-sub tracking-tight">Customer average spending</span>
                                     </div>
                                     <span className="text-xs text-text-muted font-bold mt-2 pl-6">{formatCurrency(averageTicketSize)} pesos</span>
                                 </div>

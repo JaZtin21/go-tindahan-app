@@ -90,9 +90,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
 
     // --- CAMERA & INTERNAL SCANNER STEP TRACKING STATES ---
     const [scannerStep, setScannerStep] = useState<'camera' | 'form'>('camera');
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-    const [stream, setStream] = useState<MediaStream | null>(null);
-    const [cameraError, setCameraError] = useState<string | null>(null);
 
 
     // Clean up all local string variables and close the view
@@ -310,39 +307,6 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     };
 
 
-    const startCamera = async () => {
-        setCameraError(null);
-        try {
-            console.log('starting camera');
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-            setStream(mediaStream);
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-            }
-        } catch (err: any) {
-            console.error("Camera access failed:", err);
-            setCameraError(err.message || "Could not access device camera.");
-        }
-    };
-
-    const stopCamera = () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-        }
-    };
-
-    // Watch the master activeTab to toggle hardware safely
-    useEffect(() => {
-        if (activeTab === 'scanner' && scannerStep === 'camera') {
-            startCamera();
-        } else {
-            stopCamera();
-        }
-        return () => stopCamera();
-    }, [activeTab, scannerStep]);
 
     const handleGoBackToCamera = () => {
         setPhoto(null);
@@ -533,6 +497,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             <ProductScannerCamera
                                                 shopId={shopId as string}
                                                 isSubscribed={isSubscribed}
+                                                active={isOpen}
                                                 searchInventory={false}
                                                 onCaptureComplete={(outcome: ScanOutcome) => {
                                                     setPhoto(outcome.file);

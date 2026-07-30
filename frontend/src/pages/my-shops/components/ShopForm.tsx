@@ -38,7 +38,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const isSubscribed = true
+    const isSubscribed = false
 
 
     const openModal = ({ isSuccess, type, error }: { isSuccess: boolean, type: string, error?: string }) => {

@@ -69,6 +69,16 @@ interface ProductScannerCameraProps {
     // whole point is the item doesn't exist yet). Defaults true so
     // ScannerTab/RestockScannerTab need no changes.
     searchInventory?: boolean;
+    // NEW: parent-controlled kill switch. Whatever ultimately owns the
+    // "is this modal/screen open" boolean (Checkout, Restock, InventoryForm,
+    // etc.) should pass that boolean straight through here, all the way
+    // down, no matter how many components sit in between. The moment it
+    // flips to false, the camera hardware is released — regardless of
+    // whether this component happens to unmount at the same time or not.
+    // This is necessary because some Modal implementations keep children
+    // mounted and only hide them visually, which means unmount-based
+    // cleanup (the effect below) would otherwise never run.
+    active?: boolean;
 }
 
 const IMG_SIZE = 224;
@@ -77,9 +87,27 @@ const TOP_N_CANDIDATES = 10;
 const VISUAL_CANDIDATE_KEY_LIMIT = 5;
 const SEARCH_RESULT_LIMIT = 7;
 
-export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, hasResult = false, onRetry, searchInventory = true }: ProductScannerCameraProps) => {
+export const ProductScannerCamera = ({
+    shopId,
+    isSubscribed,
+    onCaptureComplete,
+    hasResult = false,
+    onRetry,
+    searchInventory = true,
+    active = true,
+}: ProductScannerCameraProps) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const [stream, setStream] = useState<MediaStream | null>(null);
+
+    // 🚀 streamRef mirrors `stream` state but is mutated synchronously and in
+    // place. `stopCamera` reads from this instead of the `stream` state
+    // variable, because a closure over `stream` captured at effect-setup
+    // time can go stale (startCamera is async — by the time getUserMedia
+    // resolves and setStream(...) fires, an earlier-captured cleanup closure
+    // may still be holding a null `stream` and silently no-op). Reading a
+    // ref always gets the true current value regardless of which render's
+    // closure is calling stopCamera.
+    const streamRef = useRef<MediaStream | null>(null);
+
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isPredicting, setIsPredicting] = useState(false);
     const [loadPhase, setLoadPhase] = useState<'model' | 'names' | 'embeddings' | 'ocr' | 'ready' | 'error' | 'offline'>('model');
@@ -140,6 +168,11 @@ export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, 
     };
 
     const startCamera = async () => {
+        // 🚀 Guard: never open the camera on behalf of a parent that has
+        // already told us it's inactive (e.g. loadPhase flips to 'ready'
+        // right as/after the parent modal closes).
+        if (!active) return;
+
         setCameraError(null);
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             setCameraError("Webcams are blocked unless using localhost or HTTPS.");
@@ -152,12 +185,19 @@ export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, 
                 audio: false
             });
 
+            // If `active` flipped to false while we were awaiting permission,
+            // don't attach the stream — immediately release it instead.
+            if (!active) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                return;
+            }
+
             if (videoRef.current) {
                 videoRef.current.pause();
                 videoRef.current.srcObject = null;
             }
 
-            setStream(mediaStream);
+            streamRef.current = mediaStream;
 
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
@@ -179,18 +219,31 @@ export const ProductScannerCamera = ({ shopId, isSubscribed, onCaptureComplete, 
     };
 
     const stopCamera = () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
+        if (streamRef.current) {
+            console.log('[ProductScannerCamera] stopping camera tracks');
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
         }
     };
 
     useEffect(() => {
-        if (isReady && loadPhase === 'ready') {
+        if (isReady && loadPhase === 'ready' && active) {
+            console.log('[ProductScannerCamera] starting camera');
             startCamera();
         }
         return () => stopCamera();
     }, [isReady, loadPhase]);
+
+    // 🚀 NEW: parent-driven stop, independent of our own mount lifecycle.
+    // This is what actually fixes "modal closes but camera light stays on"
+    // when the Modal component keeps children mounted and only hides them
+    // visually — that scenario never runs the effect cleanup above, so we
+    // need a dedicated effect that reacts to `active` directly.
+    useEffect(() => {
+        if (!active) {
+            stopCamera();
+        }
+    }, [active]);
 
     const preprocessImage = (imgElement: HTMLImageElement) => {
         return tf.tidy(() => {

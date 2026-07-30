@@ -27,14 +27,14 @@ export const App = () => {
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
 
-
+          <Route path="/my-shops" element={<MyShops />} />
+          {/* ADDED: Dynamic unprotected route for individual shop dashboards */}
+          <Route path="/my-shops/:id" element={<ShopDetailDashboard />} />
+          <Route path="/my-shops/:shopId/inventory" element={<InventoryPage />} />
+          <Route path="/my-shops/:shopId/sales-history" element={<SalesHistoryPage />} />
           {/* Protected routes */}
           <Route element={<ProtectedRouteGuard />}>
-            <Route path="/my-shops" element={<MyShops />} />
-            {/* ADDED: Dynamic unprotected route for individual shop dashboards */}
-            <Route path="/my-shops/:id" element={<ShopDetailDashboard />} />
-            <Route path="/my-shops/:shopId/inventory" element={<InventoryPage />} />
-            <Route path="/my-shops/:shopId/sales-history" element={<SalesHistoryPage />} />
+
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/scan" element={<ScanPage />} />
           </Route>

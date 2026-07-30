@@ -93,7 +93,7 @@ export default function Checkout({ isOpen, onClose }: { isOpen: boolean, onClose
                         )}
                         {/* AI SCANNER TAB */}
                         {activeTab === 'scanner' && (
-                            <ScannerTab shopId={shopId || ""} updateCart={() => getCartItems(shopId || "")} />
+                            <ScannerTab shopId={shopId || ""} updateCart={() => getCartItems(shopId || "")} isOpen={isOpen} />
                         )}
                         {/* CHECKOUT TAB */}
                         {activeTab === 'checkout' && (

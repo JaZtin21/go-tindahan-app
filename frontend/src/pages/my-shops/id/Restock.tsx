@@ -82,7 +82,7 @@ export default function Restock({ isOpen, onClose }: { isOpen: boolean, onClose:
                         )}
                         {/* AI SCANNER TAB */}
                         {activeTab === 'scanner' && (
-                            <RestockScannerTab shopId={shopId || ""} />
+                            <RestockScannerTab shopId={shopId || ""} isOpen={isOpen} />
                         )}
 
                     </div>

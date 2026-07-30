@@ -10,11 +10,12 @@ import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
 
 interface ScannerTabProps {
     shopId: string
+    isOpen?: boolean
 }
 
 let searchTimeoutId: ReturnType<typeof setTimeout>;
 
-export function RestockScannerTab({ shopId }: ScannerTabProps) {
+export function RestockScannerTab({ shopId, isOpen }: ScannerTabProps) {
     // 🚀 Component States
     // 'camera'  -> live camera / viewfinder
     // 'result'  -> AI Result card shown over the captured image (NEW)
@@ -26,7 +27,7 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = true;
+    const isSubscribed = false;
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
@@ -286,6 +287,7 @@ export function RestockScannerTab({ shopId }: ScannerTabProps) {
                         onCaptureComplete={handleScannerCapture}
                         hasResult={scannerStep === 'result'}
                         onRetry={handleGoBackToCamera}
+                        active={isOpen}
                     />
 
                     {/* AI Result card, docked above the capture button row so both stay visible */}
