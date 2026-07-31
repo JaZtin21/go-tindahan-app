@@ -229,7 +229,13 @@ export const ShopDetailDashboard = () => {
                     <ArrowLeft size={16} strokeWidth={2.5} />
                     <span className="">Go Back to My Shops</span>
                 </button>
-                <span className="text-xs font-bold text-text-muted">Live Tracking Active</span>
+                <span className="flex items-center gap-1.5 text-xs font-bold text-text-muted">
+                    <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-green opacity-75"></span>
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-green"></span>
+                    </span>
+                    Live Tracking Active
+                </span>
             </div>
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
@@ -722,6 +728,15 @@ export const ShopDetailDashboard = () => {
                 </div>
 
             </div>
+            <button
+                type="button"
+                onClick={handleOpenCheckoutModal}
+                aria-label="Someone is buying"
+                title="Someone is buying"
+                className="md:hidden fixed bottom-6 right-4 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-brand-gold text-white shadow-lg hover:brightness-95 transition-all duration-200 cursor-pointer active:scale-95"
+            >
+                <ShoppingCart size={24} strokeWidth={2.25} className="-ml-0.5" />
+            </button>
             <InventoryForm isOpen={isInventoryModalOpen} onClose={handleCloseInventoryModal} />
             <Checkout isOpen={isCheckoutModalOpen} onClose={handleCloseCheckoutModal} />
             <Restock isOpen={isRestockModalOpen} onClose={handleCloseRestockModal} />
