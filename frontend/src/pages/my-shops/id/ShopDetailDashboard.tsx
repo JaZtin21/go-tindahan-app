@@ -32,6 +32,8 @@ import {
     ShoppingBag,
     Coins,
     Activity,
+    Eye,
+    EyeOff,
 } from 'lucide-react';
 import { ShoppingCart, PlusCircle, Package, MessageSquare, Store, ArrowLeft, History, TriangleAlert, X, Check, Trash2 } from 'lucide-react';
 import { setAddShopModalOpen } from '~/store/uiSlice';
@@ -66,6 +68,29 @@ export const ShopDetailDashboard = () => {
         shopId,
         isSubscribed
     )
+
+    // --- NEW: Toggle visibility of the metrics/charts panel (persisted per-shop in localStorage) ---
+    const chartsVisibilityStorageKey = `shopDashboard:${shopId}:chartsVisible`;
+
+    const [isChartsVisible, setIsChartsVisible] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return true;
+        try {
+            const stored = window.localStorage.getItem(chartsVisibilityStorageKey);
+            return stored === null ? true : stored === 'true';
+        } catch {
+            return true;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(chartsVisibilityStorageKey, String(isChartsVisible));
+        } catch {
+            // localStorage may be unavailable (e.g. private browsing); fail silently
+        }
+    }, [isChartsVisible, chartsVisibilityStorageKey]);
+
+    const toggleChartsVisibility = () => setIsChartsVisible((prev) => !prev);
 
 
     // Format helper utility for financial readouts
@@ -210,230 +235,317 @@ export const ShopDetailDashboard = () => {
             {/* --- RECHARTS-DRIVEN 2.5x SCALE METRICS PANEL --- */}
             {/* MAIN CONTAINER: Handles clear, scrollable layout blocks seamlessly */}
             {/* WRAPPER — new, outermost. Only job: clip + host the wave. No padding, no scroll, nothing else. */}
-            <div className="relative overflow-hidden rounded-2xl mb-8">
+            {isChartsVisible ? (
+                <div className="relative overflow-hidden rounded-2xl mb-8">
 
-                {/* YOUR CARD — 100% as it was before any of this wave stuff, just remove mb-8 (wrapper has it now) */}
-                <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-10  p-4 shadow-sm w-full overflow-x-auto min-h-[180px] flex items-center">
-                    <div className="flex items-center justify-start md:gap-12 gap-3 min-w-[1300px] w-full box-border">
+                    {/* --- FLOATING VISIBILITY TOGGLE — pinned to upper-right of the charts container --- */}
+                    <button
+                        type="button"
+                        onClick={toggleChartsVisibility}
+                        aria-pressed={isChartsVisible}
+                        aria-label={isChartsVisible ? 'Hide charts' : 'Show charts'}
+                        title={isChartsVisible ? 'Hide charts' : 'Show charts'}
+                        className="absolute top-3 right-3 z-30 flex items-center justify-center w-8 h-8 rounded-xl border border-brand-gold/50 bg-bg-primary/80 backdrop-blur-sm text-text-muted hover:text-text-main hover:bg-brand-gold/10 transition-all duration-200 cursor-pointer active:scale-95"
+                    >
+                        <Eye size={16} strokeWidth={2.5} />
+                    </button>
 
-                        {/* SECTION 1 */}
-                        <div className="flex items-center gap-6 shrink-0 md:w-[420px] w-[unset]">
-                            <div className="w-65 h-65 md:w-80 md:h-80 relative flex items-center justify-center shrink-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={[{ value: 100 }]}
-                                            dataKey="value"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius="84%"
-                                            outerRadius="100%"
-                                            startAngle={90}
-                                            endAngle={-270}
-                                            stroke="none"
-                                            fill={
-                                                todaysGrossSales === 0 || todaysSalesGrowthPct === -100
-                                                    ? 'var(--color-text-muted)'
-                                                    : todaysSalesGrowthPct === 0
+                    {/* YOUR CARD — 100% as it was before any of this wave stuff, just remove mb-8 (wrapper has it now) */}
+                    <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl md:p-10  p-4 shadow-sm w-full overflow-x-auto min-h-[180px] flex items-center">
+                        <div className="flex items-center justify-start md:gap-12 gap-3 min-w-[1300px] w-full box-border">
+
+                            {/* SECTION 1 */}
+                            <div className="flex items-center gap-6 shrink-0 md:w-[420px] w-[unset]">
+                                <div className="w-65 h-65 md:w-80 md:h-80 relative flex items-center justify-center shrink-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={[{ value: 100 }]}
+                                                dataKey="value"
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius="84%"
+                                                outerRadius="100%"
+                                                startAngle={90}
+                                                endAngle={-270}
+                                                stroke="none"
+                                                fill={
+                                                    todaysGrossSales === 0 || todaysSalesGrowthPct === -100
                                                         ? 'var(--color-text-muted)'
-                                                        : 'var(--color-text-muted)'
-                                            }
-                                            opacity={
-                                                todaysGrossSales === 0 || todaysSalesGrowthPct === -100 || todaysSalesGrowthPct === 0
-                                                    ? 0.2
-                                                    : 0.2
-                                            }
-                                            cornerRadius={10}
-                                        />
-                                        <Pie
-                                            data={[{
-                                                value: todaysGrossSales === 0
-                                                    ? 0
-                                                    : todaysSalesGrowthPct === 0
-                                                        ? Math.min((todaysGrossSales / 1000) * 100, 100)
-                                                        : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
-                                            }]}
-                                            dataKey="value"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius="84%"
-                                            outerRadius="100%"
-                                            startAngle={90}
-                                            endAngle={90 - (360 * ((
-                                                todaysGrossSales === 0
-                                                    ? 0
-                                                    : todaysSalesGrowthPct === 0
-                                                        ? Math.min((todaysGrossSales / 1000) * 100, 100)
-                                                        : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
-                                            ) / 100))}
-                                            stroke="none"
-                                            fill={todaysGrossSales === 0 ? 'transparent' : 'var(--color-brand-green)'}
-                                            cornerRadius={10}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-
-                                <div className="absolute text-center flex flex-col items-center justify-center select-none pointer-events-none">
-                                    <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1">
-                                        {shop?.shopName}
-                                    </span>
-                                    <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
-                                        {formatCurrency(todaysGrossSales)}
-                                    </span>
-                                    <p className={`text-sm font-bold border-b-2 border-border-white/30 pb-1 mt-2 ${(weeklySalesTrend.at(-1)?.grossSale || 0) === 0
-                                        ? 'text-text-muted'
-                                        : (weeklySalesTrend.at(-1)?.grossSale || 0) > 0
-                                            ? 'text-brand-green'
-                                            : 'text-brand-red'
-                                        }`}>
-                                        {/* Only show the "+" sign if sales are strictly greater than 0 */}
-                                        {(weeklySalesTrend.at(-1)?.grossSale || 0) > 0 && '+ '}
-                                        {formatCurrency(weeklySalesTrend.at(-1)?.grossSale || 0)} today
-                                    </p>
-                                    <p className={`text-xs font-extrabold mt-1 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
-                                        {todaysSalesGrowthPct === 0 && todaysGrossSales > 0
-                                            ? `+${formatCurrency(todaysGrossSales)} vs last week`
-                                            : formatGrowthRate(todaysSalesGrowthPct)}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col max-w-[120px]">
-                                <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
-                                    <TrendingUp className="w-4 h-4" />
-                                </div>
-                                <span className="text-2xl font-black text-text-main tracking-tight">Weekly Sales</span>
-                                <span className="text-sm font-bold text-text-muted mt-1.5">Primary revenue scale</span>
-                            </div>
-                        </div>
-
-                        {/* SECTION 2 */}
-                        <div className="flex flex-col gap-10 shrink-0 justify-center">
-                            <div className="flex items-center gap-6">
-                                <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-gold)' }]} startAngle={90} endAngle={-270}>
-                                            <RadialBar background={{ fill: 'var(--color-brand-gold)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
-                                        </RadialBarChart>
+                                                        : todaysSalesGrowthPct === 0
+                                                            ? 'var(--color-text-muted)'
+                                                            : 'var(--color-text-muted)'
+                                                }
+                                                opacity={
+                                                    todaysGrossSales === 0 || todaysSalesGrowthPct === -100 || todaysSalesGrowthPct === 0
+                                                        ? 0.2
+                                                        : 0.2
+                                                }
+                                                cornerRadius={10}
+                                            />
+                                            <Pie
+                                                data={[{
+                                                    value: todaysGrossSales === 0
+                                                        ? 0
+                                                        : todaysSalesGrowthPct === 0
+                                                            ? Math.min((todaysGrossSales / 1000) * 100, 100)
+                                                            : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
+                                                }]}
+                                                dataKey="value"
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius="84%"
+                                                outerRadius="100%"
+                                                startAngle={90}
+                                                endAngle={90 - (360 * ((
+                                                    todaysGrossSales === 0
+                                                        ? 0
+                                                        : todaysSalesGrowthPct === 0
+                                                            ? Math.min((todaysGrossSales / 1000) * 100, 100)
+                                                            : Math.min(Math.max(0, 100 + todaysSalesGrowthPct), 100)
+                                                ) / 100))}
+                                                stroke="none"
+                                                fill={todaysGrossSales === 0 ? 'transparent' : 'var(--color-brand-green)'}
+                                                cornerRadius={10}
+                                            />
+                                        </PieChart>
                                     </ResponsiveContainer>
-                                    <span className="absolute text-base font-black text-text-main">{weeklyRevenueGrowthIndex.toFixed(0)}%</span>
-                                </div>
-                                <div className="flex flex-col max-w-[200px]">
-                                    <div className="flex items-center gap-2">
-                                        <BarChart3 className="w-4 h-4 text-brand-gold" />
-                                        <span className="text-lg font-black text-text-sub tracking-tight">7-Day Growth Index</span>
+
+                                    <div className="absolute text-center flex flex-col items-center justify-center select-none pointer-events-none">
+                                        <span className="text-md line-clamp-2 font-bold text-text-muted tracking-tight max-w-[160px] mb-1">
+                                            {shop?.shopName}
+                                        </span>
+                                        <span className="text-4xl font-black text-text-main tracking-tighter leading-none mt-2">
+                                            {formatCurrency(todaysGrossSales)}
+                                        </span>
+                                        <p className={`text-sm font-bold border-b-2 border-border-white/30 pb-1 mt-2 ${(weeklySalesTrend.at(-1)?.grossSale || 0) === 0
+                                            ? 'text-text-muted'
+                                            : (weeklySalesTrend.at(-1)?.grossSale || 0) > 0
+                                                ? 'text-brand-green'
+                                                : 'text-brand-red'
+                                            }`}>
+                                            {/* Only show the "+" sign if sales are strictly greater than 0 */}
+                                            {(weeklySalesTrend.at(-1)?.grossSale || 0) > 0 && '+ '}
+                                            {formatCurrency(weeklySalesTrend.at(-1)?.grossSale || 0)} today
+                                        </p>
+                                        <p className={`text-xs font-extrabold mt-1 ${todaysSalesGrowthPct >= 0 ? 'text-brand-green' : 'text-brand-red'}`}>
+                                            {todaysSalesGrowthPct === 0 && todaysGrossSales > 0
+                                                ? `+${formatCurrency(todaysGrossSales)} vs last week`
+                                                : formatGrowthRate(todaysSalesGrowthPct)}
+                                        </p>
                                     </div>
-                                    <span className="text-xs text-text-muted font-bold mt-2 pl-6">Growth of sales over the last 7 days</span>
+                                </div>
+
+                                <div className="flex flex-col max-w-[120px]">
+                                    <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
+                                        <TrendingUp className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-2xl font-black text-text-main tracking-tight">Weekly Sales</span>
+                                    <span className="text-sm font-bold text-text-muted mt-1.5">Primary revenue scale</span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
-                                <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
+                            {/* SECTION 2 */}
+                            <div className="flex flex-col gap-10 shrink-0 justify-center">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: Math.min(weeklyRevenueGrowthIndex, 100), fill: 'var(--color-brand-gold)' }]} startAngle={90} endAngle={-270}>
+                                                <RadialBar background={{ fill: 'var(--color-brand-gold)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
+                                            </RadialBarChart>
+                                        </ResponsiveContainer>
+                                        <span className="absolute text-base font-black text-text-main">{weeklyRevenueGrowthIndex.toFixed(0)}%</span>
+                                    </div>
+                                    <div className="flex flex-col max-w-[200px]">
+                                        <div className="flex items-center gap-2">
+                                            <BarChart3 className="w-4 h-4 text-brand-gold" />
+                                            <span className="text-lg font-black text-text-sub tracking-tight">7-Day Growth Index</span>
+                                        </div>
+                                        <span className="text-xs text-text-muted font-bold mt-2 pl-6">Growth of sales over the last 7 days</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-6">
+                                    <div className="w-35 h-35 relative flex items-center justify-center shrink-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: 100, fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270}>
+                                                <RadialBar background={{ fill: 'var(--color-brand-red)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
+                                            </RadialBarChart>
+                                        </ResponsiveContainer>
+                                        <span className="absolute text-xs font-black text-text-main">{formatCurrency(averageTicketSize)}</span>
+                                    </div>
+                                    <div className="flex flex-col max-w-[200px]">
+                                        <div className="flex gap-2">
+                                            <ShoppingBag className="w-5 h-5 mt-1 text-brand-green" />
+                                            <span className="text-lg font-black text-text-sub tracking-tight">Customer average spending</span>
+                                        </div>
+                                        <span className="text-xs text-text-muted font-bold mt-2 pl-6">{formatCurrency(averageTicketSize)} pesos</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION 3 */}
+                            <div className="flex flex-col shrink-0 justify-center h-44 px-8 w-[320px] border-r-2 border-border-white/40">
+                                <div className="w-full h-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={14} data={[{ value: 100, fill: 'var(--color-brand-green)' }]} startAngle={90} endAngle={-270}>
-                                            <RadialBar background={{ fill: 'var(--color-brand-red)', opacity: 0.15 }} dataKey="value" cornerRadius={6} />
-                                        </RadialBarChart>
+                                        <ComposedChart data={weeklySalesTrend} margin={{ top: 15, right: 5, left: 5, bottom: 5 }} >
+                                            <XAxis dataKey="dayName" axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: '800' }} dy={8} />
+                                            <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.04)', radius: 6 }} content={({ active, payload }) => { if (active && payload && payload.length) { const data = payload[0].payload; return (<div className="p-3 bg-white rounded-xl border border-slate-200 font-bold flex flex-col gap-1 shadow-md select-none text-xs"> <p className="text-text-muted font-black mb-0.5">{data.formattedDate}</p> <p className="text-slate-800">Sales: {formatCurrency(data.grossSale)}</p> <p className="text-brand-green">Profit: {formatCurrency(data.grossProfit)}</p> </div>); } return null; }} />
+                                            <Bar dataKey="grossSale" fill="var(--color-brand-green)" radius={[4, 4, 0, 0]} barSize={20} />
+                                            <Line type="monotone" dataKey="grossSale" stroke='rgba(148, 163, 184, 0.2)' strokeWidth={2.5} dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 3 }} activeDot={{ r: 5 }} />
+                                        </ComposedChart>
                                     </ResponsiveContainer>
-                                    <span className="absolute text-xs font-black text-text-main">{formatCurrency(averageTicketSize)}</span>
                                 </div>
-                                <div className="flex flex-col max-w-[200px]">
-                                    <div className="flex gap-2">
-                                        <ShoppingBag className="w-5 h-5 mt-1 text-brand-green" />
-                                        <span className="text-lg font-black text-text-sub tracking-tight">Customer average spending</span>
+                                <p className="text-[10px] text-center font-bold text-text-muted mt-2 uppercase tracking-wider select-none flex items-center justify-center gap-1">
+                                    <Activity className="w-3 h-3 text-text-muted/60" /> 7-Day Sales & Profit Trend
+                                </p>
+                            </div>
+
+                            {/* SECTION 4 */}
+                            <div className="flex items-center gap-10 shrink-0 w-[450px] justify-end pr-8">
+                                <div className="flex flex-col text-right select-none items-end">
+                                    <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
+                                        <Coins className="w-4 h-4" />
                                     </div>
-                                    <span className="text-xs text-text-muted font-bold mt-2 pl-6">{formatCurrency(averageTicketSize)} pesos</span>
+                                    <span className="text-2xl font-black text-text-main tracking-tight"> Expected Profit Yield </span>
+                                    <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight"> {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value </span>
+                                </div>
+                                <div className="w-52 h-52 relative flex items-center justify-center shrink-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={[{ value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' }, { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }]} dataKey="value" cx="50%" cy="50%" innerRadius="75%" outerRadius="95%" startAngle={90} endAngle={-270} stroke="none" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <span className="absolute text-xl font-black text-text-main"> {(100 - inventoryCapitalRatio).toFixed(0)}% </span>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* SECTION 3 */}
-                        <div className="flex flex-col shrink-0 justify-center h-44 px-8 w-[320px] border-r-2 border-border-white/40">
-                            <div className="w-full h-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={weeklySalesTrend} margin={{ top: 15, right: 5, left: 5, bottom: 5 }} >
-                                        <XAxis dataKey="dayName" axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1.5 }} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: '800' }} dy={8} />
-                                        <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.04)', radius: 6 }} content={({ active, payload }) => { if (active && payload && payload.length) { const data = payload[0].payload; return (<div className="p-3 bg-white rounded-xl border border-slate-200 font-bold flex flex-col gap-1 shadow-md select-none text-xs"> <p className="text-text-muted font-black mb-0.5">{data.formattedDate}</p> <p className="text-slate-800">Sales: {formatCurrency(data.grossSale)}</p> <p className="text-brand-green">Profit: {formatCurrency(data.grossProfit)}</p> </div>); } return null; }} />
-                                        <Bar dataKey="grossSale" fill="var(--color-brand-green)" radius={[4, 4, 0, 0]} barSize={20} />
-                                        <Line type="monotone" dataKey="grossSale" stroke='rgba(148, 163, 184, 0.2)' strokeWidth={2.5} dot={{ fill: 'rgba(148, 163, 184, 0.2)', r: 3 }} activeDot={{ r: 5 }} />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <p className="text-[10px] text-center font-bold text-text-muted mt-2 uppercase tracking-wider select-none flex items-center justify-center gap-1">
-                                <Activity className="w-3 h-3 text-text-muted/60" /> 7-Day Sales & Profit Trend
-                            </p>
                         </div>
-
-                        {/* SECTION 4 */}
-                        <div className="flex items-center gap-10 shrink-0 w-[450px] justify-end pr-8">
-                            <div className="flex flex-col text-right select-none items-end">
-                                <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green mb-2">
-                                    <Coins className="w-4 h-4" />
-                                </div>
-                                <span className="text-2xl font-black text-text-main tracking-tight"> Expected Profit Yield </span>
-                                <span className="text-xs font-bold text-text-muted mt-1.5 max-w-[200px] leading-tight"> {(100 - inventoryCapitalRatio).toFixed(0)}% goes to your pocket on total shelf value </span>
-                            </div>
-                            <div className="w-52 h-52 relative flex items-center justify-center shrink-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={[{ value: Math.max(0, 100 - inventoryCapitalRatio), fill: 'var(--color-brand-green)' }, { value: inventoryCapitalRatio, fill: 'var(--color-brand-red)' }]} dataKey="value" cx="50%" cy="50%" innerRadius="75%" outerRadius="95%" startAngle={90} endAngle={-270} stroke="none" />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <span className="absolute text-xl font-black text-text-main"> {(100 - inventoryCapitalRatio).toFixed(0)}% </span>
-                            </div>
-                        </div>
-
                     </div>
-                </div>
 
-                {/* WAVE — lives in the WRAPPER now, not inside the padded/scrolling card.
+                    {/* WAVE — lives in the WRAPPER now, not inside the padded/scrolling card.
         w-full here = the wrapper's width = the card's true visible border-box width, always. */}
-                {/* MOBILE WAVE — fewer, bigger bumps. Visible below md breakpoint only. */}
-                <svg
-                    className="block md:hidden absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
-                    viewBox="0 0 1440 160"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                >
-                    <g className="animate-wave-back-mobile">
-                        <path
-                            d="M-720,65 C-480,25 -240,105 0,65 C240,25 480,105 720,65 C960,25 1200,105 1440,65 C1680,25 1920,105 2160,65 L2160,160 L-720,160 Z"
-                            fill="var(--color-brand-gold)"
-                            opacity="0.14"
-                        />
-                    </g>
-                    <g className="animate-wave-front-mobile">
-                        <path
-                            d="M-720,105 C-480,145 -240,65 0,105 C240,145 480,65 720,105 C960,145 1200,65 1440,105 C1680,145 1920,65 2160,105 L2160,160 L-720,160 Z"
-                            fill="var(--color-brand-gold)"
-                            opacity="0.25"
-                        />
-                    </g>
-                </svg>
+                    {/* MOBILE WAVE — fewer, bigger bumps. Visible below md breakpoint only. */}
+                    <svg
+                        className="block md:hidden absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
+                        viewBox="0 0 1440 160"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    >
+                        <g className="animate-wave-back-mobile">
+                            <path
+                                d="M-720,65 C-480,25 -240,105 0,65 C240,25 480,105 720,65 C960,25 1200,105 1440,65 C1680,25 1920,105 2160,65 L2160,160 L-720,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.14"
+                            />
+                        </g>
+                        <g className="animate-wave-front-mobile">
+                            <path
+                                d="M-720,105 C-480,145 -240,65 0,105 C240,145 480,65 720,105 C960,145 1200,65 1440,105 C1680,145 1920,65 2160,105 L2160,160 L-720,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.25"
+                            />
+                        </g>
+                    </svg>
 
-                {/* DESKTOP WAVE — original density, just taller amplitude. Visible md and up only. */}
-                <svg
-                    className="hidden md:block absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
-                    viewBox="0 0 1440 160"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                >
-                    <g className="animate-wave-back">
-                        <path
-                            d="M-480,65 C-360,25 -240,105 -120,65 C0,25 120,105 240,65 C360,25 480,105 600,65 C720,25 840,105 960,65 C1080,25 1200,105 1320,65 C1440,25 1560,105 1680,65 C1800,25 1920,105 2040,65 L2040,160 L-480,160 Z"
-                            fill="var(--color-brand-gold)"
-                            opacity="0.14"
-                        />
-                    </g>
-                    <g className="animate-wave-front">
-                        <path
-                            d="M-480,105 C-360,145 -240,65 -120,105 C0,145 120,65 240,105 C360,145 480,65 600,105 C720,145 840,65 960,105 C1080,145 1200,65 1320,105 C1440,145 1560,65 1680,105 C1800,145 1920,65 2040,105 L2040,160 L-480,160 Z"
-                            fill="var(--color-brand-gold)"
-                            opacity="0.25"
-                        />
-                    </g>
-                </svg>
+                    {/* DESKTOP WAVE — original density, just taller amplitude. Visible md and up only. */}
+                    <svg
+                        className="hidden md:block absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
+                        viewBox="0 0 1440 160"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    >
+                        <g className="animate-wave-back">
+                            <path
+                                d="M-480,65 C-360,25 -240,105 -120,65 C0,25 120,105 240,65 C360,25 480,105 600,65 C720,25 840,105 960,65 C1080,25 1200,105 1320,65 C1440,25 1560,105 1680,65 C1800,25 1920,105 2040,65 L2040,160 L-480,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.14"
+                            />
+                        </g>
+                        <g className="animate-wave-front">
+                            <path
+                                d="M-480,105 C-360,145 -240,65 -120,105 C0,145 120,65 240,105 C360,145 480,65 600,105 C720,145 840,65 960,105 C1080,145 1200,65 1320,105 C1440,145 1560,65 1680,105 C1800,145 1920,65 2040,105 L2040,160 L-480,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.25"
+                            />
+                        </g>
+                    </svg>
 
-            </div>
+                </div>
+            ) : (
+                /* --- HIDDEN STATE PLACEHOLDER: shown when charts are toggled off --- */
+                <div className="relative overflow-hidden rounded-2xl mb-8">
+
+                    {/* --- FLOATING VISIBILITY TOGGLE — pinned to upper-right, same spot as the visible state --- */}
+                    <button
+                        type="button"
+                        onClick={toggleChartsVisibility}
+                        aria-pressed={isChartsVisible}
+                        aria-label={isChartsVisible ? 'Hide charts' : 'Show charts'}
+                        title={isChartsVisible ? 'Hide charts' : 'Show charts'}
+                        className="absolute top-3 right-3 z-30 flex items-center justify-center w-8 h-8 rounded-xl border border-brand-gold/50 bg-bg-primary/80 backdrop-blur-sm text-text-muted hover:text-text-main hover:bg-brand-gold/10 transition-all duration-200 cursor-pointer active:scale-95"
+                    >
+                        <EyeOff size={16} strokeWidth={2.5} />
+                    </button>
+
+                    <div className="border-2 border-brand-gold/70 bg-brand-gold/10 rounded-2xl p-10 shadow-sm w-full min-h-[180px] flex flex-col items-center justify-center gap-3 text-center">
+                        <div className="w-12 h-12 rounded-xl bg-brand-gold/10 flex items-center justify-center text-text-muted">
+                            <EyeOff className="w-6 h-6" />
+                        </div>
+                        <span className="text-lg font-black text-text-main tracking-tight">
+                            Charts are hidden
+                        </span>
+                        <span className="text-sm font-bold text-text-muted max-w-[360px]">
+                            Your sales metrics are still tracking in the background. Tap the eye icon to show them again.
+                        </span>
+                    </div>
+
+                    {/* WAVE — kept animating even while charts are hidden, identical to the visible state */}
+                    <svg
+                        className="block md:hidden absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
+                        viewBox="0 0 1440 160"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    >
+                        <g className="animate-wave-back-mobile">
+                            <path
+                                d="M-720,65 C-480,25 -240,105 0,65 C240,25 480,105 720,65 C960,25 1200,105 1440,65 C1680,25 1920,105 2160,65 L2160,160 L-720,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.14"
+                            />
+                        </g>
+                        <g className="animate-wave-front-mobile">
+                            <path
+                                d="M-720,105 C-480,145 -240,65 0,105 C240,145 480,65 720,105 C960,145 1200,65 1440,105 C1680,145 1920,65 2160,105 L2160,160 L-720,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.25"
+                            />
+                        </g>
+                    </svg>
+
+                    <svg
+                        className="hidden md:block absolute bottom-0 left-0 w-full h-28 pointer-events-none select-none z-20"
+                        viewBox="0 0 1440 160"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    >
+                        <g className="animate-wave-back">
+                            <path
+                                d="M-480,65 C-360,25 -240,105 -120,65 C0,25 120,105 240,65 C360,25 480,105 600,65 C720,25 840,105 960,65 C1080,25 1200,105 1320,65 C1440,25 1560,105 1680,65 C1800,25 1920,105 2040,65 L2040,160 L-480,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.14"
+                            />
+                        </g>
+                        <g className="animate-wave-front">
+                            <path
+                                d="M-480,105 C-360,145 -240,65 -120,105 C0,145 120,65 240,105 C360,145 480,65 600,105 C720,145 840,65 960,105 C1080,145 1200,65 1320,105 C1440,145 1560,65 1680,105 C1800,145 1920,65 2040,105 L2040,160 L-480,160 Z"
+                                fill="var(--color-brand-gold)"
+                                opacity="0.25"
+                            />
+                        </g>
+                    </svg>
+                </div>
+            )}
 
 
 
