@@ -58,7 +58,7 @@ export type ScanOutcome =
         unitOfMeasure: string;
         visualCandidateKeys: string[];
         confidenceTier: ConfidenceTier;
-        scannedBarcode?: string; // NEW — set only when this came from a barcode that didn't match anything
+        scannedBarcode?: string; // set only when this came from a barcode that didn't match anything
     };
 
 interface ProductScannerCameraProps {
@@ -67,11 +67,11 @@ interface ProductScannerCameraProps {
     onCaptureComplete: (outcome: ScanOutcome) => void;
     hasResult?: boolean;
     onRetry?: () => void;
-    // NEW: false for flows where a match is meaningless (Add Item — the
-    // whole point is the item doesn't exist yet). Defaults true so
+    // false for flows where a match is meaningless (Add Item — the whole
+    // point is the item doesn't exist yet). Defaults true so
     // ScannerTab/RestockScannerTab need no changes.
     searchInventory?: boolean;
-    // NEW: parent-controlled kill switch. Whatever ultimately owns the
+    // parent-controlled kill switch. Whatever ultimately owns the
     // "is this modal/screen open" boolean (Checkout, Restock, InventoryForm,
     // etc.) should pass that boolean straight through here, all the way
     // down, no matter how many components sit in between. The moment it
@@ -100,7 +100,7 @@ export const ProductScannerCamera = ({
 }: ProductScannerCameraProps) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
-    // 🚀 streamRef mirrors `stream` state but is mutated synchronously and in
+    // streamRef mirrors `stream` state but is mutated synchronously and in
     // place. `stopCamera` reads from this instead of the `stream` state
     // variable, because a closure over `stream` captured at effect-setup
     // time can go stale (startCamera is async — by the time getUserMedia
@@ -110,20 +110,25 @@ export const ProductScannerCamera = ({
     // closure is calling stopCamera.
     const streamRef = useRef<MediaStream | null>(null);
 
-    // 🚀 NEW: same ref-mirroring pattern as streamRef above, applied to
-    // isPredicting/hasResult. The live barcode watcher's callback is set up
-    // once (inside startBarcodeWatch) and can outlive several renders before
-    // it fires — reading these refs instead of the state values directly
-    // guarantees the guard checks inside handleCameraCapture see the true
-    // current values instead of whatever was true when the watcher started.
-    const isPredictingRef = useRef(false);
-    const hasResultRef = useRef(hasResult);
+    // Single source of truth for "a capture is currently in flight" — set
+    // synchronously the instant either the manual shutter or the live
+    // barcode watcher decides to capture. This replaces three separate refs
+    // from an earlier pass (isPredictingRef, hasResultRef,
+    // autoCaptureTriggeredRef): those mirrored state via a useEffect, which
+    // lags one tick behind the actual change and left a real race window —
+    // e.g. a burst of frames from the video watcher, or a manual tap landing
+    // in the same instant the watcher auto-fires, could both slip through.
+    // Setting this flag directly at the decision point (not via a state
+    // mirror) closes that gap. It's reset to false wherever a fresh capture
+    // cycle is armed: at the top of startBarcodeWatch, and implicitly
+    // whenever the arming effect below re-runs after hasResult/isPredicting
+    // clear.
+    const captureInFlightRef = useRef(false);
 
-    // 🚀 NEW: holds the live barcode watcher's stop handle + a one-shot
-    // guard so a burst of frames around the same barcode can't fire capture
-    // twice before the watcher actually stops.
+    // holds the live barcode watcher's stop handle, same category as
+    // streamRef above — an imperative handle to an ongoing operation, not
+    // render data.
     const barcodeScanControlsRef = useRef<BarcodeScanControls | null>(null);
-    const autoCaptureTriggeredRef = useRef(false);
     const [barcodeArmed, setBarcodeArmed] = useState(false);
 
     const [cameraError, setCameraError] = useState<string | null>(null);
@@ -143,14 +148,6 @@ export const ProductScannerCamera = ({
     // in identifyAndSearch (`searchInventory && shopId`). Without it a
     // detected barcode wouldn't be used for anything anyway.
     const canAutoScanBarcode = searchInventory && !!shopId;
-
-    useEffect(() => {
-        isPredictingRef.current = isPredicting;
-    }, [isPredicting]);
-
-    useEffect(() => {
-        hasResultRef.current = hasResult;
-    }, [hasResult]);
 
     useEffect(() => {
         initScannerAssets((status) => {
@@ -199,30 +196,32 @@ export const ProductScannerCamera = ({
         setRetryCount((prev) => prev + 1);
     };
 
-    // 🚀 NEW: starts continuously decoding frames straight off the live
-    // <video> feed (not a still photo), so a barcode gets many chances per
-    // second instead of depending on one sharp capture. The moment a code
-    // is found we stop the watcher and hand it straight to
-    // handleCameraCapture, which reuses it instead of re-decoding the
-    // (possibly blurrier) frozen frame it grabs.
+    // Starts continuously decoding frames straight off the live <video> feed
+    // (not a still photo), so a barcode gets many chances per second instead
+    // of depending on one sharp capture. The moment a code is found we stop
+    // the watcher and hand it straight to handleCameraCapture, which reuses
+    // it instead of re-decoding the (possibly blurrier) frozen frame it grabs.
     const startBarcodeWatch = () => {
         if (!videoRef.current || !canAutoScanBarcode) return;
         stopBarcodeWatch();
-        autoCaptureTriggeredRef.current = false;
+        captureInFlightRef.current = false; // arming a fresh watch — clear any prior guard
 
         watchVideoForBarcode(videoRef.current, (barcode) => {
-            if (autoCaptureTriggeredRef.current) return;
-            if (isPredictingRef.current || hasResultRef.current) return;
-
-            autoCaptureTriggeredRef.current = true;
+            // Guards against: (a) a burst of frames from the same barcode
+            // firing this callback multiple times before .stop() takes
+            // effect, and (b) a manual shutter tap landing in the same
+            // instant the watcher fires. Single synchronous check, no
+            // state-mirror lag.
+            if (captureInFlightRef.current) return;
+            captureInFlightRef.current = true;
             stopBarcodeWatch();
             handleCameraCapture(barcode);
         })
             .then((controls) => {
-                // Watch may have been stopped (or already fired) while the
-                // reader was still spinning up — don't hang onto a stale
-                // controls handle in that case.
-                if (autoCaptureTriggeredRef.current) {
+                // Watch may have already fired (and captureInFlightRef
+                // flipped true) while the reader was still spinning up —
+                // don't hang onto a stale controls handle in that case.
+                if (captureInFlightRef.current) {
                     controls.stop();
                     return;
                 }
@@ -243,7 +242,7 @@ export const ProductScannerCamera = ({
     };
 
     const startCamera = async () => {
-        // 🚀 Guard: never open the camera on behalf of a parent that has
+        // Guard: never open the camera on behalf of a parent that has
         // already told us it's inactive (e.g. loadPhase flips to 'ready'
         // right as/after the parent modal closes).
         if (!active) return;
@@ -310,18 +309,18 @@ export const ProductScannerCamera = ({
         return () => stopCamera();
     }, [isReady, loadPhase]);
 
-    // 🚀 NEW: parent-driven stop, independent of our own mount lifecycle.
-    // This is what actually fixes "modal closes but camera light stays on"
-    // when the Modal component keeps children mounted and only hides them
-    // visually — that scenario never runs the effect cleanup above, so we
-    // need a dedicated effect that reacts to `active` directly.
+    // Parent-driven stop, independent of our own mount lifecycle. This is
+    // what actually fixes "modal closes but camera light stays on" when the
+    // Modal component keeps children mounted and only hides them visually —
+    // that scenario never runs the effect cleanup above, so we need a
+    // dedicated effect that reacts to `active` directly.
     useEffect(() => {
         if (!active) {
             stopCamera();
         }
     }, [active]);
 
-    // 🚀 NEW: keeps the live barcode watcher's on/off state in sync with
+    // Keeps the live barcode watcher's on/off state in sync with
     // isPredicting/hasResult/active. This is what makes the watcher resume
     // after a retry (hasResult flips back to false) or after a finished
     // capture (isPredicting flips back to false) — cases where the video
@@ -349,7 +348,7 @@ export const ProductScannerCamera = ({
     // the effect above instead, since `playing` won't fire again for an
     // already-playing element.
     const handleVideoPlaying = () => {
-        if (canAutoScanBarcode && active && !hasResultRef.current && !isPredictingRef.current) {
+        if (canAutoScanBarcode && active && !hasResult && !isPredicting) {
             startBarcodeWatch();
         }
     };
@@ -427,7 +426,7 @@ export const ProductScannerCamera = ({
         imgElement: HTMLImageElement,
         preDetectedBarcode?: DetectedBarcode | null
     ): Promise<ScanOutcome> => {
-        // 🚀 If preDetectedBarcode was passed at all, this capture was
+        // If preDetectedBarcode was passed at all, this capture was
         // AUTO-TRIGGERED by the live barcode watcher — meaning the entire
         // point of this capture is the barcode. Vision/OCR must NEVER run for
         // this path, period — not as a fallback, not on a failed lookup, not
@@ -455,6 +454,11 @@ export const ProductScannerCamera = ({
                         query: detectedBarcode.rawValue,
                         limit: SEARCH_RESULT_LIMIT,
                         offset: 0,
+                        // Sentinel — tells the backend this is an exclusive
+                        // barcode-mode search (Layer 0 in SearchShopProducts),
+                        // not a vision-candidate array. Backend returns either
+                        // exactly one product or empty; never falls through to
+                        // Layer 1/2 for this request.
                         visualCandidates: ['barcode'],
                     },
                 });
@@ -466,15 +470,15 @@ export const ProductScannerCamera = ({
                     return {
                         status: 'matched',
                         product: barcodeHit,
-                        variants: [barcodeHit],
+                        variants: [barcodeHit], // a barcode is 1:1 with a specific SKU — no itemName grouping needed
                         file,
                         previewUrl,
-                        visualCandidateKeys: [],
+                        visualCandidateKeys: [], // not a vision guess — nothing worth binding/teaching the model
                         confidenceTier: 'barcode',
                     };
                 }
 
-                // 🚀 Valid barcode, nothing registered to it in this shop.
+                // Valid barcode, nothing registered to it in this shop yet.
                 // For a MANUAL capture, old behavior stands: fall through to
                 // vision+OCR so the user still gets a suggested name. For an
                 // AUTO barcode capture, that fallback is exactly what you don't
@@ -508,13 +512,15 @@ export const ProductScannerCamera = ({
                         scannedBarcode: detectedBarcode.rawValue,
                     };
                 }
+                // fall through to vision+OCR below for MANUAL captures only —
+                // don't strand the user on a network hiccup
             }
         }
 
-        // 🚀 Hard stop: an auto-triggered capture should always have returned
-        // above (matched, or unmatched-with-scannedBarcode). This guard exists
-        // only so a future refactor can't accidentally let an auto-capture fall
-        // through to vision/OCR below by mistake.
+        // Hard stop: an auto-triggered capture should always have returned
+        // above (matched, or unmatched-with-scannedBarcode). This guard
+        // exists only so a future refactor can't accidentally let an
+        // auto-capture fall through to vision/OCR below by mistake.
         if (isAutoBarcodeCapture) {
             return {
                 status: 'unmatched',
@@ -604,14 +610,19 @@ export const ProductScannerCamera = ({
         };
     };
 
-    // 🚀 CHANGED: now accepts an optional pre-detected barcode so the live
-    // watcher (startBarcodeWatch) can trigger a capture and hand its already
-    // -decoded result straight through, instead of forcing identifyAndSearch
-    // to re-decode the freshly-captured (potentially blurrier) still frame.
-    // Manual taps on the shutter button still call this with no argument,
-    // exactly as before.
+    // Accepts an optional pre-detected barcode so the live watcher
+    // (startBarcodeWatch) can trigger a capture and hand its already-decoded
+    // result straight through, instead of forcing identifyAndSearch to
+    // re-decode the freshly-captured (potentially blurrier) still frame.
+    // Manual taps on the shutter button still call this with no argument.
+    //
+    // Note: captureInFlightRef is set by the CALLER (startBarcodeWatch, or
+    // the shutter button's onClick) before this runs, not inside this
+    // function — that's what makes the guard synchronous relative to the
+    // event that triggered the capture, closing the race the earlier
+    // multi-ref version had.
     const handleCameraCapture = (preDetectedBarcode?: DetectedBarcode) => {
-        if (!videoRef.current || !isReady || isPredictingRef.current || hasResultRef.current) return;
+        if (!videoRef.current || !isReady) return;
 
         setIsPredicting(true);
         stopBarcodeWatch();
@@ -631,6 +642,7 @@ export const ProductScannerCamera = ({
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             setIsPredicting(false);
+            captureInFlightRef.current = false;
             return;
         }
 
@@ -652,6 +664,7 @@ export const ProductScannerCamera = ({
         canvas.toBlob((blob) => {
             if (!blob) {
                 setIsPredicting(false);
+                captureInFlightRef.current = false;
                 return;
             }
 
@@ -661,10 +674,15 @@ export const ProductScannerCamera = ({
             const tempImg = new Image();
             tempImg.src = previewUrl;
             tempImg.onload = async () => {
-                // 🚀 Camera intentionally left running — behind the AI Result card.
+                // Camera intentionally left running — behind the AI Result card.
                 const outcome = await identifyAndSearch(capturedFile, previewUrl, tempImg, preDetectedBarcode);
                 setIsPredicting(false);
                 onCaptureComplete(outcome);
+                // Deliberately NOT resetting captureInFlightRef here — hasResult
+                // will flip true from the caller's outcome handling, which the
+                // arming effect treats as "stay stopped" anyway. It gets reset
+                // back to false at the top of startBarcodeWatch the next time
+                // arming actually happens (e.g. after onRetry).
             };
         }, 'image/jpeg', 0.85);
     };
@@ -688,6 +706,7 @@ export const ProductScannerCamera = ({
         const file = e.target.files?.[0];
         if (!file || isPredicting || hasResult) return;
 
+        captureInFlightRef.current = true;
         setIsPredicting(true);
         stopBarcodeWatch();
         const previewUrl = URL.createObjectURL(file);
@@ -695,7 +714,7 @@ export const ProductScannerCamera = ({
         const tempImg = new Image();
         tempImg.src = previewUrl;
         tempImg.onload = async () => {
-            // 🚀 Camera intentionally left running — same as handleCameraCapture above.
+            // Camera intentionally left running — same as handleCameraCapture above.
             // No pre-detected barcode here — this is a static picked image, not
             // the live feed, so identifyAndSearch falls back to its own
             // detectBarcodeFromImage call on it.
@@ -703,6 +722,12 @@ export const ProductScannerCamera = ({
             setIsPredicting(false);
             onCaptureComplete(outcome);
         };
+    };
+
+    const handleShutterTap = () => {
+        if (isPredicting || hasResult || captureInFlightRef.current) return;
+        captureInFlightRef.current = true;
+        handleCameraCapture();
     };
 
     const handleRetryTap = () => {
@@ -802,7 +827,7 @@ export const ProductScannerCamera = ({
                         className="absolute inset-0 w-full h-full object-cover bg-bg-secondary"
                     />
 
-                    {/* 🚀 NEW: subtle indicator that live barcode auto-capture is
+                    {/* Subtle indicator that live barcode auto-capture is
                         armed, so the auto-trigger doesn't feel invisible/magic. */}
                     {barcodeArmed && !isPredicting && (
                         <div className="absolute top-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -843,7 +868,7 @@ export const ProductScannerCamera = ({
                             <button
                                 type="button"
                                 disabled={isPredicting || hasResult}
-                                onClick={() => handleCameraCapture()}
+                                onClick={handleShutterTap}
                                 className="w-14 h-14 rounded-full bg-[#d9d9d9] hover:bg-white border-4 border-[#3f3f3f]/40 shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                             />
 
