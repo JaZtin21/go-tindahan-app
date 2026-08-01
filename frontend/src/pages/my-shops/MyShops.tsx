@@ -15,7 +15,7 @@ export const MyShops: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const isAddShopModalOpen = useSelector((state: RootState) => state.ui.isAddShopModalOpen);
-    const isSubscribed = true
+    const isSubscribed = false
 
     // PAGINATION SETUP: 10 items per page limit matrix footprint
     const PAGE_LIMIT = 10;

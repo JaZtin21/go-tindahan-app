@@ -9,10 +9,10 @@ import {
     type VisualMatch,
     type ConfidenceTier,
 } from '~/utils/productMatching';
-import { TriangleAlert, ImageIcon, RotateCcw, WifiOff } from 'lucide-react';
+import { TriangleAlert, ImageIcon, RotateCcw, WifiOff, ScanLine } from 'lucide-react';
 import { useSearchShopProducts } from '~/api/queries';
 import type { Product } from '~/types/item';
-import { detectBarcodeFromImage } from '~/utils/barcodeDetection';
+import { detectBarcodeFromImage, watchVideoForBarcode, type DetectedBarcode, type BarcodeScanControls } from '~/utils/barcodeDetection';
 
 // ============================================================================
 // SCAN OUTCOME CONTRACT
@@ -58,6 +58,7 @@ export type ScanOutcome =
         unitOfMeasure: string;
         visualCandidateKeys: string[];
         confidenceTier: ConfidenceTier;
+        scannedBarcode?: string; // NEW — set only when this came from a barcode that didn't match anything
     };
 
 interface ProductScannerCameraProps {
@@ -109,6 +110,22 @@ export const ProductScannerCamera = ({
     // closure is calling stopCamera.
     const streamRef = useRef<MediaStream | null>(null);
 
+    // 🚀 NEW: same ref-mirroring pattern as streamRef above, applied to
+    // isPredicting/hasResult. The live barcode watcher's callback is set up
+    // once (inside startBarcodeWatch) and can outlive several renders before
+    // it fires — reading these refs instead of the state values directly
+    // guarantees the guard checks inside handleCameraCapture see the true
+    // current values instead of whatever was true when the watcher started.
+    const isPredictingRef = useRef(false);
+    const hasResultRef = useRef(hasResult);
+
+    // 🚀 NEW: holds the live barcode watcher's stop handle + a one-shot
+    // guard so a burst of frames around the same barcode can't fire capture
+    // twice before the watcher actually stops.
+    const barcodeScanControlsRef = useRef<BarcodeScanControls | null>(null);
+    const autoCaptureTriggeredRef = useRef(false);
+    const [barcodeArmed, setBarcodeArmed] = useState(false);
+
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isPredicting, setIsPredicting] = useState(false);
     const [loadPhase, setLoadPhase] = useState<'model' | 'names' | 'embeddings' | 'ocr' | 'ready' | 'error' | 'offline'>('model');
@@ -120,6 +137,20 @@ export const ProductScannerCamera = ({
 
     const assets = getCachedScannerAssets();
     const isReady = assets.isLoaded;
+
+    // Auto-capture-on-barcode only makes sense when a detected code can
+    // actually be looked up against something — matches the existing gate
+    // in identifyAndSearch (`searchInventory && shopId`). Without it a
+    // detected barcode wouldn't be used for anything anyway.
+    const canAutoScanBarcode = searchInventory && !!shopId;
+
+    useEffect(() => {
+        isPredictingRef.current = isPredicting;
+    }, [isPredicting]);
+
+    useEffect(() => {
+        hasResultRef.current = hasResult;
+    }, [hasResult]);
 
     useEffect(() => {
         initScannerAssets((status) => {
@@ -166,6 +197,49 @@ export const ProductScannerCamera = ({
         setLoadPhase('model');
         setLoadProgress(0);
         setRetryCount((prev) => prev + 1);
+    };
+
+    // 🚀 NEW: starts continuously decoding frames straight off the live
+    // <video> feed (not a still photo), so a barcode gets many chances per
+    // second instead of depending on one sharp capture. The moment a code
+    // is found we stop the watcher and hand it straight to
+    // handleCameraCapture, which reuses it instead of re-decoding the
+    // (possibly blurrier) frozen frame it grabs.
+    const startBarcodeWatch = () => {
+        if (!videoRef.current || !canAutoScanBarcode) return;
+        stopBarcodeWatch();
+        autoCaptureTriggeredRef.current = false;
+
+        watchVideoForBarcode(videoRef.current, (barcode) => {
+            if (autoCaptureTriggeredRef.current) return;
+            if (isPredictingRef.current || hasResultRef.current) return;
+
+            autoCaptureTriggeredRef.current = true;
+            stopBarcodeWatch();
+            handleCameraCapture(barcode);
+        })
+            .then((controls) => {
+                // Watch may have been stopped (or already fired) while the
+                // reader was still spinning up — don't hang onto a stale
+                // controls handle in that case.
+                if (autoCaptureTriggeredRef.current) {
+                    controls.stop();
+                    return;
+                }
+                barcodeScanControlsRef.current = controls;
+                setBarcodeArmed(true);
+            })
+            .catch((err) => {
+                console.error('[ProductScannerCamera] failed to start live barcode watch:', err);
+            });
+    };
+
+    const stopBarcodeWatch = () => {
+        if (barcodeScanControlsRef.current) {
+            barcodeScanControlsRef.current.stop();
+            barcodeScanControlsRef.current = null;
+        }
+        setBarcodeArmed(false);
     };
 
     const startCamera = async () => {
@@ -220,6 +294,7 @@ export const ProductScannerCamera = ({
     };
 
     const stopCamera = () => {
+        stopBarcodeWatch();
         if (streamRef.current) {
             console.log('[ProductScannerCamera] stopping camera tracks');
             streamRef.current.getTracks().forEach(track => track.stop());
@@ -245,6 +320,39 @@ export const ProductScannerCamera = ({
             stopCamera();
         }
     }, [active]);
+
+    // 🚀 NEW: keeps the live barcode watcher's on/off state in sync with
+    // isPredicting/hasResult/active. This is what makes the watcher resume
+    // after a retry (hasResult flips back to false) or after a finished
+    // capture (isPredicting flips back to false) — cases where the video
+    // element is already playing and never fires another native `playing`
+    // event, so something has to explicitly kick the watch back on.
+    useEffect(() => {
+        if (!canAutoScanBarcode) {
+            stopBarcodeWatch();
+            return;
+        }
+        if (!active || hasResult || isPredicting) {
+            stopBarcodeWatch();
+            return;
+        }
+        if (videoRef.current && streamRef.current) {
+            startBarcodeWatch();
+        }
+        return () => stopBarcodeWatch();
+    }, [canAutoScanBarcode, active, hasResult, isPredicting]);
+
+    // Fires once the live stream actually starts rendering frames — the
+    // most reliable point to arm the watcher on first camera start (before
+    // this, video.videoWidth/height are still 0 and there's nothing to
+    // decode yet). Subsequent restarts (retry, post-capture) are handled by
+    // the effect above instead, since `playing` won't fire again for an
+    // already-playing element.
+    const handleVideoPlaying = () => {
+        if (canAutoScanBarcode && active && !hasResultRef.current && !isPredictingRef.current) {
+            startBarcodeWatch();
+        }
+    };
 
     const preprocessImage = (imgElement: HTMLImageElement) => {
         return tf.tidy(() => {
@@ -305,19 +413,35 @@ export const ProductScannerCamera = ({
      * inventory for it — visual keys first, text fallback second (handled
      * server-side by searchShopProducts). Returns a single ScanOutcome so
      * callers never touch the search API themselves.
+     *
+     * `preDetectedBarcode`, when provided, comes from the live-feed watcher
+     * (startBarcodeWatch) that already found a clean decode from the video
+     * stream itself — in that case we trust it outright and skip re-running
+     * detectBarcodeFromImage against the just-captured still frame, since
+     * that frame can be blurrier than the live frame the watcher actually
+     * decoded (motion blur from the capture itself, JPEG re-encode, etc).
      */
-    const identifyAndSearch = async (file: File, previewUrl: string, imgElement: HTMLImageElement): Promise<ScanOutcome> => {
-        // 🚀 NEW: barcode check runs FIRST, sequentially, before the vision
-        // model / OCR even start. If this image has a valid, decodable barcode,
-        // that's a deterministic identity — no reason to pay the cost of running
-        // the vision model or OCR at all, let alone let their (fuzzier) guesses
-        // compete with it. Early return below completely bypasses the rest of
-        // this function when a barcode is found AND matched in this shop.
+    const identifyAndSearch = async (
+        file: File,
+        previewUrl: string,
+        imgElement: HTMLImageElement,
+        preDetectedBarcode?: DetectedBarcode | null
+    ): Promise<ScanOutcome> => {
+        // 🚀 If preDetectedBarcode was passed at all, this capture was
+        // AUTO-TRIGGERED by the live barcode watcher — meaning the entire
+        // point of this capture is the barcode. Vision/OCR must NEVER run for
+        // this path, period — not as a fallback, not on a failed lookup, not
+        // on a network error. Vision/OCR only ever runs for a MANUAL capture
+        // (shutter tap / gallery pick), where preDetectedBarcode is always
+        // undefined and detectBarcodeFromImage() is what decides if a barcode
+        // is even in play.
+        const isAutoBarcodeCapture = preDetectedBarcode !== undefined && preDetectedBarcode !== null;
+
         console.log('scanning image for barcode...');
 
-        const detectedBarcode = await detectBarcodeFromImage(imgElement);
-
-
+        const detectedBarcode = isAutoBarcodeCapture
+            ? preDetectedBarcode
+            : await detectBarcodeFromImage(imgElement);
 
         if (detectedBarcode) {
             console.log('[Identify] Barcode detected:', detectedBarcode.rawValue, detectedBarcode.format);
@@ -331,11 +455,6 @@ export const ProductScannerCamera = ({
                         query: detectedBarcode.rawValue,
                         limit: SEARCH_RESULT_LIMIT,
                         offset: 0,
-                        // 🚀 Sentinel — tells the backend this is an exclusive
-                        // barcode-mode search (Layer 0 in SearchShopProducts),
-                        // not a vision-candidate array. Backend returns either
-                        // exactly one product or empty; never falls through to
-                        // Layer 1/2 for this request.
                         visualCandidates: ['barcode'],
                     },
                 });
@@ -347,28 +466,72 @@ export const ProductScannerCamera = ({
                     return {
                         status: 'matched',
                         product: barcodeHit,
-                        variants: [barcodeHit], // a barcode is 1:1 with a specific SKU — no itemName grouping needed
+                        variants: [barcodeHit],
                         file,
                         previewUrl,
-                        visualCandidateKeys: [], // not a vision guess — nothing worth binding/teaching the model
+                        visualCandidateKeys: [],
                         confidenceTier: 'barcode',
                     };
                 }
-                // Empty result — valid barcode, but not registered to any item
-                // in this shop yet. Deliberately falls through to the vision+OCR
-                // path below rather than returning 'unmatched' immediately, so
-                // the user still gets a suggested name/photo prefill instead of
-                // a blank form.
+
+                // 🚀 Valid barcode, nothing registered to it in this shop.
+                // For a MANUAL capture, old behavior stands: fall through to
+                // vision+OCR so the user still gets a suggested name. For an
+                // AUTO barcode capture, that fallback is exactly what you don't
+                // want — bail out here with the barcode itself so the caller
+                // can prefill an "add new item" form, and stop.
+                if (isAutoBarcodeCapture) {
+                    return {
+                        status: 'unmatched',
+                        file,
+                        previewUrl,
+                        suggestedName: '',
+                        unitOfMeasure: '',
+                        visualCandidateKeys: [],
+                        confidenceTier: 'barcode',
+                        scannedBarcode: detectedBarcode.rawValue,
+                    };
+                }
             } catch (err) {
                 console.error('[Identify] Barcode search failed:', err);
-                // fall through to vision+OCR below — don't strand the user on a network hiccup
+                if (isAutoBarcodeCapture) {
+                    // Same rule applies to a network hiccup — auto-capture
+                    // still does not fall through to vision.
+                    return {
+                        status: 'unmatched',
+                        file,
+                        previewUrl,
+                        suggestedName: '',
+                        unitOfMeasure: '',
+                        visualCandidateKeys: [],
+                        confidenceTier: 'barcode',
+                        scannedBarcode: detectedBarcode.rawValue,
+                    };
+                }
             }
         }
 
+        // 🚀 Hard stop: an auto-triggered capture should always have returned
+        // above (matched, or unmatched-with-scannedBarcode). This guard exists
+        // only so a future refactor can't accidentally let an auto-capture fall
+        // through to vision/OCR below by mistake.
+        if (isAutoBarcodeCapture) {
+            return {
+                status: 'unmatched',
+                file,
+                previewUrl,
+                suggestedName: '',
+                unitOfMeasure: '',
+                visualCandidateKeys: [],
+                confidenceTier: 'barcode',
+                scannedBarcode: preDetectedBarcode?.rawValue,
+            };
+        }
 
         console.log('running visual model and OCR instead');
 
-        // --- existing vision + OCR pipeline, UNCHANGED below this line ---
+        // --- existing vision + OCR pipeline, UNCHANGED below this line, and
+        // now ONLY reachable from a manual capture ---
 
         const ocrCanvas = imageElementToCanvas(imgElement);
 
@@ -441,10 +604,17 @@ export const ProductScannerCamera = ({
         };
     };
 
-    const handleCameraCapture = () => {
-        if (!videoRef.current || !isReady || isPredicting || hasResult) return;
+    // 🚀 CHANGED: now accepts an optional pre-detected barcode so the live
+    // watcher (startBarcodeWatch) can trigger a capture and hand its already
+    // -decoded result straight through, instead of forcing identifyAndSearch
+    // to re-decode the freshly-captured (potentially blurrier) still frame.
+    // Manual taps on the shutter button still call this with no argument,
+    // exactly as before.
+    const handleCameraCapture = (preDetectedBarcode?: DetectedBarcode) => {
+        if (!videoRef.current || !isReady || isPredictingRef.current || hasResultRef.current) return;
 
         setIsPredicting(true);
+        stopBarcodeWatch();
 
         const video = videoRef.current;
 
@@ -492,7 +662,7 @@ export const ProductScannerCamera = ({
             tempImg.src = previewUrl;
             tempImg.onload = async () => {
                 // 🚀 Camera intentionally left running — behind the AI Result card.
-                const outcome = await identifyAndSearch(capturedFile, previewUrl, tempImg);
+                const outcome = await identifyAndSearch(capturedFile, previewUrl, tempImg, preDetectedBarcode);
                 setIsPredicting(false);
                 onCaptureComplete(outcome);
             };
@@ -519,12 +689,16 @@ export const ProductScannerCamera = ({
         if (!file || isPredicting || hasResult) return;
 
         setIsPredicting(true);
+        stopBarcodeWatch();
         const previewUrl = URL.createObjectURL(file);
 
         const tempImg = new Image();
         tempImg.src = previewUrl;
         tempImg.onload = async () => {
             // 🚀 Camera intentionally left running — same as handleCameraCapture above.
+            // No pre-detected barcode here — this is a static picked image, not
+            // the live feed, so identifyAndSearch falls back to its own
+            // detectBarcodeFromImage call on it.
             const outcome = await identifyAndSearch(file, previewUrl, tempImg);
             setIsPredicting(false);
             onCaptureComplete(outcome);
@@ -624,8 +798,20 @@ export const ProductScannerCamera = ({
                         autoPlay
                         playsInline
                         muted
+                        onPlaying={handleVideoPlaying}
                         className="absolute inset-0 w-full h-full object-cover bg-bg-secondary"
                     />
+
+                    {/* 🚀 NEW: subtle indicator that live barcode auto-capture is
+                        armed, so the auto-trigger doesn't feel invisible/magic. */}
+                    {barcodeArmed && !isPredicting && (
+                        <div className="absolute top-4 inset-x-0 flex justify-center z-10 pointer-events-none">
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 text-white/90 text-[11px] font-semibold tracking-wide">
+                                <ScanLine className="w-3.5 h-3.5" />
+                                Point at a barcode or product
+                            </div>
+                        </div>
+                    )}
 
                     {isPredicting && (
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-xs z-20 flex flex-col items-center justify-center text-white gap-3">
@@ -657,7 +843,7 @@ export const ProductScannerCamera = ({
                             <button
                                 type="button"
                                 disabled={isPredicting || hasResult}
-                                onClick={handleCameraCapture}
+                                onClick={() => handleCameraCapture()}
                                 className="w-14 h-14 rounded-full bg-[#d9d9d9] hover:bg-white border-4 border-[#3f3f3f]/40 shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                             />
 
