@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef, act } from 'react';
 import { Modal } from "~/components";
 import { useParams } from 'react-router-dom';
-import { Camera, Pencil } from 'lucide-react';
-import { useMutation } from '@apollo/client/react';
-import { ADD_INVENTORY_ITEM_MUTATION, UPDATE_INVENTORY_ITEM_MUTATION } from '~/api/graphql';
+import { Camera, Pencil, Barcode } from 'lucide-react';
 import { useDispatch } from 'react-redux';
-import { addShop, updateShop } from '~/store/myShopsSlice';
 import {
     addInventoryItem as addInventoryItemAction,
     updateInventoryItem as updateInventoryItemAction
@@ -14,6 +11,9 @@ import { Check, X, XIcon } from 'lucide-react';
 import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { useAddInventoryItem, useUpdateInventoryItem } from '~/api/queries';
 import { resizeAndConvertToWebPFile } from '~/utils/imageUtils';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import type { IScannerControls } from '@zxing/browser';
+import { NotFoundException } from '@zxing/library';
 
 export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
 
@@ -26,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = false;
+    const isSubscribed = true;
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this
@@ -90,6 +90,13 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
 
     // --- CAMERA & INTERNAL SCANNER STEP TRACKING STATES ---
     const [scannerStep, setScannerStep] = useState<'camera' | 'form'>('camera');
+
+    // --- 🚀 NEW: BARCODE LIVE-SCAN STATES (powered by @zxing/browser) ---
+    const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+    const [barcodeScanError, setBarcodeScanError] = useState('');
+    const barcodeVideoRef = useRef<HTMLVideoElement>(null);
+    const barcodeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+    const barcodeControlsRef = useRef<IScannerControls | null>(null);
 
 
     // Clean up all local string variables and close the view
@@ -313,6 +320,99 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
         setScannerStep('camera');
     };
 
+    // --- 🚀 NEW: BARCODE LIVE-SCAN LOGIC (via @zxing/browser) ---
+    // ZXing owns the getUserMedia call itself (through decodeFromConstraints),
+    // so permission prompts, device selection, and stream teardown are all
+    // handled by a battle-tested library instead of hand-rolled camera code.
+    const stopBarcodeScanner = () => {
+        // .stop() releases the underlying MediaStream tracks too — no separate
+        // getTracks().forEach(track => track.stop()) needed.
+        barcodeControlsRef.current?.stop();
+        barcodeControlsRef.current = null;
+        barcodeReaderRef.current = null;
+        setIsBarcodeScannerOpen(false);
+        setBarcodeScanError('');
+    };
+
+    const startBarcodeScanner = async () => {
+        setBarcodeScanError('');
+        setIsBarcodeScannerOpen(true);
+
+        // wait a tick for the <video> element to mount before attaching the stream
+        setTimeout(async () => {
+            if (!barcodeVideoRef.current) return;
+
+            try {
+                const reader = new BrowserMultiFormatReader();
+                barcodeReaderRef.current = reader;
+
+                // facingMode: 'environment' -> use the rear camera on phones.
+                // This call itself triggers the browser's permission prompt.
+                const controls = await reader.decodeFromConstraints(
+                    { video: { facingMode: 'environment' } },
+                    barcodeVideoRef.current,
+                    (result, error) => {
+                        if (result) {
+                            setFormData((prev) => ({ ...prev, barcode: result.getText() }));
+                            stopBarcodeScanner();
+                            return;
+                        }
+                        // ZXing fires a NotFoundException on essentially every frame
+                        // where no barcode is visible yet — that's expected while
+                        // scanning, not a real error, so it's ignored here.
+                        if (error && !(error instanceof NotFoundException)) {
+                            console.error('Barcode decode error:', error);
+                        }
+                    }
+                );
+                barcodeControlsRef.current = controls;
+            } catch (err: any) {
+                console.error('Camera access error:', err);
+                if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+                    setBarcodeScanError('Camera permission was denied. Please allow camera access in your browser/site settings and try again.');
+                } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
+                    setBarcodeScanError('No camera was found on this device.');
+                } else if (err?.name === 'NotReadableError') {
+                    setBarcodeScanError('The camera is already in use by another app. Close it and try again.');
+                } else {
+                    setBarcodeScanError('Could not access the camera. Please type the barcode number instead.');
+                }
+            }
+        }, 100);
+    };
+
+    // stop the camera stream if the component unmounts while the scanner is open
+    useEffect(() => {
+        return () => stopBarcodeScanner();
+    }, []);
+
+    // 🚀 NEW: shared barcode field markup (manual entry input + camera scan
+    // button) — rendered on both the manual tab and the AI-scanner tab's form
+    // step, right before the product image field.
+    const renderBarcodeField = () => (
+        <div className="flex flex-col gap-2 text-left w-full">
+            <label className="text-xs font-semibold text-[var(--color-text-sub)]">Barcode (Optional)</label>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-[var(--color-border-main)] rounded-lg text-[var(--color-text-main)] bg-[var(--color-bg-primary)] focus:outline-none focus:border-border-muted"
+                    placeholder="e.g. 8901234567890"
+                />
+                <button
+                    type="button"
+                    onClick={startBarcodeScanner}
+                    title="Scan barcode with camera"
+                    className="px-3 py-2 border border-[var(--color-border-main)] rounded-lg bg-[var(--color-bg-primary)] hover:bg-[var(--color-bg-primary-hover)] text-[var(--color-text-sub)] transition-colors flex items-center justify-center"
+                >
+                    <Barcode className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
+
 
     // --- 3. RENDERING COMPONENT MARKUP ---
     return (
@@ -423,6 +523,10 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                             />
                                         </div>
                                     </div>
+
+                                    {/* 🚀 NEW: Barcode Field — manual type-in + camera live-scan button */}
+                                    {renderBarcodeField()}
+
                                     <div className="flex flex-col gap-1 text-left w-full">
                                         <label className="text-xs font-semibold text-[var(--color-text-sub)]">Product Image (Optional)</label>
 
@@ -600,6 +704,9 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                                                 </div>
                                             </div>
 
+                                            {/* 🚀 NEW: Barcode Field — manual type-in + camera live-scan button */}
+                                            {renderBarcodeField()}
+
                                             {/* Pre-Populated Snapshot Render Canvas Preview Container */}
                                             <div className="flex flex-col gap-1 text-left w-full">
                                                 <label className="text-xs font-semibold text-[var(--color-text-sub)]">Captured Scanner Snapshot</label>
@@ -680,6 +787,32 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                         className='mt-6 p-2 px-4 bg-brand-gold hover:bg-brand-gold-hover cursor-pointer text-text-white rounded-lg  transition-colors'
                     >
                         OK
+                    </button>
+                </div>
+            </Modal>
+
+            {/* 🚀 NEW: Barcode live-scan camera modal */}
+            <Modal
+                isOpen={isBarcodeScannerOpen}
+                onClose={stopBarcodeScanner}
+                title="Scan Barcode"
+                subtitle="Point your camera at the barcode"
+            >
+                <div className="flex flex-col items-center gap-4 p-4 h-full">
+                    {barcodeScanError ? (
+                        <p className="text-sm text-brand-red text-center">{barcodeScanError}</p>
+                    ) : (
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
+                            <video ref={barcodeVideoRef} className="w-full h-full object-cover" muted playsInline />
+                            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-brand-gold/80" />
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={stopBarcodeScanner}
+                        className="px-5 w-full mt-auto py-2 bg-[var(--color-bg-primary-hover)] border border-[var(--color-border-main)] text-[var(--color-text-sub)] rounded-lg font-semibold text-sm cursor-pointer hover:bg-[var(--color-border-main)] transition-colors"
+                    >
+                        Close
                     </button>
                 </div>
             </Modal>

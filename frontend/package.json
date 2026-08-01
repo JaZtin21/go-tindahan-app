@@ -29,6 +29,8 @@
     "@reduxjs/toolkit": "^2.12.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tensorflow/tfjs": "^4.22.0",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "framer-motion": "^12.42.2",
     "graphql": "^16.14.2",
     "graphql-ws": "^6.0.8",

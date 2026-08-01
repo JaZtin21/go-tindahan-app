@@ -548,12 +548,12 @@ export const ProductScannerCamera = ({
         <div className="relative flex flex-col flex-1 w-full bg-bg-secondary h-full min-h-0">
             {cameraError ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center gap-3 text-white">
-                    <span className="text-3xl"><TriangleAlert /></span>
-                    <p className="text-sm font-semibold opacity-90">{cameraError}</p>
+                    <span className="text-3xl text-brand-red"><TriangleAlert /></span>
+                    <p className="text-sm text-text-main font-semibold opacity-90">{cameraError}</p>
                     <button
                         type="button"
                         onClick={startCamera}
-                        className="px-4 py-1.5 text-xs font-bold text-text-main bg-bg-primary hover:bg-bg-primary-hover rounded-md transition-colors cursor-pointer"
+                        className="px-4 py-1.5 text-xs font-bold text-text-white bg-brand-gold hover:bg-brand-gold-hover rounded-md transition-colors cursor-pointer"
                     >
                         Try Again
                     </button>
