@@ -13,7 +13,7 @@ import { useAddInventoryItem, useUpdateInventoryItem } from '~/api/queries';
 import { resizeAndConvertToWebPFile } from '~/utils/imageUtils';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
-import { NotFoundException } from '@zxing/library';
+import { NotFoundException, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
 
@@ -26,7 +26,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = true;
+    const isSubscribed = false;
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this
@@ -343,7 +343,22 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
             if (!barcodeVideoRef.current) return;
 
             try {
-                const reader = new BrowserMultiFormatReader();
+                // 🚀 NEW: restrict decoding to the barcode formats actually used on
+                // retail products. By default ZXing tries every supported format
+                // (including QR, PDF417, Aztec, etc.) on every single frame, which
+                // costs more CPU/battery than needed here — narrowing the hint set
+                // makes each frame decode faster and scanning feel snappier,
+                // especially on older phones.
+                const hints = new Map();
+                hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+                    BarcodeFormat.EAN_13,
+                    BarcodeFormat.EAN_8,
+                    BarcodeFormat.UPC_A,
+                    BarcodeFormat.UPC_E,
+                    BarcodeFormat.CODE_128,
+                ]);
+
+                const reader = new BrowserMultiFormatReader(hints);
                 barcodeReaderRef.current = reader;
 
                 // facingMode: 'environment' -> use the rear camera on phones.
@@ -798,7 +813,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 title="Scan Barcode"
                 subtitle="Point your camera at the barcode"
             >
-                <div className="flex flex-col items-center gap-4 p-4 h-full">
+                <div className="flex flex-col items-center gap-4 p-4">
                     {barcodeScanError ? (
                         <p className="text-sm text-brand-red text-center">{barcodeScanError}</p>
                     ) : (
