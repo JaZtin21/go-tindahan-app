@@ -237,6 +237,7 @@ type ComplexityRoot struct {
 	}
 
 	PublicProduct struct {
+		Barcode       func(childComplexity int) int
 		Category      func(childComplexity int) int
 		Description   func(childComplexity int) int
 		ID            func(childComplexity int) int
@@ -1271,6 +1272,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Post.UserID(childComplexity), true
 
+	case "PublicProduct.barcode":
+		if e.ComplexityRoot.PublicProduct.Barcode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PublicProduct.Barcode(childComplexity), true
 	case "PublicProduct.category":
 		if e.ComplexityRoot.PublicProduct.Category == nil {
 			break
@@ -2264,6 +2271,8 @@ func (ec *executionContext) childFields_PublicProduct(ctx context.Context, field
 		return ec.fieldContext_PublicProduct_matchScore(ctx, field)
 	case "matchType":
 		return ec.fieldContext_PublicProduct_matchType(ctx, field)
+	case "barcode":
+		return ec.fieldContext_PublicProduct_barcode(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PublicProduct", field.Name)
 }
@@ -7016,6 +7025,29 @@ func (ec *executionContext) _PublicProduct_matchType(ctx context.Context, field 
 	)
 }
 func (ec *executionContext) fieldContext_PublicProduct_matchType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PublicProduct", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _PublicProduct_barcode(ctx context.Context, field graphql.CollectedField, obj *model.PublicProduct) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PublicProduct_barcode(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Barcode, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_PublicProduct_barcode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("PublicProduct", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -13029,6 +13061,11 @@ func (ec *executionContext) _PublicProduct(ctx context.Context, sel ast.Selectio
 			}
 		case "matchType":
 			out.Values[i] = ec._PublicProduct_matchType(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "barcode":
+			out.Values[i] = ec._PublicProduct_barcode(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

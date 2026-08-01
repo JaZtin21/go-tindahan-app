@@ -324,6 +324,7 @@ type PublicProduct struct {
 	StockQuantity *int     `json:"stockQuantity,omitempty"`
 	MatchScore    *float64 `json:"matchScore,omitempty"`
 	MatchType     *string  `json:"matchType,omitempty"`
+	Barcode       *string  `json:"barcode,omitempty"`
 }
 
 type Query struct {

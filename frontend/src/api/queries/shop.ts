@@ -614,9 +614,6 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                 query: string;
                 limit: number;
                 offset: number;
-                // The scanner's top vision-model candidate names, passed
-                // through from ProductScannerCamera. Optional — manual typed
-                // search (ScannerTab's handleSearchChange) omits it entirely.
                 visualCandidates?: string[];
             };
         }) => {
@@ -628,6 +625,30 @@ export function useSearchShopProducts(isSubscribed: boolean) {
                     .filter(([, row]: any) => !row._deleted)
                     .map(([id, row]) => fromItemRow(id, row))
                     .filter((i) => i.shopId === shopId);
+
+                // -----------------------------------------------------------
+                // LAYER 0: exact barcode match — mirrors the backend's
+                // SearchShopProducts Layer 0. Signaled the same way:
+                // visualCandidates === ['barcode'] means `query` holds the
+                // actual scanned barcode value, not a name/vision-candidate
+                // search. This is an EXCLUSIVE mode — returns here whether
+                // it hits or misses, never falls through to Layer 1/2, so
+                // the offline path stays behaviorally identical to the
+                // online resolver for a barcode scan.
+                // -----------------------------------------------------------
+                if (visualCandidates && visualCandidates.length === 1 && visualCandidates[0] === 'barcode') {
+                    const trimmedBarcode = query.trim();
+                    const barcodeMatch = shopItems.find((i) => i.barcode === trimmedBarcode);
+
+                    const data = {
+                        searchShopProducts: {
+                            products: barcodeMatch ? [barcodeMatch] : [],
+                            totalCount: barcodeMatch ? 1 : 0,
+                        },
+                    };
+                    setResult({ loading: false, error: null, data });
+                    return { data };
+                }
 
                 // LAYER 1: exact visual_class_keys overlap — mirrors the
                 // backend's Postgres array && check. A bound key survives

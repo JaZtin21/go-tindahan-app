@@ -404,7 +404,7 @@ const resolveUnitOfMeasure = (chosenName: string, ocrText: string): UnitResoluti
  *                        raw OCR text, not from any candidate.
  *  - 'weak_fallback'    : neither signal gave anything usable. Worst case.
  */
-export type ConfidenceTier = 'ocr_confirmed' | 'visual_confident' | 'ocr_fallback' | 'weak_fallback';
+export type ConfidenceTier = 'ocr_confirmed' | 'visual_confident' | 'ocr_fallback' | 'weak_fallback' | 'barcode';
 
 /**
  * Whether this tier is trustworthy enough to bind visual_class_keys against

@@ -12,6 +12,7 @@ import {
 import { TriangleAlert, ImageIcon, RotateCcw, WifiOff } from 'lucide-react';
 import { useSearchShopProducts } from '~/api/queries';
 import type { Product } from '~/types/item';
+import { detectBarcodeFromImage } from '~/utils/barcodeDetection';
 
 // ============================================================================
 // SCAN OUTCOME CONTRACT
@@ -306,6 +307,69 @@ export const ProductScannerCamera = ({
      * callers never touch the search API themselves.
      */
     const identifyAndSearch = async (file: File, previewUrl: string, imgElement: HTMLImageElement): Promise<ScanOutcome> => {
+        // 🚀 NEW: barcode check runs FIRST, sequentially, before the vision
+        // model / OCR even start. If this image has a valid, decodable barcode,
+        // that's a deterministic identity — no reason to pay the cost of running
+        // the vision model or OCR at all, let alone let their (fuzzier) guesses
+        // compete with it. Early return below completely bypasses the rest of
+        // this function when a barcode is found AND matched in this shop.
+        console.log('scanning image for barcode...');
+
+        const detectedBarcode = await detectBarcodeFromImage(imgElement);
+
+
+
+        if (detectedBarcode) {
+            console.log('[Identify] Barcode detected:', detectedBarcode.rawValue, detectedBarcode.format);
+        }
+
+        if (detectedBarcode && searchInventory && shopId) {
+            try {
+                const barcodeResult: any = await searchProducts({
+                    variables: {
+                        shopId: String(shopId),
+                        query: detectedBarcode.rawValue,
+                        limit: SEARCH_RESULT_LIMIT,
+                        offset: 0,
+                        // 🚀 Sentinel — tells the backend this is an exclusive
+                        // barcode-mode search (Layer 0 in SearchShopProducts),
+                        // not a vision-candidate array. Backend returns either
+                        // exactly one product or empty; never falls through to
+                        // Layer 1/2 for this request.
+                        visualCandidates: ['barcode'],
+                    },
+                });
+
+                const barcodeProducts: Product[] = barcodeResult?.data?.searchShopProducts?.products || [];
+
+                if (barcodeProducts.length > 0) {
+                    const barcodeHit = barcodeProducts[0];
+                    return {
+                        status: 'matched',
+                        product: barcodeHit,
+                        variants: [barcodeHit], // a barcode is 1:1 with a specific SKU — no itemName grouping needed
+                        file,
+                        previewUrl,
+                        visualCandidateKeys: [], // not a vision guess — nothing worth binding/teaching the model
+                        confidenceTier: 'barcode',
+                    };
+                }
+                // Empty result — valid barcode, but not registered to any item
+                // in this shop yet. Deliberately falls through to the vision+OCR
+                // path below rather than returning 'unmatched' immediately, so
+                // the user still gets a suggested name/photo prefill instead of
+                // a blank form.
+            } catch (err) {
+                console.error('[Identify] Barcode search failed:', err);
+                // fall through to vision+OCR below — don't strand the user on a network hiccup
+            }
+        }
+
+
+        console.log('running visual model and OCR instead');
+
+        // --- existing vision + OCR pipeline, UNCHANGED below this line ---
+
         const ocrCanvas = imageElementToCanvas(imgElement);
 
         const [topCandidates, ocrText] = await Promise.all([
@@ -318,10 +382,6 @@ export const ProductScannerCamera = ({
 
         const { name: suggestedName, unitOfMeasure, confidenceTier } = resolveProductIdentity(topCandidates, ocrText);
 
-        // Send the full candidate list for SEARCH regardless of tier — a bad
-        // guess here just fails to match and falls through to server-side
-        // text search, no harm done. WRITING these as visual_class_keys is a
-        // separate, stricter decision made below via shouldBindVisualClassKeys.
         const searchCandidateKeys = getTopVisualCandidateNames(topCandidates, VISUAL_CANDIDATE_KEY_LIMIT);
         const visualCandidateKeys = shouldBindVisualClassKeys(confidenceTier) ? searchCandidateKeys : [];
 
@@ -368,7 +428,6 @@ export const ProductScannerCamera = ({
             }
         } catch (err) {
             console.error('[Identify] Post-scan inventory search failed:', err);
-            // Fall through to 'unmatched' below — don't strand the user.
         }
 
         return {

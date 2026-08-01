@@ -120,6 +120,7 @@ type PublicProduct {
                           # resolvers that don't compute a score (e.g. public
                           # customer-facing searchProduct).
   matchType: String       # NEW: "visual_key" | "trgm_fallback" | null
+  barcode: String
 }
 
 # 🔐 OWNER PRODUCT TYPE: For store management (Contains sensitive financials)

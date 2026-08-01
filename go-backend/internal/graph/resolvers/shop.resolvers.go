@@ -16,6 +16,7 @@ import (
 	"go-backend/internal/utils"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -2746,6 +2747,43 @@ func (r *queryResolver) SearchProduct(ctx context.Context, query string, limit i
 // SearchShopProducts is the resolver for the searchShopProducts field.
 func (r *queryResolver) SearchShopProducts(ctx context.Context, shopID string, query string, limit int, offset int, visualCandidates []string) (*model.PaginatedPublicProducts, error) {
 	normalizedQuery := utils.NormalizeSearchText(query)
+
+	if len(visualCandidates) == 1 && visualCandidates[0] == "barcode" {
+		trimmedBarcode := strings.TrimSpace(query)
+		barcodeQuery := `
+			SELECT id, shop_id, item_name, description, category, unit_of_measure, barcode, photo, selling_price, stock_quantity
+			FROM inventory_items
+			WHERE shop_id = $1 AND barcode = $2 AND deleted_at IS NULL
+			LIMIT 1
+		`
+		var prod model.PublicProduct
+		err := r.Resolver.DB.QueryRow(ctx, barcodeQuery, shopID, trimmedBarcode).Scan(
+			&prod.ID, &prod.ShopID, &prod.ItemName, &prod.Description, &prod.Category,
+			&prod.UnitOfMeasure, &prod.Barcode, &prod.Photo, &prod.SellingPrice, &prod.StockQuantity,
+		)
+
+		if err == pgx.ErrNoRows {
+			return &model.PaginatedPublicProducts{Products: nil, TotalCount: 0, HasNextPage: false}, nil
+		}
+		if err != nil {
+			log.Printf("🔴 SearchShopProducts: barcode mode query failed: %v", err)
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "internal server error: shop product search failure",
+				Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+			})
+			return nil, nil
+		}
+
+		score := 1.0
+		matchType := "barcode"
+		prod.MatchScore = &score
+		prod.MatchType = &matchType
+		return &model.PaginatedPublicProducts{
+			Products:    []*model.PublicProduct{&prod},
+			TotalCount:  1,
+			HasNextPage: false,
+		}, nil
+	}
 
 	// -------------------------------------------------------------------
 	// LAYER 1: exact match against stable visual recognition keys.
