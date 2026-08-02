@@ -216,6 +216,12 @@ type PaginatedItemActionHistory {
   hasNextPage: Boolean!
 }
 
+type SyncRejection {
+  localId: ID!
+  code: String!
+  reason: String!
+}
+
 # --- INPUTS FOR MUTATIONS ---
 
 input CreateShopInput {
@@ -455,6 +461,7 @@ input UnifiedBatchSyncInput {
 type DeltaResponse {
   upserted: [JSON!]!  # Raw parsed backend structures including their assigned localId
   deletedIds: [ID!]!  # Database IDs deleted globally that the client needs to purge
+  rejected: [SyncRejection!]!
 }
 
 type UnifiedBatchSyncPayload {

@@ -147,6 +147,7 @@ type DeliveryOptionsInput struct {
 type DeltaResponse struct {
 	Upserted   []map[string]any `json:"upserted"`
 	DeletedIds []string         `json:"deletedIds"`
+	Rejected   []*SyncRejection `json:"rejected"`
 }
 
 type GoogleLoginInput struct {
@@ -414,6 +415,12 @@ type SocialMedia struct {
 type SocialMediaInput struct {
 	Facebook  *string `json:"facebook,omitempty"`
 	Instagram *string `json:"instagram,omitempty"`
+}
+
+type SyncRejection struct {
+	LocalID string `json:"localId"`
+	Code    string `json:"code"`
+	Reason  string `json:"reason"`
 }
 
 type UnifiedBatchSyncInput struct {

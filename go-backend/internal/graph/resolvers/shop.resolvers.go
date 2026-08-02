@@ -1111,6 +1111,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	var upsertedInventory []map[string]any
 	var upsertedCheckouts []map[string]any
 	var upsertedHistories []map[string]any
+	var rejectedInventory []*model.SyncRejection // NEW: kept for schema compat, currently never populated
 
 	// =========================================================================
 	// PHASE 1: PROCESS SHOPS BATCH ARRAY
@@ -1120,37 +1121,11 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		shopUploader := uploader.WithFolder(shopUploadFolder)
 
 		if s.IsDeleted {
-			// NEW: fetch this shop's + its inventory's photo URLs BEFORE the
-			// cascade delete below, so we know what to purge from R2 — same
-			// asset-collection step DeleteShop already does. Ownership is
-			// enforced implicitly: the UPDATE shops ... WHERE owner_id = $2
-			// a few lines down is the actual security boundary, this SELECT
-			// is purely for gathering cleanup targets and is harmless if it
-			// matches nothing.
 			var oldPrimaryPhoto *string
 			var oldPhotosSlice []string
 			_ = tx.QueryRow(ctx, `SELECT photo, photos FROM shops WHERE id = $1 AND owner_id = $2`,
 				s.LocalID, currentUser.ID).Scan(&oldPrimaryPhoto, &oldPhotosSlice)
 
-			// CHANGED: no longer fetching every inventory item's photo URL
-			// individually — now that inventory folders are nested by item
-			// id (shops/<owner>/shops/<shop>/inventory/<itemId>/...), one
-			// prefix delete on .../inventory/ below covers all of them at
-			// once, recursively, regardless of how many items the shop has.
-
-			// FIX: cascade the deletion — same shape as the single-resolver
-			// DeleteShop mutation. Without this, a shop soft-deleted through
-			// batch sync leaves its inventory items behind with no
-			// deleted_at, so they never tombstone for other devices, and
-			// (per the previous fix) an offline edit to one of those
-			// orphaned items would still pass the `deleted_at IS NULL`
-			// check and silently succeed even though its shop is gone.
-			//
-			// checkout_batches / checkout_batch_items / item_action_history
-			// are hard-deleted, not soft-deleted, for the same reason as in
-			// DeleteShop: syncEngine.ts never reads checkoutsDelta.deletedIds
-			// or actionHistoriesDelta.deletedIds today, so a tombstone there
-			// would never be consumed.
 			if _, err = tx.Exec(ctx, `
 				DELETE FROM checkout_batch_items
 				WHERE inventory_item_id IN (SELECT id FROM inventory_items WHERE shop_id = $1)
@@ -1188,11 +1163,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			}
 			cascadeRows.Close()
 
-			// Tell this client's own sync response about every item that
-			// just got cascade-deleted, so its own TinyBase/Redux drop them
-			// too — not just the shop itself. Without this, THIS client
-			// (the one that pushed the shop deletion) wouldn't find out
-			// about its own cascade until some later sync.
 			for _, itemID := range cascadedItemIDs {
 				upsertedInventory = append(upsertedInventory, map[string]any{
 					"id":        itemID,
@@ -1212,8 +1182,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				"isDeleted": true,
 			})
 
-			// NEW: clean up R2 now that the soft-delete succeeded — same
-			// direct calls DeleteShop makes, no queue, best-effort only.
 			if oldPrimaryPhoto != nil && *oldPrimaryPhoto != "" {
 				if cleanErr := shopUploader.DeleteImageByURL(ctx, *oldPrimaryPhoto); cleanErr != nil {
 					log.Printf("⚠️ BATCH SYNC: failed to remove primary shop image %s on deletion: %v", *oldPrimaryPhoto, cleanErr)
@@ -1234,19 +1202,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			continue
 		}
 
-		// NEW: resolve the photo(s) that will actually get written — upload
-		// any real File objects the client sent (`NewPhoto`/`NewPhotos`) and
-		// merge with whatever retained URLs came through in `Photo`/`Photos`.
-		// This is the piece that was missing entirely before: s.Photo /
-		// s.Photos used to get written to the DB as-is, so a freshly
-		// captured photo (which arrives as NewPhoto, not Photo) never made
-		// it anywhere.
-		// FIX: s.Photo is *string — ShopSyncInput.photo is a nullable
-		// `String` in the schema, same as UpdateShopInput.Photo, which your
-		// original UpdateShop resolver already dereferences the same way
-		// (`if input.Photo != nil { finalPrimaryPhoto = *input.Photo }`).
-		// I missed that here originally and assigned the pointer directly,
-		// which is what the compiler caught.
 		finalPrimaryPhoto := ""
 		if s.Photo != nil {
 			finalPrimaryPhoto = *s.Photo
@@ -1266,7 +1221,7 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				result, upErr := shopUploader.UploadImage(ctx, upload.File, upload.Filename)
 				if upErr != nil {
 					log.Printf("⚠️ BATCH SYNC: shop %s gallery photo upload failed: %v", s.LocalID, upErr)
-					continue // Gracefully skip failed slice tracks, same as CreateShop
+					continue
 				}
 				finalPhotosSlice = append(finalPhotosSlice, result.URL)
 			}
@@ -1285,10 +1240,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		var deletedGalleryPhotos []string
 
 		if s.IsServerSynced {
-			// NEW: grab the pre-update photo state so we can diff against
-			// finalPrimaryPhoto/finalPhotosSlice below and know what's now
-			// orphaned in R2 — same idea as UpdateShop's oldPrimaryPhoto /
-			// oldPhotosSlice fetch.
 			var oldPrimaryPhoto *string
 			var oldPhotosSlice []string
 			_ = tx.QueryRow(ctx, `SELECT photo, photos FROM shops WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
@@ -1299,9 +1250,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			}
 			deletedGalleryPhotos = utils.DiffPhotoURLs(oldPhotosSlice, finalPhotosSlice)
 
-			// FIX: AND deleted_at IS NULL — without this, editing a shop
-			// that was soft-deleted on another device silently revives it
-			// (the UPDATE succeeds and looks like a normal edit).
 			query := `
 				UPDATE shops SET 
 					shop_name = $1, address = $2, description = $3, photo = $4, photos = $5,
@@ -1315,28 +1263,17 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				s.LocalID, currentUser.ID,
 			).Scan(&finalServerID, &finalCreatedAt)
 
-			// FIX: the shop was already soft-deleted elsewhere between this
-			// client's last sync and now — the UPDATE matched zero rows.
-			// Report it as a deletion instead of falling into the generic
-			// error handler below (which would fail the whole batch) or
-			// silently treating it as a successful edit.
 			if errors.Is(err, pgx.ErrNoRows) {
 				upsertedShops = append(upsertedShops, map[string]any{
 					"id":        s.LocalID,
 					"localId":   s.LocalID,
 					"isDeleted": true,
 				})
-				// NEW: the shop vanished before this update landed, so any
-				// image we just uploaded above for it is now orphaned —
-				// clean it up directly rather than leaking it in R2.
 				if s.NewPhoto != nil && finalPrimaryPhoto != "" {
 					if cleanErr := shopUploader.DeleteImageByURL(ctx, finalPrimaryPhoto); cleanErr != nil {
 						log.Printf("⚠️ BATCH SYNC: failed to remove orphaned shop image %s: %v", finalPrimaryPhoto, cleanErr)
 					}
 				}
-				// Any freshly-uploaded gallery images are also orphaned here.
-				// finalPhotosSlice = retained (s.Photos) + newly uploaded URLs,
-				// so anything in it that wasn't already in s.Photos is new.
 				retainedSet := make(map[string]bool, len(s.Photos))
 				for _, p := range s.Photos {
 					retainedSet[p] = true
@@ -1381,8 +1318,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 
 		shopIDMap[s.LocalID] = finalServerID
 
-		// NEW: clean up replaced/removed photos now that the write succeeded
-		// — same "SECURE R2 CLEANUP SWEEPS" step UpdateShop runs.
 		if deletedPrimaryPhoto != "" {
 			if cleanErr := shopUploader.DeleteImageByURL(ctx, deletedPrimaryPhoto); cleanErr != nil {
 				log.Printf("⚠️ BATCH SYNC: failed to remove replaced shop image %s: %v", deletedPrimaryPhoto, cleanErr)
@@ -1402,8 +1337,8 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			"shopName":       s.ShopName,
 			"address":        s.Address,
 			"description":    s.Description,
-			"photo":          finalPrimaryPhoto, // CHANGED: was s.Photo — now the R2-resolved URL
-			"photos":         finalPhotosSlice,  // CHANGED: was s.Photos
+			"photo":          finalPrimaryPhoto,
+			"photos":         finalPhotosSlice,
 			"coordinates":    s.Coordinates,
 			"businessHours":  s.BusinessHours,
 			"paymentMethods": s.PaymentMethods,
@@ -1423,20 +1358,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			targetShopID = realShopID
 		}
 
-		// CHANGED: folder keyed by shops/<ownerId>/shops/<shopId>/inventory/<itemLocalId>/<itemName>
-		// — item.LocalID works as the durable folder key for BOTH create and
-		// update here, with no extra generation step needed, because of what
-		// it actually is on each path:
-		//   - brand new item (IsServerSynced=false): syncEngine.ts already
-		//     generated this via crypto.randomUUID() before queuing it, so
-		//     it's a stable id even before this row exists in Postgres.
-		//   - already-synced item being edited (IsServerSynced=true): once
-		//     a shop/item is confirmed, TinyBase's row key IS the real
-		//     server id (see replaceLocalShop's swap-in-place), and that's
-		//     what gets sent back as localId on the next dirty push — so
-		//     it's already equal to the real DB id here.
-		// Either way it's the same value across every sync call for a given
-		// item, which is exactly what a folder key needs to be.
 		inventoryUploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, targetShopID, item.LocalID, item.ItemName)
 		inventoryUploader := uploader.WithFolder(inventoryUploadFolder)
 
@@ -1452,18 +1373,12 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				"isDeleted": true,
 			})
 
-			// CHANGED: whole-folder delete instead of fetching one known
-			// photo URL — matches DeleteInventoryItem's new approach, and
-			// means we no longer need a SELECT before the soft-delete here.
 			if cleanErr := inventoryUploader.DeleteFolder(ctx); cleanErr != nil {
 				log.Printf("⚠️ BATCH SYNC: failed to remove inventory folder %s on deletion: %v", inventoryUploadFolder, cleanErr)
 			}
 			continue
 		}
 
-		// Same upload-or-keep resolution as shops, single photo only.
-		// FIX: same as the shops fix above — item.Photo is *string
-		// (InventorySyncInput.photo is a nullable String), not string.
 		finalPhoto := ""
 		if item.Photo != nil {
 			finalPhoto = *item.Photo
@@ -1474,6 +1389,24 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				finalPhoto = result.URL
 			} else {
 				log.Printf("⚠️ BATCH SYNC: item %s photo upload failed: %v", item.LocalID, upErr)
+			}
+		}
+
+		// NEW: if this item is bringing a barcode, whichever OTHER item in
+		// this shop currently holds it loses it first. The incoming/pushed
+		// item always wins — it represents what the user is actively using
+		// right now. Runs in the same transaction, so by the time the
+		// INSERT/UPDATE below executes, nothing else in this shop can be
+		// holding a conflicting barcode, and no unique-violation is possible
+		// — no savepoint/retry needed for this anymore.
+		if item.Barcode != nil && strings.TrimSpace(*item.Barcode) != "" {
+			if _, err = tx.Exec(ctx, `
+				UPDATE inventory_items
+				SET barcode = NULL
+				WHERE shop_id = $1 AND barcode = $2 AND id <> $3 AND deleted_at IS NULL
+			`, targetShopID, *item.Barcode, item.LocalID); err != nil {
+				log.Printf("🔴 BATCH SYNC: failed clearing conflicting barcode ahead of item %s: %v", item.LocalID, err)
+				return nil, err
 			}
 		}
 
@@ -1489,9 +1422,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				deletedPhoto = *oldPhoto
 			}
 
-			// FIX: AND deleted_at IS NULL — same reasoning as the shops UPDATE above.
-			// NEW: visual_class_keys appended (deduped) via the same COALESCE
-			// pattern as UpdateInventoryItem — nil/empty input is a no-op.
 			query := `
 				UPDATE inventory_items SET 
 					item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5,
@@ -1506,9 +1436,9 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				item.LocalID, targetShopID,
 			).Scan(&finalItemID, &finalVisualClassKeys)
 
-			// FIX: item was already soft-deleted elsewhere — report as a
-			// deletion instead of silently reviving it or erroring the batch.
 			if errors.Is(err, pgx.ErrNoRows) {
+				// item already soft-deleted elsewhere — unrelated to
+				// barcodes, unchanged from before.
 				upsertedInventory = append(upsertedInventory, map[string]any{
 					"id":        item.LocalID,
 					"localId":   item.LocalID,
@@ -1522,12 +1452,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				continue
 			}
 		} else {
-			// CHANGED: id is now supplied explicitly as item.LocalID —
-			// same value the folder above was built from — instead of
-			// letting the column's DEFAULT gen_random_uuid() assign a
-			// different one. Mirrors AddInventoryItem's new behavior, and
-			// means finalItemID == item.LocalID for every item created
-			// through batch sync from here on.
 			seedVisualClassKeys := item.VisualClassKeys
 			if seedVisualClassKeys == nil {
 				seedVisualClassKeys = []string{}
@@ -1572,20 +1496,15 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			"sellingPrice":    item.SellingPrice,
 			"stockQuantity":   item.StockQuantity,
 			"reorderLevel":    item.ReorderLevel,
-			"photo":           finalPhoto,           // CHANGED: was item.Photo — now the R2-resolved URL
-			"visualClassKeys": finalVisualClassKeys, // NEW — so the pushing client's own
-			// TinyBase/Redux copy picks up the
-			// server-merged key set immediately,
-			// same reasoning as the cascade-delete
-			// echo-back further up this file.
-			"updatedAt": time.Now().Format(time.RFC3339),
+			"photo":           finalPhoto,
+			"visualClassKeys": finalVisualClassKeys,
+			"updatedAt":       time.Now().Format(time.RFC3339),
 		})
 	}
 
 	// =========================================================================
 	// PHASE 3: PROCESS CHECKOUT TRANSACTIONS BATCH ARRAY (Append-Only)
 	// =========================================================================
-	// unchanged — no photos on checkouts
 	pushedCheckoutIDs := make(map[string]bool)
 
 	for _, c := range input.Checkouts {
@@ -1691,7 +1610,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// PHASE 4: PROCESS ITEM ACTION HISTORIES ARRAY (Append-Only)
 	// =========================================================================
-	// unchanged — no photos on action history rows
 	pushedHistoryIDs := make(map[string]bool)
 	for _, h := range input.ActionHistories {
 		targetShopID := h.ShopID
@@ -1715,8 +1633,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 			createdAtAnchor = parsedTime
 		}
 
-		// 🟢 Step 1: SELF-HEALING GUARD
-		// If a history log points to a valid ID, check if it actually exists in Postgres
 		if resolvedItemID != nil {
 			var itemExists bool
 			checkQuery := `SELECT EXISTS(SELECT 1 FROM inventory_items WHERE id = $1)`
@@ -1727,16 +1643,12 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 				return nil, checkItemErr
 			}
 
-			// If the item doesn't exist anywhere (ghost offline item), skip it safely!
-			// This stops the foreign key constraint from breaking your entire batch update.
 			if !itemExists {
 				log.Printf("🧹 BATCH SYNC: Safely skipped ghost action log for missing item ID: %s", *resolvedItemID)
 				continue
 			}
 		}
 
-		// Step 2: Run your normal INSERT statement.
-		// This is now 100% safe because Step 1 guarantees the item is in the DB!
 		var historyID string
 		query := `
         INSERT INTO item_action_history (shop_id, inventory_item_id, item_name, action, quantity, created_at)
@@ -1767,7 +1679,6 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 	// =========================================================================
 	// PHASE 5: FETCH GLOBAL DELTAS FROM PULL ANCHORS
 	// =========================================================================
-	// unchanged
 	serverCheckpointTime := time.Now().Format(time.RFC3339)
 
 	lastSyncedAnchor, parseErr := time.Parse(time.RFC3339, input.LastSyncedAt)
@@ -2048,22 +1959,30 @@ func (r *mutationResolver) UnifiedBatchSync(ctx context.Context, input model.Uni
 		return nil, fmt.Errorf("transaction commit collision: %w", errCommit)
 	}
 
+	if rejectedInventory == nil {
+		rejectedInventory = []*model.SyncRejection{}
+	}
+
 	return &model.UnifiedBatchSyncPayload{
 		ShopsDelta: &model.DeltaResponse{
 			Upserted:   upsertedShops,
 			DeletedIds: deletedShops,
+			Rejected:   []*model.SyncRejection{},
 		},
 		InventoryDelta: &model.DeltaResponse{
 			Upserted:   upsertedInventory,
 			DeletedIds: deletedItems,
+			Rejected:   rejectedInventory,
 		},
 		CheckoutsDelta: &model.DeltaResponse{
 			Upserted:   upsertedCheckouts,
 			DeletedIds: []string{},
+			Rejected:   []*model.SyncRejection{},
 		},
 		ActionHistoriesDelta: &model.DeltaResponse{
 			Upserted:   upsertedHistories,
 			DeletedIds: []string{},
+			Rejected:   []*model.SyncRejection{},
 		},
 		ServerTime: serverCheckpointTime,
 	}, nil

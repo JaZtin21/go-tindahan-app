@@ -98,6 +98,7 @@ type ComplexityRoot struct {
 
 	DeltaResponse struct {
 		DeletedIds func(childComplexity int) int
+		Rejected   func(childComplexity int) int
 		Upserted   func(childComplexity int) int
 	}
 
@@ -316,6 +317,12 @@ type ComplexityRoot struct {
 	SocialMedia struct {
 		Facebook  func(childComplexity int) int
 		Instagram func(childComplexity int) int
+	}
+
+	SyncRejection struct {
+		Code    func(childComplexity int) int
+		LocalID func(childComplexity int) int
+		Reason  func(childComplexity int) int
 	}
 
 	UnifiedBatchSyncPayload struct {
@@ -618,6 +625,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.DeltaResponse.DeletedIds(childComplexity), true
+	case "DeltaResponse.rejected":
+		if e.ComplexityRoot.DeltaResponse.Rejected == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeltaResponse.Rejected(childComplexity), true
 	case "DeltaResponse.upserted":
 		if e.ComplexityRoot.DeltaResponse.Upserted == nil {
 			break
@@ -1684,6 +1697,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.SocialMedia.Instagram(childComplexity), true
 
+	case "SyncRejection.code":
+		if e.ComplexityRoot.SyncRejection.Code == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SyncRejection.Code(childComplexity), true
+	case "SyncRejection.localId":
+		if e.ComplexityRoot.SyncRejection.LocalID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SyncRejection.LocalID(childComplexity), true
+	case "SyncRejection.reason":
+		if e.ComplexityRoot.SyncRejection.Reason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SyncRejection.Reason(childComplexity), true
+
 	case "UnifiedBatchSyncPayload.actionHistoriesDelta":
 		if e.ComplexityRoot.UnifiedBatchSyncPayload.ActionHistoriesDelta == nil {
 			break
@@ -2027,6 +2059,8 @@ func (ec *executionContext) childFields_DeltaResponse(ctx context.Context, field
 		return ec.fieldContext_DeltaResponse_upserted(ctx, field)
 	case "deletedIds":
 		return ec.fieldContext_DeltaResponse_deletedIds(ctx, field)
+	case "rejected":
+		return ec.fieldContext_DeltaResponse_rejected(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type DeltaResponse", field.Name)
 }
@@ -2377,6 +2411,18 @@ func (ec *executionContext) childFields_SocialMedia(ctx context.Context, field g
 		return ec.fieldContext_SocialMedia_instagram(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type SocialMedia", field.Name)
+}
+
+func (ec *executionContext) childFields_SyncRejection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "localId":
+		return ec.fieldContext_SyncRejection_localId(ctx, field)
+	case "code":
+		return ec.fieldContext_SyncRejection_code(ctx, field)
+	case "reason":
+		return ec.fieldContext_SyncRejection_reason(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type SyncRejection", field.Name)
 }
 
 func (ec *executionContext) childFields_UnifiedBatchSyncPayload(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -3997,6 +4043,38 @@ func (ec *executionContext) _DeltaResponse_deletedIds(ctx context.Context, field
 }
 func (ec *executionContext) fieldContext_DeltaResponse_deletedIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("DeltaResponse", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _DeltaResponse_rejected(ctx context.Context, field graphql.CollectedField, obj *model.DeltaResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeltaResponse_rejected(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Rejected, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.SyncRejection) graphql.Marshaler {
+			return ec.marshalNSyncRejection2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSyncRejectionᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeltaResponse_rejected(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeltaResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SyncRejection(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _HourlySalesMetric_hour(ctx context.Context, field graphql.CollectedField, obj *model.HourlySalesMetric) (ret graphql.Marshaler) {
@@ -8602,6 +8680,75 @@ func (ec *executionContext) fieldContext_SocialMedia_instagram(_ context.Context
 	return graphql.NewScalarFieldContext("SocialMedia", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _SyncRejection_localId(ctx context.Context, field graphql.CollectedField, obj *model.SyncRejection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SyncRejection_localId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LocalID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SyncRejection_localId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SyncRejection", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _SyncRejection_code(ctx context.Context, field graphql.CollectedField, obj *model.SyncRejection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SyncRejection_code(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Code, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SyncRejection_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SyncRejection", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _SyncRejection_reason(ctx context.Context, field graphql.CollectedField, obj *model.SyncRejection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SyncRejection_reason(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Reason, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SyncRejection_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SyncRejection", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _UnifiedBatchSyncPayload_shopsDelta(ctx context.Context, field graphql.CollectedField, obj *model.UnifiedBatchSyncPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -12005,6 +12152,11 @@ func (ec *executionContext) _DeltaResponse(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "rejected":
+			out.Values[i] = ec._DeltaResponse_rejected(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13794,6 +13946,54 @@ func (ec *executionContext) _SocialMedia(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var syncRejectionImplementors = []string{"SyncRejection"}
+
+func (ec *executionContext) _SyncRejection(ctx context.Context, sel ast.SelectionSet, obj *model.SyncRejection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, syncRejectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SyncRejection")
+		case "localId":
+			out.Values[i] = ec._SyncRejection_localId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "code":
+			out.Values[i] = ec._SyncRejection_code(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._SyncRejection_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var unifiedBatchSyncPayloadImplementors = []string{"UnifiedBatchSyncPayload"}
 
 func (ec *executionContext) _UnifiedBatchSyncPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnifiedBatchSyncPayload) graphql.Marshaler {
@@ -15203,6 +15403,32 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalNSyncRejection2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSyncRejectionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.SyncRejection) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNSyncRejection2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSyncRejection(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSyncRejection2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐSyncRejection(ctx context.Context, sel ast.SelectionSet, v *model.SyncRejection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SyncRejection(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNUnifiedBatchSyncInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐUnifiedBatchSyncInput(ctx context.Context, v any) (model.UnifiedBatchSyncInput, error) {
