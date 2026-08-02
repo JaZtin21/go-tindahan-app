@@ -6,6 +6,8 @@ import { Check, X, ShoppingCart, Trash2, Image as ImageIcon } from 'lucide-react
 import { toast } from 'sonner';
 import { useCheckoutCart } from '~/api/queries';
 import { Plus, Minus } from 'lucide-react'
+import { RootState } from '~/store/store';
+import { useSelector } from 'react-redux';
 
 
 
@@ -25,7 +27,7 @@ export const CheckoutTab = ({ shopId, updateCart }: ManualSearchTabProps) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const isSubscribed = false
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
 
 

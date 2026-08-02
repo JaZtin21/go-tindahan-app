@@ -1,10 +1,10 @@
 import type { Store } from 'tinybase';
 import client from '../../config/apolloClient';
 import { UNIFIED_BATCH_SYNC_MUTATION } from '~/api/graphql';
-import { store as reduxStore } from '~/store';
+import { store as reduxStore, RootState } from '~/store';
 import { replaceLocalShop, deleteShop } from '~/store/myShopsSlice';
-import { WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED } from '~/api/queries';
 import { dataUriToFile, isBase64Image } from '~/utils';
+import { useSelector } from 'react-redux';
 
 // ============================================================================
 // WHO OWNS REDUX, AND WHY replaceLocalShop INSTEAD OF addShop/updateShop
@@ -30,7 +30,6 @@ import { dataUriToFile, isBase64Image } from '~/utils';
 // of leaving a permanent duplicate.
 
 let isSyncRunning = false;
-
 function makeLogger() {
     const runId = Math.random().toString(36).slice(2, 8);
     const t0 = performance.now();
@@ -234,6 +233,8 @@ export async function syncAll(store: Store): Promise<void> {
             shopsDeleted: response.shopsDelta?.deletedIds,
         });
 
+        const WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED = reduxStore.getState().appSubscription.isWriteToOfflineDBWhenSubscribed;
+
         // =========================================================================
         // PHASE 3: RECONCILIATION
         // =========================================================================
@@ -309,7 +310,7 @@ export async function syncAll(store: Store): Promise<void> {
                 // Step 3: conditionally mirror into TinyBase (Condition 2
                 // only — when the flag is off this is skipped, same as
                 // before, and correctly so: TinyBase is write-only here).
-                log(`shops: STEP 3 — WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED=${WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED}, ${WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED ? 'writing' : 'skipping'} TinyBase mirror for ${realId}`);
+
                 if (WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED) {
                     store.setRow('shops', realId, {
                         shopName: shop.shopName,

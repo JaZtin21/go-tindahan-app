@@ -2,12 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import uiReducer from './uiSlice';
 import myShopsSlice from './myShopsSlice';
 import inventorySlice from './inventorySlice';
+import appSubscriptionReducer from './appSubscription';
 
 export const store = configureStore({
     reducer: {
         ui: uiReducer,
         myShops: myShopsSlice,
-        inventory: inventorySlice
+        inventory: inventorySlice,
+        appSubscription: appSubscriptionReducer
     },
 });
 

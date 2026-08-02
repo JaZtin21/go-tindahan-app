@@ -74,11 +74,12 @@ import {
     DELETE_INVENTORY_ITEM_MUTATION,
 } from '../graphql';
 import { fileToStorableBase64, findLocalBarcodeConflict, makeBarcodeConflictError } from '~/utils';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import type { RootState } from '~/store';
 import {
     setError as setErrorMyShops,
     setShops,
-} from '~/store/myShopsSlice';
+} from '~/store';
 
 // ============================================================================
 // OFFLINE PERSISTENCE TOGGLE
@@ -93,13 +94,8 @@ import {
 //        Changes made while OFFLINE still write locally as normal (that's
 //        the only way they can ever reach the server), so flipping this
 //        flag never affects the offline path, only the online one.
-export const WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED = true;
-
-// Central gate every hook below calls before touching TinyBase. Offline
-// writes (isSubscribed === false) are never gated — see the toggle comment
-// above for why.
 function shouldPersistLocally(isSubscribed: boolean): boolean {
-    return !isSubscribed || WRITE_TO_OFFLINE_DB_WHEN_SUBSCRIBED;
+    return !isSubscribed || useSelector((state: RootState) => state.appSubscription.isWriteToOfflineDBWhenSubscribed);
 }
 
 export function upsertServerRow(

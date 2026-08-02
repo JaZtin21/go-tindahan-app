@@ -6,6 +6,8 @@ import { ImageIcon, Plus, Minus, ChevronDown } from 'lucide-react';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
+import { RootState } from '~/store/store';
+import { useSelector } from 'react-redux';
 
 
 interface ManualSearchTabProps {
@@ -21,7 +23,7 @@ export const ManualRestockTab = ({ shopId }: ManualSearchTabProps) => {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = true;
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
     // 🚀 Stores all alternative items sharing the exact same name
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);

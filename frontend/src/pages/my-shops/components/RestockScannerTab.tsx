@@ -7,6 +7,8 @@ import { ProductScannerCamera, type ScanOutcome } from './ProductScannerCamera';
 import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { useSearchShopProducts, useIncrementStock } from '~/api/queries';
+import { RootState } from '~/store/store';
+import { useSelector } from 'react-redux';
 
 interface ScannerTabProps {
     shopId: string
@@ -27,7 +29,7 @@ export function RestockScannerTab({ shopId, isOpen }: ScannerTabProps) {
     const [quantity, setQuantity] = useState<number | ''>(0);
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
-    const isSubscribed = false;
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
     // 🚀 Added state to save the camera snapshot preview URL link string
     const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);

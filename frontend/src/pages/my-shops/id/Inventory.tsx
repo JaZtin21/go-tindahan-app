@@ -13,6 +13,7 @@ import type { Item } from '~/types';
 import { Modal } from '~/components';
 import { X, Check, TriangleAlert, SlidersHorizontal } from 'lucide-react';
 import { useShopInventory, useDeleteInventoryItem } from '~/api/queries';
+import { RootState } from '~/store/store';
 
 // Generic debounce hook: returns a debounced copy of `value` that only
 // updates after `delay` ms have passed without `value` changing again.
@@ -31,7 +32,7 @@ export const InventoryPage = () => {
     const { shopId } = useParams<{ shopId: string }>();
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const isSubscribed = true;
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
     // 1. PAGINATION SETUP: 10 items per page limit matrix footprint
     const itemsPerPage = 10;
@@ -126,7 +127,7 @@ export const InventoryPage = () => {
             setIsConfirmingDelete(false);
             setIsModalOpen(true);
             setIsSuccess(true);
-            setModalMessage('item have been permanently deleted.');
+            setModalMessage('Item have been permanently deleted.');
             setSelectedItemId(null);
         },
         onError: (error) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, act } from 'react';
 import { Modal } from "~/components";
 import { useParams } from 'react-router-dom';
 import { Camera, Pencil, Barcode } from 'lucide-react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
     addInventoryItem as addInventoryItemAction,
     updateInventoryItem as updateInventoryItemAction
@@ -14,6 +14,7 @@ import { resizeAndConvertToWebPFile } from '~/utils/imageUtils';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
 import { NotFoundException, DecodeHintType, BarcodeFormat } from '@zxing/library';
+import { RootState } from '~/store/store';
 
 export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data?: any }) {
 
@@ -26,7 +27,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
     const { id: shopId } = useParams();
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string>(typeof item?.photo === 'string' ? item.photo : '');
-    const isSubscribed = false;
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
     // 🚀 NEW: recognition keys from the scan that produced this form's current
     // itemName/unitOfMeasure/photo — sent as `visualClassKeys` on save so this

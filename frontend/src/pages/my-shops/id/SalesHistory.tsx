@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, ReceiptText } from 'lucide-react';
 import { useCheckoutHistory, useItemActionHistory } from '~/api/queries';
+import { RootState } from '~/store/store';
+import { useSelector } from 'react-redux';
 
 
 const PAGE_LIMIT = 10;
@@ -12,7 +14,7 @@ export const SalesHistoryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'checkout' | 'actions'>('checkout');
   const [checkoutOffset, setCheckoutOffset] = useState(0);
   const [actionsOffset, setActionsOffset] = useState(0);
-  const isSubscribed = false;
+  const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
   const checkoutQuery = useCheckoutHistory({
     shopId: shopId || '',

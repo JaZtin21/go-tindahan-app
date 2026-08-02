@@ -7,6 +7,8 @@ import { Modal } from '~/components';
 import { X, Check, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchShopProducts } from '~/api/queries';
+import { RootState } from '~/store/store';
+import { useSelector } from 'react-redux';
 
 
 interface ManualSearchTabProps {
@@ -24,8 +26,7 @@ export const ManualSearchTab = ({ shopId, updateCart }: ManualSearchTabProps) =>
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
 
-    const isSubscribed = false;
-    // 🚀 Stores all alternative items sharing the exact same name
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
     const [groupedProducts, setGroupedProducts] = useState<Product[]>([]);
     const [showUnitDropdown, setShowUnitDropdown] = useState(false);
 

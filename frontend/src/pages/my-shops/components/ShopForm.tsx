@@ -4,12 +4,13 @@ import { useState, useRef, type ChangeEvent, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { CREATE_SHOP_MUTATION, UPDATE_SHOP_MUTATION } from '~/api/graphql';
 import type { Shop } from "~/types/shop";
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { addShop, updateShop } from '~/store/myShopsSlice';
 import { setAddShopModalOpen } from '~/store/uiSlice';
 import { Modal } from "~/components";
 import { Check, X } from 'lucide-react';
 import { useCreateShop, useUpdateShop } from '~/api/queries';
+import { RootState } from '~/store/store';
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400';
 
@@ -38,7 +39,7 @@ export const ShopForm = ({ data }: { data?: Shop }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const isSubscribed = false
+    const isSubscribed = useSelector((state: RootState) => state.appSubscription.isSubscribed);
 
 
     const openModal = ({ isSuccess, type, error }: { isSuccess: boolean, type: string, error?: string }) => {
