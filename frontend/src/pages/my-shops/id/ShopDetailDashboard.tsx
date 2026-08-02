@@ -215,6 +215,8 @@ export const ShopDetailDashboard = () => {
     }
 
 
+    const [isInquireModalOpen, setIsInquireModalOpen] = useState(false);
+
 
     return (
         <div className="min-h-screen  transition-colors duration-300 pb-12">
@@ -656,7 +658,7 @@ export const ShopDetailDashboard = () => {
 
                 {/* 4. View Inquiries (Subroute Navigation Anchor) */}
                 <a
-                    onClick={() => navigate(`/my-shops/${shopId}/inquiries`)}
+                    onClick={() => setIsInquireModalOpen(true)}
                     className="group flex flex-col border-1 border-brand-gold/50 hover:border-brand-gold/20 bg-bg-primary hover:bg-brand-gold/10 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-bg-primary-hover cursor-pointer no-underline "
                 >
                     <div className="relative w-full aspect-video bg-brand-gold/10 group-hover:bg-bg-primary transition-all duration-300 rounded-xl mb-4 shrink-0 flex items-center justify-center overflow-hidden">
@@ -746,6 +748,38 @@ export const ShopDetailDashboard = () => {
                 <ShopForm data={shop} />
             </Modal>
 
+
+            <Modal
+                isOpen={isInquireModalOpen}
+                onClose={() => setIsInquireModalOpen(false)}
+                title={"Shop Inquiry"}
+                subtitle=""
+                isMobileVariant={false}
+                maxWidth="max-w-[360px] md:max-w-[400px]"
+                isHeaderVisible={false}
+                unsetHeight
+            >
+                <div className="flex flex-col gap-4 items-center text-center p-2">
+
+
+                    <div className='p-6 flex gap-6 flex-col'>
+                        <div className="text-2xl self-center font-bold">Coming Soon!</div>
+                        <p className="m-0 text-[15px] max-w-[400px] text-[var(--color-text-sub)] leading-relaxed">
+                            Soon you'll be able to connect with your customers directly through the platform. Stay tuned for updates!
+                        </p>
+
+                        <div className="flex gap-3 w-full mt-4">
+                            <button
+                                onClick={() => setIsInquireModalOpen(false)}
+                                disabled={isDeleting}
+                                className="flex-1 px-4 py-2.5 bg-[var(--color-bg-primary-hover)] hover:bg-[var(--color-border-main)] text-[var(--color-text-sub)] border border-[var(--color-border-main)] rounded-md font-semibold cursor-pointer transition-colors duration-200 disabled:opacity-50"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={isModalOpen}
