@@ -813,13 +813,13 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 title="Scan Barcode"
                 subtitle="Point your camera at the barcode"
             >
-                <div className="flex flex-col items-center gap-4 p-4">
+                <div className="flex flex-col items-center gap-4 p-4 h-full">
                     {barcodeScanError ? (
                         <p className="text-sm text-brand-red text-center">{barcodeScanError}</p>
                     ) : (
-                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black h-full">
                             <video ref={barcodeVideoRef} className="w-full h-full object-cover" muted playsInline />
-                            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-brand-gold/80" />
+                            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-text-white/80" />
                         </div>
                     )}
                     <button
