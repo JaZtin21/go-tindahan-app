@@ -777,7 +777,7 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                 isHeaderVisible={false}
                 unsetHeight
             >
-                <div className="flex flex-col items-center justify-center  min-h-[200px]">
+                <div className="flex flex-col items-center justify-center  min-h-[200px] py-6">
                     {/* Visual Success/Error Indicator Anchor (Optional styling) */}
                     <div className=''>
                         {isSuccess ? (
@@ -788,11 +788,11 @@ export default function InventoryForm({ isOpen, onClose, data }: { isOpen: boole
                     </div>
 
                     {/* Dynamic Text Content */}
-                    <p className="mt-2 text-lg font-bold text-text-main dark:text-zinc-400">
+                    <p className="mt-2 text-lg font-bold text-text-main dark:text-zinc-400 max-w-[300px] text-center">
                         {modalMessage}
                     </p>
 
-                    <p className={`mt-2 ${isSuccess ? 'hidden' : ''} text-sm text-text-main dark:text-zinc-400`}>
+                    <p className={`mt-2 ${isSuccess ? 'hidden' : ''} text-sm text-text-main dark:text-zinc-400 max-w-[300px] text-center`}>
                         {errorMessage}
                     </p>
 

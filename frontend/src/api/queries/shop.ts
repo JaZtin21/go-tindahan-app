@@ -73,7 +73,7 @@ import {
     UPDATE_SHOP_MUTATION,
     DELETE_INVENTORY_ITEM_MUTATION,
 } from '../graphql';
-import { fileToStorableBase64 } from '~/utils';
+import { fileToStorableBase64, findLocalBarcodeConflict, makeBarcodeConflictError } from '~/utils';
 import { useDispatch } from 'react-redux';
 import {
     setError as setErrorMyShops,
@@ -1379,6 +1379,13 @@ export function useAddInventoryItem(opts: MutationCallbacks) {
                         input.photo = await fileToStorableBase64(input.photo);
                     }
                     const row = { ...toItemRow(input), _dirty: true, _serverSynced: false, _deleted: false };
+
+                    // NEW: block duplicate barcode within the same shop before writing locally
+                    const conflictId = findLocalBarcodeConflict(store, row.shopId, row.barcode ?? '');
+                    if (conflictId) {
+                        throw makeBarcodeConflictError();
+                    }
+
                     store.setRow('inventory', id, row);
 
                     recordOfflineItemAction(store, {
@@ -1449,6 +1456,19 @@ export function useUpdateInventoryItem(opts: MutationCallbacks) {
                         ...toItemRow({ ...input, shopId: input.shopId ?? (existing.shopId as string) }),
                         _dirty: true,
                     };
+
+                    // NEW: block duplicate barcode within the same shop before writing locally.
+                    // excludeId = itemId so an item doesn't conflict with its own unchanged barcode.
+                    const conflictId = findLocalBarcodeConflict(
+                        store,
+                        merged.shopId,
+                        merged.barcode ?? '',
+                        options.variables.itemId
+                    );
+                    if (conflictId) {
+                        throw makeBarcodeConflictError();
+                    }
+
                     store.setRow('inventory', options.variables.itemId, merged);
 
                     recordOfflineItemAction(store, {

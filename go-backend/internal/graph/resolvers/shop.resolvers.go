@@ -21,6 +21,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -515,7 +516,6 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
 	// SECURITY GUARD 2: Verify the caller is the actual owner of the target shop.
-	// CHANGED: no longer selecting shop_name — the folder no longer needs it.
 	var shopOwnerID string
 	checkQuery := "SELECT owner_id FROM shops WHERE id = $1 LIMIT 1"
 	err := r.Resolver.DB.QueryRow(ctx, checkQuery, input.ShopID).Scan(&shopOwnerID)
@@ -543,11 +543,6 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		return nil, nil
 	}
 
-	// NEW: get the item's real id BEFORE the insert, so the R2 folder can
-	// be keyed by it. gen_random_uuid() is the same function this column's
-	// own DEFAULT already uses — we're just calling it a step early so we
-	// can use the value before the row exists, then handing it back in
-	// explicitly on the INSERT below.
 	var itemID string
 	if err := r.Resolver.DB.QueryRow(ctx, `SELECT gen_random_uuid()`).Scan(&itemID); err != nil {
 		log.Printf("🔴 FAILED TO GENERATE ITEM ID IN ADDINVENTORYITEM: %v", err)
@@ -558,7 +553,6 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		return nil, nil
 	}
 
-	// 1. INITIALIZE IMAGE UPLOADER WITH THE BASE PATH
 	uploader, err := utils.NewImageUploader(
 		os.Getenv("R2_ACCOUNT_ID"),
 		os.Getenv("R2_ACCESS_KEY_ID"),
@@ -576,13 +570,9 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		return nil, nil
 	}
 
-	// CHANGED: shops/<ownerId>/shops/<shopId>/inventory/<itemId>/<itemName>
-	// — itemId is the durable folder key; itemName just rides along for
-	// human browsing, same reason you wanted names visible in the first place.
 	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, input.ShopID, itemID, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
-	// 2. UPLOAD PRODUCT PHOTO TO R2 IF PROVIDED
 	finalProductPhoto := ""
 	if input.Photo != nil && input.Photo.File != nil {
 		result, err := inventoryUploader.UploadImage(ctx, input.Photo.File, input.Photo.Filename)
@@ -593,17 +583,11 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 		}
 	}
 
-	// NEW: visual_class_keys — nil becomes an explicit empty array so the
-	// text[] parameter binds cleanly (a nil Go slice would otherwise send
-	// SQL NULL, which array operators like && treat as "no rows match").
 	visualClassKeys := input.VisualClassKeys
 	if visualClassKeys == nil {
 		visualClassKeys = []string{}
 	}
 
-	// 3. PERSIST RECORD TO POSTGRES — CHANGED: id is now supplied explicitly
-	// (the same value the folder above was built from), instead of letting
-	// the column's own DEFAULT gen_random_uuid() assign a different one.
 	query := `
 		INSERT INTO inventory_items (
 			id, shop_id, item_name, description, barcode, category, 
@@ -636,6 +620,16 @@ func (r *mutationResolver) AddInventoryItem(ctx context.Context, input model.Add
 	}
 
 	if err != nil {
+		// NEW: unique barcode-per-shop violation → friendly conflict error
+		// instead of a raw 500.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "This barcode is already used by another item in this shop",
+				Extensions: map[string]interface{}{"code": "BARCODE_ALREADY_EXISTS"},
+			})
+			return nil, nil
+		}
 		log.Printf("🔴 DATABASE TRANSACTION FAILED IN ADDINVENTORYITEM: %v", err)
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "internal server error: failed to create inventory item entry",
@@ -668,8 +662,7 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 	currentUser := ctx.Value("currentUser").(middleware.CachedUser)
 
 	// SECURITY GUARD 2: Fetch current database values to evaluate owner and
-	// grab old photo. CHANGED: now also selects i.shop_id instead of
-	// s.shop_name — the folder is keyed by shopId now, not shopName.
+	// grab old photo.
 	var shopOwnerID string
 	var oldPhoto *string
 	var shopID string
@@ -712,15 +705,9 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		return nil, fmt.Errorf("media processor error")
 	}
 
-	// CHANGED: input.ItemID instead of shopName+itemName — the item already
-	// has its real id (this IS an update, not a create), so no generation
-	// step is needed here, just building the same folder shape.
 	uploadFolder := fmt.Sprintf("shops/%s/shops/%s/inventory/%s/%s", currentUser.ID, shopID, input.ItemID, input.ItemName)
 	inventoryUploader := uploader.WithFolder(uploadFolder)
 
-	// =========================================================================
-	// 1. PRODUCT PHOTO UPDATES — unchanged logic, just the folder above changed
-	// =========================================================================
 	finalPhoto := ""
 	if input.Photo != nil {
 		finalPhoto = *input.Photo
@@ -740,13 +727,6 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		}
 	}
 
-	// =========================================================================
-	// 2. PERSIST AND EXECUTE SQL DATABASE UPDATE MATRIX — unchanged
-	// =========================================================================
-	// NEW: visual_class_keys are APPENDED, never overwritten. Passing nil/empty
-	// here (an ordinary field edit that isn't a scan correction) is a no-op —
-	// COALESCE($11::text[], '{}'::text[]) turns a NULL param into an empty
-	// array before the concat+dedup, so existing keys survive untouched.
 	updateQuery := `
 		UPDATE inventory_items 
 		SET item_name = $1, description = $2, barcode = $3, category = $4, unit_of_measure = $5, photo = $6,
@@ -767,8 +747,22 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		&item.UnitOfMeasure, &item.Photo, &item.CostPrice, &item.SellingPrice, &item.StockQuantity, &item.ReorderLevel, &item.VisualClassKeys, &updatedAt,
 	)
 	if err != nil {
+		// NEW: unique barcode-per-shop violation → friendly conflict error
+		// instead of a bare Go error bubbling up unstructured.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "This barcode is already used by another item in this shop",
+				Extensions: map[string]interface{}{"code": "BARCODE_ALREADY_EXISTS"},
+			})
+			return nil, nil
+		}
 		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEINVENTORYITEM: %v", err)
-		return nil, err
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: failed saving item updates",
+			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
 	}
 
 	item.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -779,8 +773,6 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		Action:          "edited item",
 	})
 
-	// NEW: this edit carried fresh visual keys, which only happens when it's
-	// a scan-correction save — log it as retraining signal.
 	if len(input.VisualClassKeys) > 0 {
 		itemIDCopy := item.ID
 		itemNameCopy := item.ItemName
@@ -792,9 +784,6 @@ func (r *mutationResolver) UpdateInventoryItem(ctx context.Context, input model.
 		})
 	}
 
-	// =========================================================================
-	// 3. SECURE R2 CLEANUP — unchanged logic, folder just changed above
-	// =========================================================================
 	if deletedPhoto != "" {
 		_ = inventoryUploader.DeleteImageByURL(ctx, deletedPhoto)
 	}
