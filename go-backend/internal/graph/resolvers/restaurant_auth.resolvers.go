@@ -282,8 +282,9 @@ func (r *mutationResolver) RevokeRestaurantStaff(ctx context.Context, restaurant
 // CurrentRestaurantOwner is the resolver for the currentRestaurantOwner field.
 // CurrentRestaurantOwner is the resolver for the currentRestaurantOwner field.
 func (r *queryResolver) CurrentRestaurantOwner(ctx context.Context) (*model.RestaurantOwner, error) {
-	currentUser, ok := ctx.Value("currentRestaurantUser").(middleware.CachedRestaurantUser)
-	if !ok {
+
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok || currentUser.ID == "" {
 		return nil, nil
 	}
 

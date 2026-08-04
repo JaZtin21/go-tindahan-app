@@ -23,8 +23,9 @@ import (
 // CreateRestaurant is the resolver for the createRestaurant field.
 // CreateRestaurant is the resolver for the createRestaurant field.
 func (r *mutationResolver) CreateRestaurant(ctx context.Context, input model.CreateRestaurantInput) (*model.Restaurant, error) {
-	currentUser, ok := ctx.Value("currentRestaurantUser").(middleware.CachedRestaurantUser)
-	if !ok {
+	// CORRECTED: Read from "currentUser" to match your unified middleware contract layout safely
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok || currentUser.ID == "" {
 		graphql.AddError(ctx, &gqlerror.Error{
 			Message:    "unauthorized: no restaurant session found",
 			Extensions: map[string]any{"code": "UNAUTHORIZED"},
@@ -43,18 +44,22 @@ func (r *mutationResolver) CreateRestaurant(ctx context.Context, input model.Cre
 	if input.Timezone != nil {
 		timezone = *input.Timezone
 	}
+
 	seatingType := model.SeatingTypeStandard
 	if input.SeatingType != nil {
 		seatingType = *input.SeatingType
 	}
+
 	turnDuration := 90
 	if input.DefaultTurnDurationMin != nil {
 		turnDuration = *input.DefaultTurnDurationMin
 	}
+
 	bufferMin := 15
 	if input.BookingBufferMin != nil {
 		bufferMin = *input.BookingBufferMin
 	}
+
 	maxParty := 12
 	if input.MaxPartySize != nil {
 		maxParty = *input.MaxPartySize
@@ -62,16 +67,16 @@ func (r *mutationResolver) CreateRestaurant(ctx context.Context, input model.Cre
 
 	var res model.Restaurant
 	var createdAt, updatedAt time.Time
+
 	err = tx.QueryRow(ctx, `
 		INSERT INTO restaurants (
-			name, phone, email, address_line1, suburb, state, postcode, timezone,
-			cuisine_type, seating_type, default_turn_duration_min, booking_buffer_min, max_party_size
-		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			name, phone, email, address_line1, suburb, state, postcode, 
+			timezone, cuisine_type, seating_type, default_turn_duration_min, 
+			booking_buffer_min, max_party_size
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, created_at, updated_at
-	`, input.Name, input.Phone, input.Email, input.AddressLine1, input.Suburb, input.State, input.Postcode,
-		timezone, input.CuisineType, seatingType, turnDuration, bufferMin, maxParty,
-	).Scan(&res.ID, &createdAt, &updatedAt)
+	`, input.Name, input.Phone, input.Email, input.AddressLine1, input.Suburb, input.State, input.Postcode, timezone, input.CuisineType, seatingType, turnDuration, bufferMin, maxParty).
+		Scan(&res.ID, &createdAt, &updatedAt)
 
 	if err != nil {
 		log.Printf("🔴 DATABASE TRANSACTION FAILED IN CREATERESTAURANT: %v", err)
@@ -83,9 +88,7 @@ func (r *mutationResolver) CreateRestaurant(ctx context.Context, input model.Cre
 	}
 
 	// Grant the creator OWNER role on their new restaurant.
-	// NOTE: role must match the migration's CHECK constraint exactly —
-	// chk_restaurant_staff_role only allows 'OWNER', 'MANAGER', 'STAFF'
-	// (uppercase). Lowercase 'owner' fails the constraint on every call.
+	// Uses currentUser.ID obtained directly from your clean unified token
 	if _, err = tx.Exec(ctx, `
 		INSERT INTO restaurant_staff (restaurant_id, owner_id, role)
 		VALUES ($1, $2, 'OWNER')
@@ -119,6 +122,7 @@ func (r *mutationResolver) CreateRestaurant(ctx context.Context, input model.Cre
 	res.IsActive = true
 	res.CreatedAt = createdAt.Format(time.RFC3339)
 	res.UpdatedAt = updatedAt.Format(time.RFC3339)
+
 	return &res, nil
 }
 

@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
-import { useMutation } from '@apollo/client/react';
+import { useMutation } from '@apollo/client/react'; // Standard clean import path
 import { CREATE_RESTAURANT_MUTATION } from '~/api/graphql';
 import { useRestaurantAuth } from '~/config';
+
+// 1. IMPORT YOUR DEDICATED RESTAURANT CLIENT HERE
+import { restaurantClient } from '~/config/restaurantApolloClient'; // Adjust path to matching file setup
 
 const AUSTRALIAN_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 
 export const CreateRestaurant = () => {
     const { isAuthenticated } = useRestaurantAuth();
-    const [createRestaurant, { loading, error }] = useMutation(CREATE_RESTAURANT_MUTATION);
+
+    // 2. PASS THE CLIENT EXPLICITLY AS AN OPTION OVERWRITE
+    const [createRestaurant, { loading, error }] = useMutation(CREATE_RESTAURANT_MUTATION, {
+        client: restaurantClient, // 👈 FORCES the hook to execute through the restaurant interceptors
+    });
+
     const [createdName, setCreatedName] = useState<string | null>(null);
 
     const [form, setForm] = useState({

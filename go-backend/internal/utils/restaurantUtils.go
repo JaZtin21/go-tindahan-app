@@ -32,28 +32,16 @@ const RestaurantRefreshCookieName = "restaurant_refresh_token"
 // PERMISSION CHECKS
 // ----------------------------------------------------------------------------
 
-// RequireRestaurantStaff checks that the currentRestaurantUser on ctx has a
+// RequireRestaurantStaff checks that the currentUser on ctx has a
 // restaurant_staff row for the given restaurantID, with sufficient role.
-// Unlike a single-restaurant setup, this can't be answered from the cached
-// session alone — an account may have different roles on different
-// restaurants — so it's always a DB lookup.
-//
-// Returns the caller's role on that restaurant, or an error if unauthorized.
-// Callers in resolvers.go should do:
-//
-//	role, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, true)
-//	if err != nil { graphql.AddError(ctx, ...); return nil, nil }
-//
-// RequireRestaurantStaff checks that the currentRestaurantUser on ctx has a
-// restaurant_staff row for the given restaurantID, with sufficient role.
-// Unlike a single-restaurant setup, this can't be answered from the cached
-// session alone — an account may have different roles on different
-// restaurants — so it's always a DB lookup.
+// The unified AuthMiddleware injects the same CachedUser for both diner and
+// restaurant sessions (it checks the "auth:" prefix, then falls back to
+// "restaurant_auth:"), so we read the shared "currentUser" key here.
 //
 // Returns the caller's role on that restaurant, or an error if unauthorized.
 func RequireRestaurantStaff(ctx context.Context, db *pgxpool.Pool, restaurantID string, allowStaffRole bool) (string, error) {
-	currentUser, ok := ctx.Value("currentRestaurantUser").(middleware.CachedRestaurantUser)
-	if !ok {
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok || currentUser.ID == "" {
 		return "", errors.New("unauthorized: no restaurant session found")
 	}
 
@@ -125,7 +113,7 @@ func GenerateAccessToken() (string, error) {
 // CreateRestaurantSession stores the session in Redis under
 // "restaurant_auth:<token>", mirroring the "auth:<token>" pattern your
 // AuthMiddleware reads from for diner sessions.
-func CreateRestaurantSession(ctx context.Context, redisClient *redis.Client, cached middleware.CachedRestaurantUser, ttl time.Duration) (string, error) {
+func CreateRestaurantSession(ctx context.Context, redisClient *redis.Client, cached middleware.CachedUser, ttl time.Duration) (string, error) {
 	token, err := GenerateAccessToken()
 	if err != nil {
 		return "", err
@@ -147,14 +135,14 @@ func CreateRestaurantSession(ctx context.Context, redisClient *redis.Client, cac
 // GetRestaurantSession looks up a cached session by token — same lookup
 // AuthMiddleware does inline, exposed here so resolvers (e.g.
 // RefreshRestaurantToken) can reuse it directly.
-func GetRestaurantSession(ctx context.Context, redisClient *redis.Client, accessToken string) (*middleware.CachedRestaurantUser, error) {
+func GetRestaurantSession(ctx context.Context, redisClient *redis.Client, accessToken string) (*middleware.CachedUser, error) {
 	redisKey := fmt.Sprintf("restaurant_auth:%s", accessToken)
 	sessionJSON, err := redisClient.Get(ctx, redisKey).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	var cached middleware.CachedRestaurantUser
+	var cached middleware.CachedUser
 	if err := json.Unmarshal([]byte(sessionJSON), &cached); err != nil {
 		return nil, err
 	}
@@ -273,7 +261,7 @@ func ExtractBearerToken(gc *gin.Context) string {
 // never has to import graph/model (would risk an import cycle since
 // resolvers import utils, not the other way around).
 func CreateRestaurantSessionAndCookie(ctx context.Context, redisClient *redis.Client, ownerID string, ownerEmail string) (string, error) {
-	cached := middleware.CachedRestaurantUser{ID: ownerID, Email: ownerEmail}
+	cached := middleware.CachedUser{ID: ownerID, Email: ownerEmail}
 
 	accessToken, err := CreateRestaurantSession(ctx, redisClient, cached, RestaurantSessionTTL)
 	if err != nil {
