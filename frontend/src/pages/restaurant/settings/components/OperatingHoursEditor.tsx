@@ -18,6 +18,15 @@ interface DayDraft {
     isClosed: boolean;
 }
 
+// Backend returns TIME columns as "HH:MM:SS.ffffff" (pgx scans with microsecond
+// precision) — <input type="time"> only accepts "HH:MM", so normalize or the
+// browser silently falls back to 00:00.
+const normalizeTime = (t?: string | null, fallback = '11:00'): string => {
+    if (!t) return fallback;
+    const m = t.match(/^(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : fallback;
+};
+
 export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEditorProps) => {
     const dispatch = useAppDispatch();
     const [setHours, { loading }] = useMutation(SET_OPERATING_HOURS_MUTATION);
@@ -26,8 +35,8 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
     const byDay = (day: number): DayDraft => {
         const existing = hours.find((h) => h.dayOfWeek === day);
         return {
-            openTime: existing?.openTime ?? '11:00',
-            closeTime: existing?.closeTime ?? '21:00',
+            openTime: normalizeTime(existing?.openTime),
+            closeTime: normalizeTime(existing?.closeTime, '21:00'),
             isClosed: existing?.isClosed ?? false,
         };
     };

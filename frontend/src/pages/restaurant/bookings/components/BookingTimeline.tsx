@@ -1,15 +1,56 @@
-import React from 'react';
-import type { Booking, RestaurantTable } from '~/types/restaurant';
+import React, { useMemo } from 'react';
+import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 
 interface BookingTimelineProps {
     tables: RestaurantTable[];
     bookings: Booking[];
+    // Operating hours for the *selected day* (already resolved by the page).
+    dayHours?: OperatingHours | null;
     onCancel: (id: string) => void;
     onAssignTable: (bookingId: string, tableId: string) => void;
     cancelling: boolean;
 }
 
-const HOURS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]; // 11:00 – 22:00
+const MIN_HOUR = 0;
+const MAX_HOUR = 23;
+
+// Backend TIME values come back as "HH:MM:SS.micros" (e.g. "11:00:00.000000").
+const parseHour = (t?: string | null): number | null => {
+    if (!t) return null;
+    const h = parseInt(t.split(':')[0], 10);
+    return Number.isFinite(h) && h >= 0 && h <= 23 ? h : null;
+};
+
+// Build the hourly grid for the selected day:
+//  - Prefer the restaurant's operating hours (open → close) for that day.
+//  - Fall back to a default 11:00–22:00 window.
+//  - Always expand to cover any booking outside the window so nothing hides.
+const buildHourRange = (bookings: Booking[], dayHours?: OperatingHours | null): number[] => {
+    const bookingHours = bookings
+        .map((b) => new Date(b.bookingTime).getHours())
+        .filter((h) => h >= MIN_HOUR && h <= MAX_HOUR);
+
+    let first = 11;
+    let last = 22;
+
+    if (dayHours && !dayHours.isClosed) {
+        const open = parseHour(dayHours.openTime);
+        const close = parseHour(dayHours.closeTime);
+        if (open !== null && close !== null && close > open) {
+            first = open;
+            last = close;
+        }
+    }
+
+    if (bookingHours.length) {
+        first = Math.min(first, ...bookingHours);
+        last = Math.max(last, ...bookingHours);
+    }
+
+    const range: number[] = [];
+    for (let h = first; h <= last; h++) range.push(h);
+    return range;
+};
 
 const STATUS_STYLES: Record<string, string> = {
     PENDING: 'bg-amber-500/90',
@@ -25,8 +66,9 @@ function fmtTime(iso: string): string {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export const BookingTimeline = ({ tables, bookings, onCancel, onAssignTable, cancelling }: BookingTimelineProps) => {
+export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssignTable, cancelling }: BookingTimelineProps) => {
     const unassigned = bookings.filter((b) => !b.tableId && b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
+    const HOURS = useMemo(() => buildHourRange(bookings, dayHours), [bookings, dayHours]);
 
     return (
         <div>
@@ -93,7 +135,7 @@ export const BookingTimeline = ({ tables, bookings, onCancel, onAssignTable, can
                                         });
                                         return (
                                             <div key={h} className="min-h-[36px] flex flex-col gap-1">
-                                                <div className="text-[10px] font-bold text-border-muted">{h}:00</div>
+                                                <div className="text-[10px] font-bold text-border-muted">{String(h).padStart(2, '0')}:00</div>
                                                 {slotBookings.map((b) => (
                                                     <div
                                                         key={b.id}

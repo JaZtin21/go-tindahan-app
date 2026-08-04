@@ -3,12 +3,13 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_BOOKINGS_QUERY,
     GET_TABLES_QUERY,
+    GET_OPERATING_HOURS_QUERY,
     CANCEL_BOOKING_MUTATION,
     ASSIGN_TABLE_MUTATION,
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setBookings, setBookingsLoading, setBookingsError, setSelectedDate, removeBooking, upsertBooking } from '~/store';
-import type { Booking, RestaurantTable } from '~/types/restaurant';
+import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 import { BookingTimeline } from './components/BookingTimeline';
 
 export const BookingsPage = () => {
@@ -28,6 +29,13 @@ export const BookingsPage = () => {
         fetchPolicy: 'network-only',
     });
 
+    // Operating hours for the selected day — the timeline window should match
+    // when the kitchen actually accepts reservations, not a hardcoded range.
+    const { data: hoursData } = useQuery(GET_OPERATING_HOURS_QUERY, {
+        variables: { restaurantId: activeRestaurantId ?? '' },
+        skip: !activeRestaurantId,
+    });
+
     // Sync the fetched bookings into Redux whenever they arrive.
     useEffect(() => {
         const fetched = (bookingsData as any)?.bookings as Booking[] | undefined;
@@ -44,6 +52,15 @@ export const BookingsPage = () => {
     }, [bookingsLoading, dispatch]);
 
     const tables: RestaurantTable[] = useMemo(() => (tablesData as any)?.tables ?? [], [tablesData]);
+
+    // Resolve operating hours for the day-of-week of the selected date
+    // (backend stores 0 = Sunday … 6 = Saturday, matching JS getDay()).
+    const dayHours: OperatingHours | null | undefined = useMemo(() => {
+        if (!selectedDate) return null;
+        const dow = new Date(selectedDate + 'T00:00:00').getDay();
+        const allHours = (hoursData as any)?.operatingHours as OperatingHours[] | undefined;
+        return allHours?.find((h) => h.dayOfWeek === dow) ?? null;
+    }, [hoursData, selectedDate]);
 
     const handleCancel = async (id: string) => {
         try {
@@ -105,6 +122,7 @@ export const BookingsPage = () => {
                 <BookingTimeline
                     tables={tables}
                     bookings={bookings}
+                    dayHours={dayHours}
                     onCancel={handleCancel}
                     onAssignTable={handleAssignTable}
                     cancelling={cancelling}

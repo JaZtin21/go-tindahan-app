@@ -1137,6 +1137,13 @@ func (r *queryResolver) CheckAvailability(ctx context.Context, input model.Check
 	// exactly — chk_bookings_status only allows 'CANCELLED', 'NO_SHOW', etc.
 	// (uppercase). Lowercase never matched, so cancelled/no-show bookings
 	// were incorrectly still blocking their table.
+	//
+	// FIXED: previously computed the window end as `$4 || ' minutes'` in SQL,
+	// which forced $4 (an int) to encode as text and pgx blew up with
+	// "unable to encode ... into text format". Compute endTime in Go and pass
+	// both bounds as timestamptz params instead.
+	endTime := requestedTime.Add(time.Duration(turnDuration) * time.Minute)
+
 	query := `
 		SELECT rt.id, rt.table_number, rt.capacity_min, rt.capacity_max, rt.section
 		FROM restaurant_tables rt
@@ -1148,19 +1155,17 @@ func (r *queryResolver) CheckAvailability(ctx context.Context, input model.Check
 				SELECT 1 FROM bookings b
 				WHERE b.table_id = rt.id
 					AND b.status NOT IN ('CANCELLED', 'NO_SHOW')
-					AND b.time_range && tstzrange($3::timestamptz, $3::timestamptz + ($4 || ' minutes')::interval)
+					AND b.time_range && tstzrange($3::timestamptz, $4::timestamptz)
 			)
 		ORDER BY rt.capacity_max ASC
 	`
 
-	rows, err := r.Resolver.DB.Query(ctx, query, input.RestaurantID, input.PartySize, requestedTime, turnDuration)
+	rows, err := r.Resolver.DB.Query(ctx, query, input.RestaurantID, input.PartySize, requestedTime, endTime)
 	if err != nil {
 		log.Printf("🔴 DATABASE QUERY FAILED IN CHECKAVAILABILITY: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
-
-	endTime := requestedTime.Add(time.Duration(turnDuration) * time.Minute)
 
 	var slots []*model.AvailableSlot
 	for rows.Next() {
