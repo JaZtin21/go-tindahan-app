@@ -896,6 +896,9 @@ func (r *mutationResolver) ConvertWaitlistToBooking(ctx context.Context, id stri
 }
 
 // Restaurant is the resolver for the restaurant field.
+// PUBLIC (no auth) — the public booking page + Vapi use this to show opening
+// hours, closures and the table list, so the nested tables/operatingHours/
+// closures fields MUST be populated here (they're model-bound, not DB-backed).
 func (r *queryResolver) Restaurant(ctx context.Context, id string) (*model.Restaurant, error) {
 	query := `
 		SELECT id, name, phone, email, address_line1, suburb, state, postcode, timezone,
@@ -923,6 +926,16 @@ func (r *queryResolver) Restaurant(ctx context.Context, id string) (*model.Resta
 
 	res.CreatedAt = createdAt.Format(time.RFC3339)
 	res.UpdatedAt = updatedAt.Format(time.RFC3339)
+
+	// Populate nested fields the schema exposes as non-null — otherwise they
+	// always come back as empty arrays even when the restaurant has data.
+	// Loaders live in utils so they survive gqlgen's resolver-file rewrite.
+	// Fail-soft on nested loads: a hiccup on hours/tables shouldn't take down
+	// the whole public restaurant lookup (errors are logged inside the loaders).
+	res.Tables, _ = utils.LoadTables(ctx, r.Resolver.DB, res.ID)
+	res.OperatingHours, _ = utils.LoadOperatingHours(ctx, r.Resolver.DB, res.ID)
+	res.Closures, _ = utils.LoadClosures(ctx, r.Resolver.DB, res.ID)
+
 	return &res, nil
 }
 
@@ -971,31 +984,7 @@ func (r *queryResolver) Tables(ctx context.Context, restaurantID string) ([]*mod
 	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
 		return nil, nil
 	}
-	query := `
-		SELECT id, restaurant_id, table_number, capacity_min, capacity_max, section, is_active
-		FROM restaurant_tables
-		WHERE restaurant_id = $1 AND is_active = true
-		ORDER BY section NULLS LAST, table_number ASC
-	`
-
-	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
-	if err != nil {
-		log.Printf("🔴 DATABASE QUERY FAILED IN TABLES: %v", err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []*model.RestaurantTable
-	for rows.Next() {
-		var t model.RestaurantTable
-		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.TableNumber, &t.CapacityMin, &t.CapacityMax, &t.Section, &t.IsActive); err != nil {
-			log.Printf("⚠️ Failed to scan restaurant table row: %v", err)
-			continue
-		}
-		results = append(results, &t)
-	}
-
-	return results, nil
+	return utils.LoadTables(ctx, r.Resolver.DB, restaurantID)
 }
 
 // OperatingHours is the resolver for the operatingHours field.
@@ -1003,38 +992,7 @@ func (r *queryResolver) OperatingHours(ctx context.Context, restaurantID string)
 	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
 		return nil, nil
 	}
-	query := `
-		SELECT id, day_of_week, open_time, close_time, is_closed
-		FROM operating_hours
-		WHERE restaurant_id = $1
-		ORDER BY day_of_week ASC
-	`
-
-	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
-	if err != nil {
-		log.Printf("🔴 DATABASE QUERY FAILED IN OPERATINGHOURS: %v", err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []*model.OperatingHours
-	for rows.Next() {
-		var oh model.OperatingHours
-		var openTime, closeTime *string
-		if err := rows.Scan(&oh.ID, &oh.DayOfWeek, &openTime, &closeTime, &oh.IsClosed); err != nil {
-			log.Printf("⚠️ Failed to scan operating hours row: %v", err)
-			continue
-		}
-		if openTime != nil {
-			oh.OpenTime = openTime
-		}
-		if closeTime != nil {
-			oh.CloseTime = closeTime
-		}
-		results = append(results, &oh)
-	}
-
-	return results, nil
+	return utils.LoadOperatingHours(ctx, r.Resolver.DB, restaurantID)
 }
 
 // Closures is the resolver for the closures field.
@@ -1042,33 +1000,7 @@ func (r *queryResolver) Closures(ctx context.Context, restaurantID string) ([]*m
 	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
 		return nil, nil
 	}
-	query := `
-		SELECT id, closure_date, reason
-		FROM closures
-		WHERE restaurant_id = $1
-		ORDER BY closure_date ASC
-	`
-
-	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
-	if err != nil {
-		log.Printf("🔴 DATABASE QUERY FAILED IN CLOSURES: %v", err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []*model.Closure
-	for rows.Next() {
-		var c model.Closure
-		var closureDate time.Time
-		if err := rows.Scan(&c.ID, &closureDate, &c.Reason); err != nil {
-			log.Printf("⚠️ Failed to scan closure row: %v", err)
-			continue
-		}
-		c.ClosureDate = closureDate.Format("2006-01-02")
-		results = append(results, &c)
-	}
-
-	return results, nil
+	return utils.LoadClosures(ctx, r.Resolver.DB, restaurantID)
 }
 
 // Customer is the resolver for the customer field.

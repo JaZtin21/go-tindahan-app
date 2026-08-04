@@ -198,6 +198,110 @@ func GetRestaurantByID(ctx context.Context, db *pgxpool.Pool, id string) (*model
 	return &res, nil
 }
 
+// LoadTables fetches the active tables for a restaurant. Lives here (not in a
+// resolvers.go file) so it survives `go generate`. Shared by the staff-facing
+// Tables query (which adds a RequireRestaurantStaff guard around it) and the
+// public Restaurant resolver (which populates the schema's non-null
+// Restaurant.tables field — without this it always comes back empty).
+func LoadTables(ctx context.Context, db *pgxpool.Pool, restaurantID string) ([]*model.RestaurantTable, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, restaurant_id, table_number, capacity_min, capacity_max, section, is_active
+		FROM restaurant_tables
+		WHERE restaurant_id = $1 AND is_active = true
+		ORDER BY section NULLS LAST, table_number ASC
+	`, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN LOADTABLES: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.RestaurantTable
+	for rows.Next() {
+		var t model.RestaurantTable
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.TableNumber, &t.CapacityMin, &t.CapacityMax, &t.Section, &t.IsActive); err != nil {
+			log.Printf("⚠️ Failed to scan restaurant table row: %v", err)
+			continue
+		}
+		results = append(results, &t)
+	}
+	if results == nil {
+		results = []*model.RestaurantTable{}
+	}
+	return results, nil
+}
+
+// LoadOperatingHours fetches the weekly operating hours for a restaurant.
+// Same rationale as LoadTables — survives `go generate`, shared between the
+// staff OperatingHours query and the public Restaurant resolver.
+func LoadOperatingHours(ctx context.Context, db *pgxpool.Pool, restaurantID string) ([]*model.OperatingHours, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, day_of_week, open_time, close_time, is_closed
+		FROM operating_hours
+		WHERE restaurant_id = $1
+		ORDER BY day_of_week ASC
+	`, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN LOADOPERATINGHOURS: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.OperatingHours
+	for rows.Next() {
+		var oh model.OperatingHours
+		var openTime, closeTime *string
+		if err := rows.Scan(&oh.ID, &oh.DayOfWeek, &openTime, &closeTime, &oh.IsClosed); err != nil {
+			log.Printf("⚠️ Failed to scan operating hours row: %v", err)
+			continue
+		}
+		if openTime != nil {
+			oh.OpenTime = openTime
+		}
+		if closeTime != nil {
+			oh.CloseTime = closeTime
+		}
+		results = append(results, &oh)
+	}
+	if results == nil {
+		results = []*model.OperatingHours{}
+	}
+	return results, nil
+}
+
+// LoadClosures fetches the one-off closure dates for a restaurant. Same
+// rationale as LoadTables — survives `go generate`, shared between the staff
+// Closures query and the public Restaurant resolver.
+func LoadClosures(ctx context.Context, db *pgxpool.Pool, restaurantID string) ([]*model.Closure, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, closure_date, reason
+		FROM closures
+		WHERE restaurant_id = $1
+		ORDER BY closure_date ASC
+	`, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN LOADCLOSURES: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.Closure
+	for rows.Next() {
+		var c model.Closure
+		var closureDate time.Time
+		if err := rows.Scan(&c.ID, &closureDate, &c.Reason); err != nil {
+			log.Printf("⚠️ Failed to scan closure row: %v", err)
+			continue
+		}
+		c.ClosureDate = closureDate.Format("2006-01-02")
+		results = append(results, &c)
+	}
+	if results == nil {
+		results = []*model.Closure{}
+	}
+	return results, nil
+}
+
 // LoadOwnerRestaurantRoles returns every restaurant an owner account has a
 // role on, with that role attached. Used to populate RestaurantOwner.restaurants
 // (a non-null list — must never return nil, only an empty slice at worst).
