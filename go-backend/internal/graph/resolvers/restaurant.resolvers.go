@@ -647,185 +647,6 @@ func (r *mutationResolver) AssignTable(ctx context.Context, bookingID string, ta
 	return r.UpdateBooking(ctx, bookingID, model.UpdateBookingInput{TableID: &tableID})
 }
 
-// CreateWaitlistEntry is the resolver for the createWaitlistEntry field.
-func (r *mutationResolver) CreateWaitlistEntry(ctx context.Context, input model.CreateWaitlistEntryInput) (*model.WaitlistEntry, error) {
-	requestedTime, err := time.Parse(time.RFC3339, input.RequestedTime)
-	if err != nil {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "invalid requestedTime: must be ISO 8601 / RFC3339",
-			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
-		})
-		return nil, nil
-	}
-
-	var w model.WaitlistEntry
-	var createdAt time.Time
-	err = r.Resolver.DB.QueryRow(ctx, `
-		INSERT INTO waitlist (restaurant_id, customer_id, party_size, requested_time)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, status, created_at
-	`, input.RestaurantID, input.CustomerID, input.PartySize, requestedTime).Scan(&w.ID, &w.Status, &createdAt)
-
-	if err != nil {
-		log.Printf("🔴 DATABASE TRANSACTION FAILED IN CREATEWAITLISTENTRY: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to join waitlist",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
-	}
-
-	w.RestaurantID = input.RestaurantID
-	w.CustomerID = input.CustomerID
-	w.PartySize = input.PartySize
-	w.RequestedTime = input.RequestedTime
-	w.CreatedAt = createdAt.Format(time.RFC3339)
-	return &w, nil
-}
-
-// UpdateWaitlistStatus is the resolver for the updateWaitlistStatus field.
-func (r *mutationResolver) UpdateWaitlistStatus(ctx context.Context, id string, status model.WaitlistStatus) (*model.WaitlistEntry, error) {
-	var w model.WaitlistEntry
-	var requestedTime, createdAt time.Time
-	err := r.Resolver.DB.QueryRow(ctx, `
-		UPDATE waitlist SET status = $1 WHERE id = $2
-		RETURNING id, restaurant_id, customer_id, party_size, requested_time, status, created_at
-	`, status, id).Scan(&w.ID, &w.RestaurantID, &w.CustomerID, &w.PartySize, &requestedTime, &w.Status, &createdAt)
-
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "not found: waitlist entry does not exist",
-				Extensions: map[string]any{"code": "NOT_FOUND"},
-			})
-			return nil, nil
-		}
-		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEWAITLISTSTATUS: %v", err)
-		return nil, err
-	}
-
-	w.RequestedTime = requestedTime.Format(time.RFC3339)
-	w.CreatedAt = createdAt.Format(time.RFC3339)
-	return &w, nil
-}
-
-// ConvertWaitlistToBooking is the resolver for the convertWaitlistToBooking field.
-// Runs as a transaction: create the booking, then mark the waitlist entry
-// converted — if the table got taken in the meantime, the EXCLUDE constraint
-// on bookings will reject the insert and we roll back cleanly rather than
-// leaving the waitlist entry in a half-converted state.
-func (r *mutationResolver) ConvertWaitlistToBooking(ctx context.Context, id string, tableID string) (*model.Booking, error) {
-	tx, err := r.Resolver.DB.Begin(ctx)
-	if err != nil {
-		log.Printf("🔴 FAILED TO ACQUIRE TRANSACTION IN CONVERTWAITLISTTOBOOKING: %v", err)
-		return nil, fmt.Errorf("internal server error")
-	}
-	defer tx.Rollback(ctx)
-
-	var restaurantID, customerID string
-	var partySize int
-	var requestedTime time.Time
-	// NOTE: status literals must match the migration's CHECK constraint
-	// exactly — chk_waitlist_status only allows 'WAITING', 'NOTIFIED',
-	// 'CONVERTED', 'EXPIRED' (uppercase). Lowercase 'waiting' never matches
-	// any real row.
-	err = tx.QueryRow(ctx, `
-		SELECT restaurant_id, customer_id, party_size, requested_time FROM waitlist WHERE id = $1 AND status = 'WAITING'
-	`, id).Scan(&restaurantID, &customerID, &partySize, &requestedTime)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "not found: no waiting waitlist entry with that id",
-				Extensions: map[string]any{"code": "NOT_FOUND"},
-			})
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	var turnDuration int
-	if err := tx.QueryRow(ctx, `SELECT default_turn_duration_min FROM restaurants WHERE id = $1`, restaurantID).Scan(&turnDuration); err != nil {
-		return nil, err
-	}
-
-	// time_range is NOT NULL with no default — compute it here just like
-	// CreateBooking does, or this insert fails with a not-null violation.
-	requestedEnd := requestedTime.Add(time.Duration(turnDuration) * time.Minute)
-	timeRange := fmt.Sprintf("[%s,%s)", requestedTime.Format(time.RFC3339), requestedEnd.Format(time.RFC3339))
-
-	var b model.Booking
-	var createdAt, updatedAt time.Time
-	err = tx.QueryRow(ctx, `
-		INSERT INTO bookings (restaurant_id, customer_id, table_id, party_size, booking_time, duration_minutes, time_range, source, idempotency_key)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::tstzrange, 'phone', $8)
-		RETURNING id, status, payment_status, created_at, updated_at
-	`, restaurantID, customerID, tableID, partySize, requestedTime, turnDuration, timeRange, "waitlist-"+id).
-		Scan(&b.ID, &b.Status, &b.PaymentStatus, &createdAt, &updatedAt)
-
-	if err != nil {
-		if utils.IsExclusionViolation(err) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "that table is already booked for the requested time",
-				Extensions: map[string]any{"code": "TABLE_ALREADY_BOOKED"},
-			})
-			return nil, nil
-		}
-		log.Printf("🔴 FAILED TO CREATE BOOKING FROM WAITLIST %s: %v", id, err)
-		return nil, fmt.Errorf("internal server error: failed converting waitlist entry")
-	}
-
-	if _, err = tx.Exec(ctx, `UPDATE waitlist SET status = 'CONVERTED' WHERE id = $1`, id); err != nil {
-		log.Printf("🔴 FAILED TO MARK WAITLIST ENTRY %s CONVERTED: %v", id, err)
-		return nil, fmt.Errorf("internal server error")
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		log.Printf("🔴 TRANSACTION COMMIT FAILED IN CONVERTWAITLISTTOBOOKING: %v", err)
-		return nil, fmt.Errorf("internal server error")
-	}
-
-	b.RestaurantID = restaurantID
-	b.CustomerID = customerID
-	b.TableID = &tableID
-	b.PartySize = partySize
-	b.BookingTime = requestedTime.Format(time.RFC3339)
-	b.DurationMinutes = turnDuration
-	b.CreatedAt = createdAt.Format(time.RFC3339)
-	b.UpdatedAt = updatedAt.Format(time.RFC3339)
-	return &b, nil
-}
-
-// LogCall is the resolver for the logCall field.
-// Written by the Go webhook handler as the call progresses / completes.
-func (r *mutationResolver) LogCall(ctx context.Context, input model.LogCallInput) (*model.CallLog, error) {
-	var c model.CallLog
-	var createdAt time.Time
-	err := r.Resolver.DB.QueryRow(ctx, `
-		INSERT INTO call_logs (restaurant_id, vapi_call_id, customer_phone, booking_id, transcript, outcome)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, created_at
-	`, input.RestaurantID, input.VapiCallID, input.CustomerPhone, input.BookingID, input.Transcript, input.Outcome).
-		Scan(&c.ID, &createdAt)
-
-	if err != nil {
-		log.Printf("🔴 DATABASE TRANSACTION FAILED IN LOGCALL: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to log call",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
-	}
-
-	c.RestaurantID = input.RestaurantID
-	c.VapiCallID = input.VapiCallID
-	c.CustomerPhone = input.CustomerPhone
-	c.BookingID = input.BookingID
-	c.Transcript = input.Transcript
-	c.Outcome = input.Outcome
-	c.CreatedAt = createdAt.Format(time.RFC3339)
-	return &c, nil
-}
-
 // Restaurant is the resolver for the restaurant field.
 func (r *queryResolver) Restaurant(ctx context.Context, id string) (*model.Restaurant, error) {
 	query := `
@@ -892,6 +713,111 @@ func (r *queryResolver) Restaurants(ctx context.Context, suburb *string, cuisine
 		res.CreatedAt = createdAt.Format(time.RFC3339)
 		res.UpdatedAt = updatedAt.Format(time.RFC3339)
 		results = append(results, &res)
+	}
+
+	return results, nil
+}
+
+// Tables is the resolver for the tables field.
+func (r *queryResolver) Tables(ctx context.Context, restaurantID string) ([]*model.RestaurantTable, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+	query := `
+		SELECT id, restaurant_id, table_number, capacity_min, capacity_max, section, is_active
+		FROM restaurant_tables
+		WHERE restaurant_id = $1 AND is_active = true
+		ORDER BY section NULLS LAST, table_number ASC
+	`
+
+	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN TABLES: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.RestaurantTable
+	for rows.Next() {
+		var t model.RestaurantTable
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.TableNumber, &t.CapacityMin, &t.CapacityMax, &t.Section, &t.IsActive); err != nil {
+			log.Printf("⚠️ Failed to scan restaurant table row: %v", err)
+			continue
+		}
+		results = append(results, &t)
+	}
+
+	return results, nil
+}
+
+// OperatingHours is the resolver for the operatingHours field.
+func (r *queryResolver) OperatingHours(ctx context.Context, restaurantID string) ([]*model.OperatingHours, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+	query := `
+		SELECT id, day_of_week, open_time, close_time, is_closed
+		FROM operating_hours
+		WHERE restaurant_id = $1
+		ORDER BY day_of_week ASC
+	`
+
+	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN OPERATINGHOURS: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.OperatingHours
+	for rows.Next() {
+		var oh model.OperatingHours
+		var openTime, closeTime *string
+		if err := rows.Scan(&oh.ID, &oh.DayOfWeek, &openTime, &closeTime, &oh.IsClosed); err != nil {
+			log.Printf("⚠️ Failed to scan operating hours row: %v", err)
+			continue
+		}
+		if openTime != nil {
+			oh.OpenTime = openTime
+		}
+		if closeTime != nil {
+			oh.CloseTime = closeTime
+		}
+		results = append(results, &oh)
+	}
+
+	return results, nil
+}
+
+// Closures is the resolver for the closures field.
+func (r *queryResolver) Closures(ctx context.Context, restaurantID string) ([]*model.Closure, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+	query := `
+		SELECT id, closure_date, reason
+		FROM closures
+		WHERE restaurant_id = $1
+		ORDER BY closure_date ASC
+	`
+
+	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN CLOSURES: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.Closure
+	for rows.Next() {
+		var c model.Closure
+		var closureDate time.Time
+		if err := rows.Scan(&c.ID, &closureDate, &c.Reason); err != nil {
+			log.Printf("⚠️ Failed to scan closure row: %v", err)
+			continue
+		}
+		c.ClosureDate = closureDate.Format("2006-01-02")
+		results = append(results, &c)
 	}
 
 	return results, nil
@@ -1095,11 +1021,58 @@ func (r *queryResolver) Waitlist(ctx context.Context, restaurantID string, statu
 	return results, nil
 }
 
+// CallLogs is the resolver for the callLogs field.
+func (r *queryResolver) CallLogs(ctx context.Context, restaurantID string) ([]*model.CallLog, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+	query := `
+		SELECT id, restaurant_id, vapi_call_id, customer_phone, booking_id, transcript, outcome, created_at
+		FROM call_logs
+		WHERE restaurant_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN CALLLOGS: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*model.CallLog
+	for rows.Next() {
+		var c model.CallLog
+		var createdAt time.Time
+		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt); err != nil {
+			log.Printf("⚠️ Failed to scan call log row: %v", err)
+			continue
+		}
+		c.CreatedAt = createdAt.Format(time.RFC3339)
+		results = append(results, &c)
+	}
+
+	return results, nil
+}
+
 // CallLog is the resolver for the callLog field.
 func (r *queryResolver) CallLog(ctx context.Context, vapiCallID string) (*model.CallLog, error) {
+	// Resolve the owning restaurant first so we can enforce staff access.
+	var restaurantID string
+	err := r.Resolver.DB.QueryRow(ctx, `SELECT restaurant_id FROM call_logs WHERE vapi_call_id = $1`, vapiCallID).Scan(&restaurantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		log.Printf("🔴 DATABASE QUERY FAILED IN CALLLOG: %v", err)
+		return nil, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
 	var c model.CallLog
 	var createdAt time.Time
-	err := r.Resolver.DB.QueryRow(ctx, `
+	err = r.Resolver.DB.QueryRow(ctx, `
 		SELECT id, restaurant_id, vapi_call_id, customer_phone, booking_id, transcript, outcome, created_at
 		FROM call_logs WHERE vapi_call_id = $1
 	`, vapiCallID).Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt)

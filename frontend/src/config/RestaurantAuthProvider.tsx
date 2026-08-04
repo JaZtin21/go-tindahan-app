@@ -8,20 +8,7 @@ import {
     REFRESH_RESTAURANT_TOKEN_MUTATION,
     LOGOUT_RESTAURANT_OWNER_MUTATION,
 } from '~/api/graphql';
-
-export interface RestaurantOwnerRole {
-    role: 'OWNER' | 'MANAGER' | 'STAFF';
-    restaurant: { id: string; name: string; suburb?: string; state?: string; };
-}
-
-export interface RestaurantOwnerInfo {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    createdAt: string;
-    restaurants: RestaurantOwnerRole[];
-}
+import type { RestaurantOwner as RestaurantOwnerInfo, RestaurantStaffRole as RestaurantOwnerRole } from '~/types/restaurant';
 
 interface RestaurantAuthContextType {
     isAuthenticated: boolean;
@@ -52,8 +39,6 @@ export const RestaurantAuthProvider = ({ children }: { children: React.ReactNode
 
     const isRefreshingRef = useRef(false);
     const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
-
-    console.log(jwt, 'jwt in RestaurantAuthProvider');
 
     // FIXED: Calls the isolated token sync setter
     useEffect(() => {
@@ -169,10 +154,11 @@ export const RestaurantAuthProvider = ({ children }: { children: React.ReactNode
 
     if (isLoading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', background: '#fafafa' }}>
-                <div style={{ textAlign: 'center', color: '#555' }}>
-                    <h3>Loading Restaurant Session...</h3>
-                    <p style={{ fontSize: '14px', color: '#888' }}>Verifying backend tokens</p>
+            <div className="flex items-center justify-center h-screen bg-bg-primary">
+                <div className="text-center">
+                    <div className="mx-auto w-10 h-10 mb-4 rounded-full border-4 border-border-main border-t-brand-gold animate-spin" />
+                    <h3 className="text-lg font-black text-text-main">Loading Restaurant Session…</h3>
+                    <p className="text-sm font-bold text-text-muted mt-1">Verifying backend tokens</p>
                 </div>
             </div>
         );

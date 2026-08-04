@@ -3,13 +3,25 @@ import uiReducer from './uiSlice';
 import myShopsSlice from './myShopsSlice';
 import inventorySlice from './inventorySlice';
 import appSubscriptionReducer from './appSubscription';
+import restaurantReducer from './restaurantSlice';
+import bookingsReducer from './bookingsSlice';
+import tablesReducer from './tablesSlice';
+import settingsReducer from './settingsSlice';
+import waitlistReducer from './waitlistSlice';
+import callLogsReducer from './callLogsSlice';
 
 export const store = configureStore({
     reducer: {
         ui: uiReducer,
         myShops: myShopsSlice,
         inventory: inventorySlice,
-        appSubscription: appSubscriptionReducer
+        appSubscription: appSubscriptionReducer,
+        restaurant: restaurantReducer,
+        bookings: bookingsReducer,
+        tables: tablesReducer,
+        settings: settingsReducer,
+        waitlist: waitlistReducer,
+        callLogs: callLogsReducer
     },
 });
 

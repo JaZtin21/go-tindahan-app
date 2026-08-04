@@ -19,52 +19,48 @@ export const RestaurantRegister = () => {
         }
     };
 
-    const inputStyle: React.CSSProperties = {
-        display: 'block', width: '100%', padding: '10px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc',
-    };
-    const labelStyle: React.CSSProperties = { fontSize: '14px', color: '#333' };
+    const inputCls =
+        'block w-full px-4 py-2.5 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200 mt-1';
 
     return (
-        <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
-            <h2>Create Your Account</h2>
-            <p>Register to manage your restaurant, tables, and bookings.</p>
+        <div className="py-16 text-center max-w-[420px] mx-auto">
+            <div className="text-4xl mb-3">🍽️</div>
+            <h2 className="text-2xl font-black text-text-main tracking-tight m-0">Create Your Account</h2>
+            <p className="text-xs font-bold text-text-muted mt-1.5">Register to manage your restaurant, tables, and bookings.</p>
 
-            <form
-                onSubmit={handleSubmit}
-                style={{ marginTop: '20px', display: 'inline-flex', flexDirection: 'column', gap: '12px', width: '280px', textAlign: 'left' }}
-            >
-                <label style={labelStyle}>
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 text-left">
+                <label className="text-xs font-black text-text-sub uppercase tracking-wider">
                     First name
-                    <input style={inputStyle} value={form.firstName} onChange={handleChange('firstName')} required />
+                    <input className={inputCls} value={form.firstName} onChange={handleChange('firstName')} required />
                 </label>
-                <label style={labelStyle}>
+                <label className="text-xs font-black text-text-sub uppercase tracking-wider">
                     Last name
-                    <input style={inputStyle} value={form.lastName} onChange={handleChange('lastName')} required />
+                    <input className={inputCls} value={form.lastName} onChange={handleChange('lastName')} required />
                 </label>
-                <label style={labelStyle}>
+                <label className="text-xs font-black text-text-sub uppercase tracking-wider">
                     Email
-                    <input style={inputStyle} type="email" value={form.email} onChange={handleChange('email')} required />
+                    <input className={inputCls} type="email" value={form.email} onChange={handleChange('email')} required />
                 </label>
-                <label style={labelStyle}>
+                <label className="text-xs font-black text-text-sub uppercase tracking-wider">
                     Password
-                    <input style={inputStyle} type="password" value={form.password} onChange={handleChange('password')} required minLength={8} />
+                    <input className={inputCls} type="password" value={form.password} onChange={handleChange('password')} required minLength={8} />
                 </label>
 
-                {loginError && <p style={{ color: '#c0392b', fontSize: '13px', margin: 0 }}>{loginError}</p>}
+                {loginError && <p className="text-brand-red text-xs font-bold m-0">{loginError}</p>}
 
                 <button
                     type="submit"
                     disabled={isLoading}
-                    style={{
-                        marginTop: '8px', padding: '12px 24px', fontSize: '16px', fontWeight: 'bold',
-                        background: isLoading ? '#a0c3ff' : '#4285F4', color: 'white', border: 'none',
-                        borderRadius: '4px', cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'background 0.2s ease',
-                    }}
+                    className={`mt-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
+                        isLoading
+                            ? 'bg-brand-gold/40 text-bg-black/50 cursor-not-allowed'
+                            : 'bg-brand-gold text-bg-black hover:bg-brand-gold-hover cursor-pointer'
+                    }`}
                 >
                     {isLoading ? 'Creating account...' : 'Create account'}
                 </button>
 
-                <Link to="/login" style={{ fontSize: '13px', textAlign: 'center', color: '#4285F4' }}>
+                <Link to="/login" className="text-xs font-bold text-brand-gold hover:text-brand-gold-hover text-center no-underline transition-colors duration-200">
                     Already have an account? Sign in
                 </Link>
             </form>

@@ -1,7 +1,17 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useRestaurantAuth } from '~/config/RestaurantAuthProvider';
-import { RestaurantLogin, RestaurantRegister, RestaurantDashboard, CreateRestaurant } from '~/pages';
+import {
+    RestaurantLogin,
+    RestaurantRegister,
+    RestaurantDashboard,
+    CreateRestaurant,
+    BookingsPage,
+    WaitlistPage,
+    TablesPage,
+    CallsPage,
+    SettingsPage,
+} from '~/pages';
 import { RestaurantLayout } from './RestaurantLayout';
 
 
@@ -36,9 +46,11 @@ export const RestaurantApp = () => {
                     <Route element={<RestaurantLayout />}>
                         <Route path="/" element={<RestaurantDashboard />} />
                         <Route path="/create-restaurant" element={<CreateRestaurant />} />
-                        {/* Add /restaurants/:id, /restaurants/:id/tables,
-                            /restaurants/:id/bookings, etc. here as those pages
-                            get built. */}
+                        <Route path="/bookings" element={<BookingsPage />} />
+                        <Route path="/waitlist" element={<WaitlistPage />} />
+                        <Route path="/tables" element={<TablesPage />} />
+                        <Route path="/calls" element={<CallsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                 </Route>
 

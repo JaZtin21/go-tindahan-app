@@ -208,6 +208,7 @@ input UpdateRestaurantInput {
 extend type Query {
   restaurant(id: String!): Restaurant
   restaurants(suburb: String, cuisineType: String): [Restaurant!]!
+  tables(restaurantId: String!): [RestaurantTable!]!
 }
 
 extend type Mutation {
@@ -262,6 +263,11 @@ extend type Mutation {
   setOperatingHours(restaurantId: String!, hours: [SetOperatingHoursInput!]!): [OperatingHours!]!
   createClosure(input: CreateClosureInput!): Closure!
   deleteClosure(id: String!): Boolean!
+}
+
+extend type Query {
+  operatingHours(restaurantId: String!): [OperatingHours!]!
+  closures(restaurantId: String!): [Closure!]!
 }
 
 # ----------------------------------------------------------------------------
@@ -341,31 +347,7 @@ extend type Query {
   waitlist(restaurantId: String!, status: WaitlistStatus): [WaitlistEntry!]!
 }
 
-extend type Mutation {
-  createWaitlistEntry(input: CreateWaitlistEntryInput!): WaitlistEntry!
-  updateWaitlistStatus(id: String!, status: WaitlistStatus!): WaitlistEntry!
-  # Converts a waitlist entry into an actual booking once a table frees up
-  convertWaitlistToBooking(id: String!, tableId: String!): Booking!
-}
-
-# ----------------------------------------------------------------------------
-# CALL LOGS — inputs & mutations
-# (mainly written to by the Go webhook handler that Vapi/Groq call into)
-# ----------------------------------------------------------------------------
-
-input LogCallInput {
-  restaurantId: String
-  vapiCallId: String!
-  customerPhone: String
-  bookingId: String
-  transcript: String
-  outcome: CallOutcome
-}
-
 extend type Query {
+  callLogs(restaurantId: String!): [CallLog!]!
   callLog(vapiCallId: String!): CallLog
-}
-
-extend type Mutation {
-  logCall(input: LogCallInput!): CallLog!
 }

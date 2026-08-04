@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useMutation } from '@apollo/client/react'; // Standard clean import path
 import { CREATE_RESTAURANT_MUTATION } from '~/api/graphql';
 import { useRestaurantAuth } from '~/config';
+import { useAppDispatch } from '~/store';
+import { addRestaurantRole } from '~/store';
+import type { Restaurant } from '~/types/restaurant';
 
 // 1. IMPORT YOUR DEDICATED RESTAURANT CLIENT HERE
 import { restaurantClient } from '~/config/restaurantApolloClient'; // Adjust path to matching file setup
@@ -10,6 +13,7 @@ const AUSTRALIAN_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 
 export const CreateRestaurant = () => {
     const { isAuthenticated } = useRestaurantAuth();
+    const dispatch = useAppDispatch();
 
     // 2. PASS THE CLIENT EXPLICITLY AS AN OPTION OVERWRITE
     const [createRestaurant, { loading, error }] = useMutation(CREATE_RESTAURANT_MUTATION, {
@@ -36,112 +40,105 @@ export const CreateRestaurant = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const { data } = await createRestaurant({ variables: { input: form } });
-            setCreatedName(data?.createRestaurant?.name ?? form.name);
+            const { data }: any = await createRestaurant({ variables: { input: form } });
+            const created = data?.createRestaurant as Restaurant | undefined;
+            setCreatedName(created?.name ?? form.name);
+            if (created) {
+                // Keep the Redux restaurant slice in sync so the dashboard
+                // shows the new restaurant without a refetch.
+                dispatch(addRestaurantRole(created));
+            }
         } catch {
             // error state below already surfaces the message
         }
     };
 
+    const inputCls =
+        'block w-full px-4 py-2.5 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200 mt-1';
+    const labelCls = 'text-xs font-black text-text-sub uppercase tracking-wider';
+
     if (!isAuthenticated) {
         return (
-            <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
-                <p>You need to sign in before creating a restaurant.</p>
+            <div className="py-16 text-center">
+                <p className="text-text-muted text-sm font-bold">You need to sign in before creating a restaurant.</p>
             </div>
         );
     }
 
     if (createdName) {
         return (
-            <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
-                <div style={{ padding: '15px', background: '#eef6ff', borderRadius: '8px', display: 'inline-block' }}>
-                    <strong>{createdName}</strong> was created. You're the owner.
+            <div className="py-16 text-center">
+                <div className="inline-block px-6 py-4 rounded-2xl border border-brand-green/40 bg-brand-green/10 text-brand-green font-black">
+                    🎉 <strong>{createdName}</strong> was created. You're the owner.
                 </div>
             </div>
         );
     }
 
-    const inputStyle: React.CSSProperties = {
-        display: 'block',
-        width: '100%',
-        padding: '10px',
-        marginTop: '4px',
-        borderRadius: '4px',
-        border: '1px solid #ccc',
-    };
-    const labelStyle: React.CSSProperties = { fontSize: '14px', color: '#333' };
-
     return (
-        <div style={{ padding: '2rem', maxWidth: '480px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-            <h2>Create Your Restaurant</h2>
-            <p>You can create more than one restaurant later from your dashboard.</p>
+        <div className="max-w-[520px] mx-auto">
+            <h2 className="text-2xl font-black text-text-main tracking-tight m-0">Create Your Restaurant</h2>
+            <p className="text-xs font-bold text-text-muted mt-1">You can create more than one restaurant later from your dashboard.</p>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
-                <label style={labelStyle}>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
+                <label className={labelCls}>
                     Restaurant name
-                    <input style={inputStyle} value={form.name} onChange={handleChange('name')} required />
+                    <input className={inputCls} value={form.name} onChange={handleChange('name')} required />
                 </label>
 
-                <label style={labelStyle}>
+                <label className={labelCls}>
                     Phone
-                    <input style={inputStyle} value={form.phone} onChange={handleChange('phone')} required />
+                    <input className={inputCls} value={form.phone} onChange={handleChange('phone')} required />
                 </label>
 
-                <label style={labelStyle}>
+                <label className={labelCls}>
                     Email (optional)
-                    <input style={inputStyle} type="email" value={form.email} onChange={handleChange('email')} />
+                    <input className={inputCls} type="email" value={form.email} onChange={handleChange('email')} />
                 </label>
 
-                <label style={labelStyle}>
+                <label className={labelCls}>
                     Address
-                    <input style={inputStyle} value={form.addressLine1} onChange={handleChange('addressLine1')} required />
+                    <input className={inputCls} value={form.addressLine1} onChange={handleChange('addressLine1')} required />
                 </label>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <label style={{ ...labelStyle, flex: 2 }}>
+                <div className="flex gap-3">
+                    <label className={`${labelCls} flex-[2]`}>
                         Suburb
-                        <input style={inputStyle} value={form.suburb} onChange={handleChange('suburb')} required />
+                        <input className={inputCls} value={form.suburb} onChange={handleChange('suburb')} required />
                     </label>
 
-                    <label style={{ ...labelStyle, flex: 1 }}>
+                    <label className={`${labelCls} flex-1`}>
                         State
-                        <select style={inputStyle} value={form.state} onChange={handleChange('state')}>
+                        <select className={inputCls} value={form.state} onChange={handleChange('state')}>
                             {AUSTRALIAN_STATES.map((s) => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
                     </label>
 
-                    <label style={{ ...labelStyle, flex: 1 }}>
+                    <label className={`${labelCls} flex-1`}>
                         Postcode
-                        <input style={inputStyle} value={form.postcode} onChange={handleChange('postcode')} required />
+                        <input className={inputCls} value={form.postcode} onChange={handleChange('postcode')} required />
                     </label>
                 </div>
 
-                <label style={labelStyle}>
+                <label className={labelCls}>
                     Cuisine type (optional)
-                    <input style={inputStyle} placeholder="e.g. Italian, Modern Australian" value={form.cuisineType} onChange={handleChange('cuisineType')} />
+                    <input className={inputCls} placeholder="e.g. Italian, Modern Australian" value={form.cuisineType} onChange={handleChange('cuisineType')} />
                 </label>
 
                 {error && (
-                    <p style={{ color: '#c0392b', fontSize: '13px', margin: 0 }}>{error.message}</p>
+                    <p className="text-brand-red text-xs font-bold m-0">{error.message}</p>
                 )}
 
                 <button
                     type="submit"
                     disabled={loading}
-                    style={{
-                        marginTop: '8px',
-                        padding: '12px 24px',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        background: loading ? '#a0c3ff' : '#4285F4',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        transition: 'background 0.2s ease',
-                    }}
+                    className={`mt-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
+                        loading
+                            ? 'bg-brand-gold/40 text-bg-black/50 cursor-not-allowed'
+                            : 'bg-brand-gold text-bg-black hover:bg-brand-gold-hover cursor-pointer'
+                    }`}
                 >
                     {loading ? 'Creating...' : 'Create restaurant'}
                 </button>

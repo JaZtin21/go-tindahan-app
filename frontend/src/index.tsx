@@ -20,7 +20,11 @@ root.render(
             <ThemeProvider>
                 <TinyBaseProvider>
                     <RestaurantAuthProvider>
-                        <RestaurantApp />
+                        <Provider store={store}>
+
+                            <RestaurantApp />
+                        </Provider>
+
                         {/* or your router */}
                     </RestaurantAuthProvider>
                 </TinyBaseProvider>

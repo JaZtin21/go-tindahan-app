@@ -323,15 +323,6 @@ type ItemActionHistorySyncInput struct {
 	ClientCreatedAt string  `json:"clientCreatedAt"`
 }
 
-type LogCallInput struct {
-	RestaurantID  *string      `json:"restaurantId,omitempty"`
-	VapiCallID    string       `json:"vapiCallId"`
-	CustomerPhone *string      `json:"customerPhone,omitempty"`
-	BookingID     *string      `json:"bookingId,omitempty"`
-	Transcript    *string      `json:"transcript,omitempty"`
-	Outcome       *CallOutcome `json:"outcome,omitempty"`
-}
-
 type Mutation struct {
 }
 

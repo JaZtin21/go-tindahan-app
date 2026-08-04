@@ -166,47 +166,43 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddInventoryItem         func(childComplexity int, input model.AddInventoryItemInput) int
-		AssignTable              func(childComplexity int, bookingID string, tableID string) int
-		CancelBooking            func(childComplexity int, id string) int
-		CheckoutCart             func(childComplexity int, input model.CheckoutCartInput) int
-		ConvertWaitlistToBooking func(childComplexity int, id string, tableID string) int
-		CreateBooking            func(childComplexity int, input model.CreateBookingInput) int
-		CreateClosure            func(childComplexity int, input model.CreateClosureInput) int
-		CreatePost               func(childComplexity int, input model.CreatePostInput) int
-		CreateRestaurant         func(childComplexity int, input model.CreateRestaurantInput) int
-		CreateShop               func(childComplexity int, input model.CreateShopInput) int
-		CreateTable              func(childComplexity int, input model.CreateTableInput) int
-		CreateWaitlistEntry      func(childComplexity int, input model.CreateWaitlistEntryInput) int
-		DecrementStock           func(childComplexity int, input model.DecrementStockInput) int
-		DeleteClosure            func(childComplexity int, id string) int
-		DeleteInventoryItem      func(childComplexity int, itemID string) int
-		DeletePost               func(childComplexity int, id string) int
-		DeleteShop               func(childComplexity int, shopID string) int
-		DeleteTable              func(childComplexity int, id string) int
-		FindOrCreateCustomer     func(childComplexity int, input model.FindOrCreateCustomerInput) int
-		IncrementStock           func(childComplexity int, input model.IncrementStockInput) int
-		InviteRestaurantStaff    func(childComplexity int, input model.InviteRestaurantStaffInput) int
-		LogCall                  func(childComplexity int, input model.LogCallInput) int
-		LoginRestaurantOwner     func(childComplexity int, input model.RestaurantLoginInput) int
-		LoginWithGoogle          func(childComplexity int, input model.GoogleLoginInput) int
-		Logout                   func(childComplexity int) int
-		LogoutRestaurantOwner    func(childComplexity int) int
-		Ping                     func(childComplexity int) int
-		RecordScanEvent          func(childComplexity int, input model.RecordScanEventInput) int
-		RefreshRestaurantToken   func(childComplexity int) int
-		RefreshToken             func(childComplexity int) int
-		RegisterRestaurantOwner  func(childComplexity int, input model.RestaurantRegisterInput) int
-		RevokeRestaurantStaff    func(childComplexity int, restaurantID string, ownerID string) int
-		SetOperatingHours        func(childComplexity int, restaurantID string, hours []*model.SetOperatingHoursInput) int
-		UnifiedBatchSync         func(childComplexity int, input model.UnifiedBatchSyncInput) int
-		UpdateBooking            func(childComplexity int, id string, input model.UpdateBookingInput) int
-		UpdateInventoryItem      func(childComplexity int, input model.UpdateInventoryItemInput) int
-		UpdatePost               func(childComplexity int, input model.UpdatePostInput) int
-		UpdateRestaurant         func(childComplexity int, id string, input model.UpdateRestaurantInput) int
-		UpdateShop               func(childComplexity int, input model.UpdateShopInput) int
-		UpdateTable              func(childComplexity int, id string, input model.UpdateTableInput) int
-		UpdateWaitlistStatus     func(childComplexity int, id string, status model.WaitlistStatus) int
+		AddInventoryItem        func(childComplexity int, input model.AddInventoryItemInput) int
+		AssignTable             func(childComplexity int, bookingID string, tableID string) int
+		CancelBooking           func(childComplexity int, id string) int
+		CheckoutCart            func(childComplexity int, input model.CheckoutCartInput) int
+		CreateBooking           func(childComplexity int, input model.CreateBookingInput) int
+		CreateClosure           func(childComplexity int, input model.CreateClosureInput) int
+		CreatePost              func(childComplexity int, input model.CreatePostInput) int
+		CreateRestaurant        func(childComplexity int, input model.CreateRestaurantInput) int
+		CreateShop              func(childComplexity int, input model.CreateShopInput) int
+		CreateTable             func(childComplexity int, input model.CreateTableInput) int
+		DecrementStock          func(childComplexity int, input model.DecrementStockInput) int
+		DeleteClosure           func(childComplexity int, id string) int
+		DeleteInventoryItem     func(childComplexity int, itemID string) int
+		DeletePost              func(childComplexity int, id string) int
+		DeleteShop              func(childComplexity int, shopID string) int
+		DeleteTable             func(childComplexity int, id string) int
+		FindOrCreateCustomer    func(childComplexity int, input model.FindOrCreateCustomerInput) int
+		IncrementStock          func(childComplexity int, input model.IncrementStockInput) int
+		InviteRestaurantStaff   func(childComplexity int, input model.InviteRestaurantStaffInput) int
+		LoginRestaurantOwner    func(childComplexity int, input model.RestaurantLoginInput) int
+		LoginWithGoogle         func(childComplexity int, input model.GoogleLoginInput) int
+		Logout                  func(childComplexity int) int
+		LogoutRestaurantOwner   func(childComplexity int) int
+		Ping                    func(childComplexity int) int
+		RecordScanEvent         func(childComplexity int, input model.RecordScanEventInput) int
+		RefreshRestaurantToken  func(childComplexity int) int
+		RefreshToken            func(childComplexity int) int
+		RegisterRestaurantOwner func(childComplexity int, input model.RestaurantRegisterInput) int
+		RevokeRestaurantStaff   func(childComplexity int, restaurantID string, ownerID string) int
+		SetOperatingHours       func(childComplexity int, restaurantID string, hours []*model.SetOperatingHoursInput) int
+		UnifiedBatchSync        func(childComplexity int, input model.UnifiedBatchSyncInput) int
+		UpdateBooking           func(childComplexity int, id string, input model.UpdateBookingInput) int
+		UpdateInventoryItem     func(childComplexity int, input model.UpdateInventoryItemInput) int
+		UpdatePost              func(childComplexity int, input model.UpdatePostInput) int
+		UpdateRestaurant        func(childComplexity int, id string, input model.UpdateRestaurantInput) int
+		UpdateShop              func(childComplexity int, input model.UpdateShopInput) int
+		UpdateTable             func(childComplexity int, id string, input model.UpdateTableInput) int
 	}
 
 	OperatingHours struct {
@@ -334,7 +330,9 @@ type ComplexityRoot struct {
 		Booking                 func(childComplexity int, id string) int
 		Bookings                func(childComplexity int, restaurantID string, date *string, status *model.BookingStatus) int
 		CallLog                 func(childComplexity int, vapiCallID string) int
+		CallLogs                func(childComplexity int, restaurantID string) int
 		CheckAvailability       func(childComplexity int, input model.CheckAvailabilityInput) int
+		Closures                func(childComplexity int, restaurantID string) int
 		CurrentRestaurantOwner  func(childComplexity int) int
 		Customer                func(childComplexity int, phone string) int
 		GetCheckoutHistory      func(childComplexity int, shopID string, limit int, offset int) int
@@ -346,12 +344,14 @@ type ComplexityRoot struct {
 		GetShopDashboardMetrics func(childComplexity int, shopID string) int
 		GetShopInventory        func(childComplexity int, shopID string, limit int, offset int, search *string, sortBy *string, sortOrder *string) int
 		Me                      func(childComplexity int) int
+		OperatingHours          func(childComplexity int, restaurantID string) int
 		Ping                    func(childComplexity int) int
 		Restaurant              func(childComplexity int, id string) int
 		Restaurants             func(childComplexity int, suburb *string, cuisineType *string) int
 		SearchProduct           func(childComplexity int, query string, limit int, offset int) int
 		SearchShop              func(childComplexity int, query string, limit int, offset int) int
 		SearchShopProducts      func(childComplexity int, shopID string, query string, limit int, offset int, visualCandidates []string) int
+		Tables                  func(childComplexity int, restaurantID string) int
 		Waitlist                func(childComplexity int, restaurantID string, status *model.WaitlistStatus) int
 	}
 
@@ -539,10 +539,6 @@ type MutationResolver interface {
 	UpdateBooking(ctx context.Context, id string, input model.UpdateBookingInput) (*model.Booking, error)
 	CancelBooking(ctx context.Context, id string) (*model.Booking, error)
 	AssignTable(ctx context.Context, bookingID string, tableID string) (*model.Booking, error)
-	CreateWaitlistEntry(ctx context.Context, input model.CreateWaitlistEntryInput) (*model.WaitlistEntry, error)
-	UpdateWaitlistStatus(ctx context.Context, id string, status model.WaitlistStatus) (*model.WaitlistEntry, error)
-	ConvertWaitlistToBooking(ctx context.Context, id string, tableID string) (*model.Booking, error)
-	LogCall(ctx context.Context, input model.LogCallInput) (*model.CallLog, error)
 	RegisterRestaurantOwner(ctx context.Context, input model.RestaurantRegisterInput) (*model.RestaurantAuthResponse, error)
 	LoginRestaurantOwner(ctx context.Context, input model.RestaurantLoginInput) (*model.RestaurantAuthResponse, error)
 	RefreshRestaurantToken(ctx context.Context) (*model.RestaurantRefreshResponse, error)
@@ -567,11 +563,15 @@ type QueryResolver interface {
 	GetPostByID(ctx context.Context, id string) (*model.Post, error)
 	Restaurant(ctx context.Context, id string) (*model.Restaurant, error)
 	Restaurants(ctx context.Context, suburb *string, cuisineType *string) ([]*model.Restaurant, error)
+	Tables(ctx context.Context, restaurantID string) ([]*model.RestaurantTable, error)
+	OperatingHours(ctx context.Context, restaurantID string) ([]*model.OperatingHours, error)
+	Closures(ctx context.Context, restaurantID string) ([]*model.Closure, error)
 	Customer(ctx context.Context, phone string) (*model.Customer, error)
 	Booking(ctx context.Context, id string) (*model.Booking, error)
 	Bookings(ctx context.Context, restaurantID string, date *string, status *model.BookingStatus) ([]*model.Booking, error)
 	CheckAvailability(ctx context.Context, input model.CheckAvailabilityInput) ([]*model.AvailableSlot, error)
 	Waitlist(ctx context.Context, restaurantID string, status *model.WaitlistStatus) ([]*model.WaitlistEntry, error)
+	CallLogs(ctx context.Context, restaurantID string) ([]*model.CallLog, error)
 	CallLog(ctx context.Context, vapiCallID string) (*model.CallLog, error)
 	CurrentRestaurantOwner(ctx context.Context) (*model.RestaurantOwner, error)
 	GetMyShops(ctx context.Context, limit int, offset int) (*model.PaginatedOwnerShops, error)
@@ -1138,17 +1138,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CheckoutCart(childComplexity, args["input"].(model.CheckoutCartInput)), true
-	case "Mutation.convertWaitlistToBooking":
-		if e.ComplexityRoot.Mutation.ConvertWaitlistToBooking == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_convertWaitlistToBooking_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.ConvertWaitlistToBooking(childComplexity, args["id"].(string), args["tableId"].(string)), true
 	case "Mutation.createBooking":
 		if e.ComplexityRoot.Mutation.CreateBooking == nil {
 			break
@@ -1215,17 +1204,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateTable(childComplexity, args["input"].(model.CreateTableInput)), true
-	case "Mutation.createWaitlistEntry":
-		if e.ComplexityRoot.Mutation.CreateWaitlistEntry == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_createWaitlistEntry_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.CreateWaitlistEntry(childComplexity, args["input"].(model.CreateWaitlistEntryInput)), true
 	case "Mutation.decrementStock":
 		if e.ComplexityRoot.Mutation.DecrementStock == nil {
 			break
@@ -1325,17 +1303,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.InviteRestaurantStaff(childComplexity, args["input"].(model.InviteRestaurantStaffInput)), true
-	case "Mutation.logCall":
-		if e.ComplexityRoot.Mutation.LogCall == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_logCall_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.LogCall(childComplexity, args["input"].(model.LogCallInput)), true
 	case "Mutation.loginRestaurantOwner":
 		if e.ComplexityRoot.Mutation.LoginRestaurantOwner == nil {
 			break
@@ -1509,17 +1476,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateTable(childComplexity, args["id"].(string), args["input"].(model.UpdateTableInput)), true
-	case "Mutation.updateWaitlistStatus":
-		if e.ComplexityRoot.Mutation.UpdateWaitlistStatus == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_updateWaitlistStatus_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.UpdateWaitlistStatus(childComplexity, args["id"].(string), args["status"].(model.WaitlistStatus)), true
 
 	case "OperatingHours.closeTime":
 		if e.ComplexityRoot.OperatingHours.CloseTime == nil {
@@ -2059,6 +2015,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.CallLog(childComplexity, args["vapiCallId"].(string)), true
+	case "Query.callLogs":
+		if e.ComplexityRoot.Query.CallLogs == nil {
+			break
+		}
+
+		args, err := ec.field_Query_callLogs_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CallLogs(childComplexity, args["restaurantId"].(string)), true
 	case "Query.checkAvailability":
 		if e.ComplexityRoot.Query.CheckAvailability == nil {
 			break
@@ -2070,6 +2037,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.CheckAvailability(childComplexity, args["input"].(model.CheckAvailabilityInput)), true
+	case "Query.closures":
+		if e.ComplexityRoot.Query.Closures == nil {
+			break
+		}
+
+		args, err := ec.field_Query_closures_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Closures(childComplexity, args["restaurantId"].(string)), true
 	case "Query.currentRestaurantOwner":
 		if e.ComplexityRoot.Query.CurrentRestaurantOwner == nil {
 			break
@@ -2182,6 +2160,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Me(childComplexity), true
+	case "Query.operatingHours":
+		if e.ComplexityRoot.Query.OperatingHours == nil {
+			break
+		}
+
+		args, err := ec.field_Query_operatingHours_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.OperatingHours(childComplexity, args["restaurantId"].(string)), true
 	case "Query.ping":
 		if e.ComplexityRoot.Query.Ping == nil {
 			break
@@ -2243,6 +2232,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.SearchShopProducts(childComplexity, args["shopId"].(string), args["query"].(string), args["limit"].(int), args["offset"].(int), args["visualCandidates"].([]string)), true
+	case "Query.tables":
+		if e.ComplexityRoot.Query.Tables == nil {
+			break
+		}
+
+		args, err := ec.field_Query_tables_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Tables(childComplexity, args["restaurantId"].(string)), true
 	case "Query.waitlist":
 		if e.ComplexityRoot.Query.Waitlist == nil {
 			break
@@ -2933,7 +2933,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputInventorySyncInput,
 		ec.unmarshalInputInviteRestaurantStaffInput,
 		ec.unmarshalInputItemActionHistorySyncInput,
-		ec.unmarshalInputLogCallInput,
 		ec.unmarshalInputPaymentMethodsInput,
 		ec.unmarshalInputRecordScanEventInput,
 		ec.unmarshalInputRestaurantLoginInput,
@@ -4008,28 +4007,6 @@ func (ec *executionContext) field_Mutation_checkoutCart_args(ctx context.Context
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_convertWaitlistToBooking_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNString2string(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["id"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "tableId",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNString2string(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["tableId"] = arg1
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_createBooking_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4106,20 +4083,6 @@ func (ec *executionContext) field_Mutation_createTable_args(ctx context.Context,
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateTableInput, error) {
 			return ec.unmarshalNCreateTableInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateTableInput(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_createWaitlistEntry_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
-		func(ctx context.Context, v any) (model.CreateWaitlistEntryInput, error) {
-			return ec.unmarshalNCreateWaitlistEntryInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateWaitlistEntryInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -4246,20 +4209,6 @@ func (ec *executionContext) field_Mutation_inviteRestaurantStaff_args(ctx contex
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.InviteRestaurantStaffInput, error) {
 			return ec.unmarshalNInviteRestaurantStaffInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐInviteRestaurantStaffInput(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_logCall_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
-		func(ctx context.Context, v any) (model.LogCallInput, error) {
-			return ec.unmarshalNLogCallInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐLogCallInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -4490,28 +4439,6 @@ func (ec *executionContext) field_Mutation_updateTable_args(ctx context.Context,
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_updateWaitlistStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNString2string(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["id"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status",
-		func(ctx context.Context, v any) (model.WaitlistStatus, error) {
-			return ec.unmarshalNWaitlistStatus2goᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistStatus(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["status"] = arg1
-	return args, nil
-}
-
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4584,6 +4511,20 @@ func (ec *executionContext) field_Query_callLog_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_callLogs_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "restaurantId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["restaurantId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_checkAvailability_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4595,6 +4536,20 @@ func (ec *executionContext) field_Query_checkAvailability_args(ctx context.Conte
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_closures_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "restaurantId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["restaurantId"] = arg0
 	return args, nil
 }
 
@@ -4812,6 +4767,20 @@ func (ec *executionContext) field_Query_getShopInventory_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_operatingHours_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "restaurantId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["restaurantId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_restaurant_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4951,6 +4920,20 @@ func (ec *executionContext) field_Query_searchShop_args(ctx context.Context, raw
 		return nil, err
 	}
 	args["offset"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_tables_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "restaurantId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["restaurantId"] = arg0
 	return args, nil
 }
 
@@ -7757,182 +7740,6 @@ func (ec *executionContext) fieldContext_Mutation_assignTable(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_assignTable_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_createWaitlistEntry(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_createWaitlistEntry(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().CreateWaitlistEntry(ctx, fc.Args["input"].(model.CreateWaitlistEntryInput))
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *model.WaitlistEntry) graphql.Marshaler {
-			return ec.marshalNWaitlistEntry2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_createWaitlistEntry(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_WaitlistEntry(ctx, field)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_createWaitlistEntry_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_updateWaitlistStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_updateWaitlistStatus(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().UpdateWaitlistStatus(ctx, fc.Args["id"].(string), fc.Args["status"].(model.WaitlistStatus))
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *model.WaitlistEntry) graphql.Marshaler {
-			return ec.marshalNWaitlistEntry2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_updateWaitlistStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_WaitlistEntry(ctx, field)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateWaitlistStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_convertWaitlistToBooking(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_convertWaitlistToBooking(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().ConvertWaitlistToBooking(ctx, fc.Args["id"].(string), fc.Args["tableId"].(string))
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
-			return ec.marshalNBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_convertWaitlistToBooking(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_Booking(ctx, field)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_convertWaitlistToBooking_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_logCall(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_logCall(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().LogCall(ctx, fc.Args["input"].(model.LogCallInput))
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *model.CallLog) graphql.Marshaler {
-			return ec.marshalNCallLog2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLog(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_logCall(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_CallLog(ctx, field)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_logCall_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11026,6 +10833,138 @@ func (ec *executionContext) fieldContext_Query_restaurants(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_tables(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_tables(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Tables(ctx, fc.Args["restaurantId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.RestaurantTable) graphql.Marshaler {
+			return ec.marshalNRestaurantTable2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurantTableᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_tables(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RestaurantTable(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_tables_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_operatingHours(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_operatingHours(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().OperatingHours(ctx, fc.Args["restaurantId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.OperatingHours) graphql.Marshaler {
+			return ec.marshalNOperatingHours2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOperatingHoursᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_operatingHours(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_OperatingHours(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_operatingHours_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_closures(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_closures(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Closures(ctx, fc.Args["restaurantId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Closure) graphql.Marshaler {
+			return ec.marshalNClosure2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐClosureᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_closures(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Closure(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_closures_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_customer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11240,6 +11179,50 @@ func (ec *executionContext) fieldContext_Query_waitlist(ctx context.Context, fie
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_waitlist_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_callLogs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_callLogs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CallLogs(ctx, fc.Args["restaurantId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.CallLog) graphql.Marshaler {
+			return ec.marshalNCallLog2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLogᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_callLogs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CallLog(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_callLogs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -16914,71 +16897,6 @@ func (ec *executionContext) unmarshalInputItemActionHistorySyncInput(ctx context
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputLogCallInput(ctx context.Context, obj any) (model.LogCallInput, error) {
-	var it model.LogCallInput
-	if obj == nil {
-		return it, nil
-	}
-
-	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"restaurantId", "vapiCallId", "customerPhone", "bookingId", "transcript", "outcome"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "restaurantId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("restaurantId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.RestaurantID = data
-		case "vapiCallId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("vapiCallId"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.VapiCallID = data
-		case "customerPhone":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("customerPhone"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.CustomerPhone = data
-		case "bookingId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bookingId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BookingID = data
-		case "transcript":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("transcript"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Transcript = data
-		case "outcome":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("outcome"))
-			data, err := ec.unmarshalOCallOutcome2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallOutcome(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Outcome = data
-		}
-	}
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputPaymentMethodsInput(ctx context.Context, obj any) (model.PaymentMethodsInput, error) {
 	var it model.PaymentMethodsInput
 	if obj == nil {
@@ -19085,34 +19003,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createWaitlistEntry":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createWaitlistEntry(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "updateWaitlistStatus":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateWaitlistStatus(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "convertWaitlistToBooking":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_convertWaitlistToBooking(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "logCall":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_logCall(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "registerRestaurantOwner":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_registerRestaurantOwner(ctx, field)
@@ -20222,6 +20112,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "tables":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_tables(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "operatingHours":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_operatingHours(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "closures":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_closures(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "customer":
 			field := field
 
@@ -20320,6 +20276,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_waitlist(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "callLogs":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_callLogs(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -22263,8 +22241,20 @@ func (ec *executionContext) unmarshalNBusinessHoursInput2ᚖgoᚑbackendᚋinter
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNCallLog2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLog(ctx context.Context, sel ast.SelectionSet, v model.CallLog) graphql.Marshaler {
-	return ec._CallLog(ctx, sel, &v)
+func (ec *executionContext) marshalNCallLog2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLogᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CallLog) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCallLog2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLog(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNCallLog2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLog(ctx context.Context, sel ast.SelectionSet, v *model.CallLog) graphql.Marshaler {
@@ -22468,11 +22458,6 @@ func (ec *executionContext) unmarshalNCreateShopInput2goᚑbackendᚋinternalᚋ
 
 func (ec *executionContext) unmarshalNCreateTableInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateTableInput(ctx context.Context, v any) (model.CreateTableInput, error) {
 	res, err := ec.unmarshalInputCreateTableInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNCreateWaitlistEntryInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateWaitlistEntryInput(ctx context.Context, v any) (model.CreateWaitlistEntryInput, error) {
-	res, err := ec.unmarshalInputCreateWaitlistEntryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -22756,11 +22741,6 @@ func (ec *executionContext) marshalNJSON2ᚕmapᚄ(ctx context.Context, sel ast.
 	}
 
 	return ret
-}
-
-func (ec *executionContext) unmarshalNLogCallInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐLogCallInput(ctx context.Context, v any) (model.LogCallInput, error) {
-	res, err := ec.unmarshalInputLogCallInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNOperatingHours2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOperatingHoursᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OperatingHours) graphql.Marshaler {
@@ -23494,10 +23474,6 @@ func (ec *executionContext) marshalNVerification2ᚖgoᚑbackendᚋinternalᚋgr
 		return graphql.Null
 	}
 	return ec._Verification(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNWaitlistEntry2goᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx context.Context, sel ast.SelectionSet, v model.WaitlistEntry) graphql.Marshaler {
-	return ec._WaitlistEntry(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNWaitlistEntry2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.WaitlistEntry) graphql.Marshaler {
