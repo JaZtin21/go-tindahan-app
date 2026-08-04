@@ -7,6 +7,8 @@ import { ThemeProvider, TinyBaseProvider, ResponsiveToaster } from '~/components
 import './style.css'
 import { Provider } from 'react-redux';
 import { store } from './store/store';
+import { RestaurantAuthProvider } from './config';
+import { RestaurantApp } from './components/';
 
 
 const container = document.getElementById('root') as HTMLDivElement;
@@ -17,12 +19,10 @@ root.render(
         <GoogleOAuthProvider clientId="451238265730-e68jdrr0840cbjo4utfaf7f12c55hd4q.apps.googleusercontent.com">
             <ThemeProvider>
                 <TinyBaseProvider>
-                    <ApolloProviderWithAuth>
-                        <Provider store={store}>
-                            <ResponsiveToaster />
-                            <App />
-                        </Provider>
-                    </ApolloProviderWithAuth>
+                    <RestaurantAuthProvider>
+                        <RestaurantApp />
+                        {/* or your router */}
+                    </RestaurantAuthProvider>
                 </TinyBaseProvider>
 
             </ThemeProvider>

@@ -3,6 +3,11 @@
 package model
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/99designs/gqlgen/graphql"
 )
 
@@ -26,6 +31,28 @@ type AuthResponse struct {
 	AccessToken string `json:"accessToken"`
 }
 
+type AvailableSlot struct {
+	Table     *RestaurantTable `json:"table"`
+	StartTime string           `json:"startTime"`
+	EndTime   string           `json:"endTime"`
+}
+
+type Booking struct {
+	ID              string        `json:"id"`
+	RestaurantID    string        `json:"restaurantId"`
+	CustomerID      string        `json:"customerId"`
+	TableID         *string       `json:"tableId,omitempty"`
+	PartySize       int           `json:"partySize"`
+	BookingTime     string        `json:"bookingTime"`
+	DurationMinutes int           `json:"durationMinutes"`
+	Status          BookingStatus `json:"status"`
+	SpecialRequests *string       `json:"specialRequests,omitempty"`
+	PaymentStatus   PaymentStatus `json:"paymentStatus"`
+	Source          BookingSource `json:"source"`
+	CreatedAt       string        `json:"createdAt"`
+	UpdatedAt       string        `json:"updatedAt"`
+}
+
 type BusinessHours struct {
 	OpenTime  string   `json:"openTime"`
 	CloseTime string   `json:"closeTime"`
@@ -36,6 +63,23 @@ type BusinessHoursInput struct {
 	OpenTime  string   `json:"openTime"`
 	CloseTime string   `json:"closeTime"`
 	Days      []string `json:"days"`
+}
+
+type CallLog struct {
+	ID            string       `json:"id"`
+	RestaurantID  *string      `json:"restaurantId,omitempty"`
+	VapiCallID    string       `json:"vapiCallId"`
+	CustomerPhone *string      `json:"customerPhone,omitempty"`
+	BookingID     *string      `json:"bookingId,omitempty"`
+	Transcript    *string      `json:"transcript,omitempty"`
+	Outcome       *CallOutcome `json:"outcome,omitempty"`
+	CreatedAt     string       `json:"createdAt"`
+}
+
+type CheckAvailabilityInput struct {
+	RestaurantID  string `json:"restaurantId"`
+	PartySize     int    `json:"partySize"`
+	RequestedTime string `json:"requestedTime"`
 }
 
 type CheckoutBatch struct {
@@ -77,6 +121,12 @@ type CheckoutCartInput struct {
 	Items  []*CheckoutBatchItemInput `json:"items"`
 }
 
+type Closure struct {
+	ID          string  `json:"id"`
+	ClosureDate string  `json:"closureDate"`
+	Reason      *string `json:"reason,omitempty"`
+}
+
 type ContactDetails struct {
 	Phone   *string `json:"phone,omitempty"`
 	Email   *string `json:"email,omitempty"`
@@ -99,9 +149,42 @@ type CoordinatesInput struct {
 	Lng float64 `json:"lng"`
 }
 
+type CreateBookingInput struct {
+	RestaurantID    string         `json:"restaurantId"`
+	CustomerID      string         `json:"customerId"`
+	TableID         *string        `json:"tableId,omitempty"`
+	PartySize       int            `json:"partySize"`
+	BookingTime     string         `json:"bookingTime"`
+	SpecialRequests *string        `json:"specialRequests,omitempty"`
+	Source          *BookingSource `json:"source,omitempty"`
+	IdempotencyKey  string         `json:"idempotencyKey"`
+}
+
+type CreateClosureInput struct {
+	RestaurantID string  `json:"restaurantId"`
+	ClosureDate  string  `json:"closureDate"`
+	Reason       *string `json:"reason,omitempty"`
+}
+
 type CreatePostInput struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
+}
+
+type CreateRestaurantInput struct {
+	Name                   string       `json:"name"`
+	Phone                  string       `json:"phone"`
+	Email                  *string      `json:"email,omitempty"`
+	AddressLine1           string       `json:"addressLine1"`
+	Suburb                 string       `json:"suburb"`
+	State                  string       `json:"state"`
+	Postcode               string       `json:"postcode"`
+	Timezone               *string      `json:"timezone,omitempty"`
+	CuisineType            *string      `json:"cuisineType,omitempty"`
+	SeatingType            *SeatingType `json:"seatingType,omitempty"`
+	DefaultTurnDurationMin *int         `json:"defaultTurnDurationMin,omitempty"`
+	BookingBufferMin       *int         `json:"bookingBufferMin,omitempty"`
+	MaxPartySize           *int         `json:"maxPartySize,omitempty"`
 }
 
 type CreateShopInput struct {
@@ -116,6 +199,29 @@ type CreateShopInput struct {
 	Coordinates    *CoordinatesInput     `json:"coordinates"`
 	Photo          *graphql.Upload       `json:"photo,omitempty"`
 	Photos         []*graphql.Upload     `json:"photos,omitempty"`
+}
+
+type CreateTableInput struct {
+	RestaurantID string  `json:"restaurantId"`
+	TableNumber  string  `json:"tableNumber"`
+	CapacityMin  int     `json:"capacityMin"`
+	CapacityMax  int     `json:"capacityMax"`
+	Section      *string `json:"section,omitempty"`
+}
+
+type CreateWaitlistEntryInput struct {
+	RestaurantID  string `json:"restaurantId"`
+	CustomerID    string `json:"customerId"`
+	PartySize     int    `json:"partySize"`
+	RequestedTime string `json:"requestedTime"`
+}
+
+type Customer struct {
+	ID        string  `json:"id"`
+	Phone     string  `json:"phone"`
+	Name      *string `json:"name,omitempty"`
+	Email     *string `json:"email,omitempty"`
+	CreatedAt string  `json:"createdAt"`
 }
 
 type DailySalesMetric struct {
@@ -148,6 +254,12 @@ type DeltaResponse struct {
 	Upserted   []map[string]any `json:"upserted"`
 	DeletedIds []string         `json:"deletedIds"`
 	Rejected   []*SyncRejection `json:"rejected"`
+}
+
+type FindOrCreateCustomerInput struct {
+	Phone string  `json:"phone"`
+	Name  *string `json:"name,omitempty"`
+	Email *string `json:"email,omitempty"`
 }
 
 type GoogleLoginInput struct {
@@ -185,6 +297,12 @@ type InventorySyncInput struct {
 	VisualClassKeys []string        `json:"visualClassKeys,omitempty"`
 }
 
+type InviteRestaurantStaffInput struct {
+	RestaurantID string             `json:"restaurantId"`
+	Email        string             `json:"email"`
+	Role         RestaurantUserRole `json:"role"`
+}
+
 type ItemActionHistory struct {
 	ID              string  `json:"id"`
 	ShopID          string  `json:"shopId"`
@@ -205,7 +323,24 @@ type ItemActionHistorySyncInput struct {
 	ClientCreatedAt string  `json:"clientCreatedAt"`
 }
 
+type LogCallInput struct {
+	RestaurantID  *string      `json:"restaurantId,omitempty"`
+	VapiCallID    string       `json:"vapiCallId"`
+	CustomerPhone *string      `json:"customerPhone,omitempty"`
+	BookingID     *string      `json:"bookingId,omitempty"`
+	Transcript    *string      `json:"transcript,omitempty"`
+	Outcome       *CallOutcome `json:"outcome,omitempty"`
+}
+
 type Mutation struct {
+}
+
+type OperatingHours struct {
+	ID        string  `json:"id"`
+	DayOfWeek int     `json:"dayOfWeek"`
+	OpenTime  *string `json:"openTime,omitempty"`
+	CloseTime *string `json:"closeTime,omitempty"`
+	IsClosed  bool    `json:"isClosed"`
 }
 
 type OwnerInventoryItem struct {
@@ -346,6 +481,93 @@ type RefreshResponse struct {
 	User        *User  `json:"user"`
 }
 
+type Restaurant struct {
+	ID                     string             `json:"id"`
+	Name                   string             `json:"name"`
+	Phone                  string             `json:"phone"`
+	Email                  *string            `json:"email,omitempty"`
+	AddressLine1           string             `json:"addressLine1"`
+	Suburb                 string             `json:"suburb"`
+	State                  string             `json:"state"`
+	Postcode               string             `json:"postcode"`
+	Timezone               string             `json:"timezone"`
+	CuisineType            *string            `json:"cuisineType,omitempty"`
+	SeatingType            SeatingType        `json:"seatingType"`
+	DefaultTurnDurationMin int                `json:"defaultTurnDurationMin"`
+	BookingBufferMin       int                `json:"bookingBufferMin"`
+	MaxPartySize           int                `json:"maxPartySize"`
+	IsActive               bool               `json:"isActive"`
+	Tables                 []*RestaurantTable `json:"tables"`
+	OperatingHours         []*OperatingHours  `json:"operatingHours"`
+	Closures               []*Closure         `json:"closures"`
+	CreatedAt              string             `json:"createdAt"`
+	UpdatedAt              string             `json:"updatedAt"`
+}
+
+type RestaurantAuthResponse struct {
+	Owner       *RestaurantOwner `json:"owner"`
+	AccessToken string           `json:"accessToken"`
+}
+
+type RestaurantLoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type RestaurantOwner struct {
+	ID          string                 `json:"id"`
+	FirstName   string                 `json:"firstName"`
+	LastName    string                 `json:"lastName"`
+	Email       string                 `json:"email"`
+	Restaurants []*RestaurantStaffRole `json:"restaurants"`
+	CreatedAt   string                 `json:"createdAt"`
+	UpdatedAt   string                 `json:"updatedAt"`
+}
+
+type RestaurantRefreshResponse struct {
+	AccessToken string           `json:"accessToken"`
+	Owner       *RestaurantOwner `json:"owner"`
+}
+
+type RestaurantRegisterInput struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+}
+
+type RestaurantStaffRole struct {
+	Restaurant *Restaurant        `json:"restaurant"`
+	Role       RestaurantUserRole `json:"role"`
+}
+
+type RestaurantTable struct {
+	ID           string  `json:"id"`
+	RestaurantID string  `json:"restaurantId"`
+	TableNumber  string  `json:"tableNumber"`
+	CapacityMin  int     `json:"capacityMin"`
+	CapacityMax  int     `json:"capacityMax"`
+	Section      *string `json:"section,omitempty"`
+	IsActive     bool    `json:"isActive"`
+}
+
+type RestaurantUser struct {
+	ID           string             `json:"id"`
+	RestaurantID string             `json:"restaurantId"`
+	Name         string             `json:"name"`
+	Email        string             `json:"email"`
+	Phone        *string            `json:"phone,omitempty"`
+	Role         RestaurantUserRole `json:"role"`
+	CreatedAt    string             `json:"createdAt"`
+}
+
+type SetOperatingHoursInput struct {
+	DayOfWeek int     `json:"dayOfWeek"`
+	OpenTime  *string `json:"openTime,omitempty"`
+	CloseTime *string `json:"closeTime,omitempty"`
+	IsClosed  *bool   `json:"isClosed,omitempty"`
+}
+
 type Shop struct {
 	ID             string           `json:"id"`
 	ShopName       string           `json:"shopName"`
@@ -439,6 +661,15 @@ type UnifiedBatchSyncPayload struct {
 	ServerTime           string         `json:"serverTime"`
 }
 
+type UpdateBookingInput struct {
+	TableID         *string        `json:"tableId,omitempty"`
+	PartySize       *int           `json:"partySize,omitempty"`
+	BookingTime     *string        `json:"bookingTime,omitempty"`
+	Status          *BookingStatus `json:"status,omitempty"`
+	SpecialRequests *string        `json:"specialRequests,omitempty"`
+	PaymentStatus   *PaymentStatus `json:"paymentStatus,omitempty"`
+}
+
 type UpdateInventoryItemInput struct {
 	ItemID          string          `json:"itemId"`
 	ItemName        string          `json:"itemName"`
@@ -461,6 +692,22 @@ type UpdatePostInput struct {
 	Content string `json:"content"`
 }
 
+type UpdateRestaurantInput struct {
+	Name                   *string      `json:"name,omitempty"`
+	Phone                  *string      `json:"phone,omitempty"`
+	Email                  *string      `json:"email,omitempty"`
+	AddressLine1           *string      `json:"addressLine1,omitempty"`
+	Suburb                 *string      `json:"suburb,omitempty"`
+	State                  *string      `json:"state,omitempty"`
+	Postcode               *string      `json:"postcode,omitempty"`
+	CuisineType            *string      `json:"cuisineType,omitempty"`
+	SeatingType            *SeatingType `json:"seatingType,omitempty"`
+	DefaultTurnDurationMin *int         `json:"defaultTurnDurationMin,omitempty"`
+	BookingBufferMin       *int         `json:"bookingBufferMin,omitempty"`
+	MaxPartySize           *int         `json:"maxPartySize,omitempty"`
+	IsActive               *bool        `json:"isActive,omitempty"`
+}
+
 type UpdateShopInput struct {
 	ShopID         string                `json:"shopId"`
 	ShopName       string                `json:"shopName"`
@@ -478,6 +725,14 @@ type UpdateShopInput struct {
 	NewPhotos      []*graphql.Upload     `json:"newPhotos,omitempty"`
 }
 
+type UpdateTableInput struct {
+	TableNumber *string `json:"tableNumber,omitempty"`
+	CapacityMin *int    `json:"capacityMin,omitempty"`
+	CapacityMax *int    `json:"capacityMax,omitempty"`
+	Section     *string `json:"section,omitempty"`
+	IsActive    *bool   `json:"isActive,omitempty"`
+}
+
 type User struct {
 	ID           string               `json:"id"`
 	FirstName    string               `json:"firstName"`
@@ -491,4 +746,425 @@ type Verification struct {
 	IsVerified     bool    `json:"isVerified"`
 	VerifiedDate   *string `json:"verifiedDate,omitempty"`
 	VerificationID *string `json:"verificationId,omitempty"`
+}
+
+type WaitlistEntry struct {
+	ID            string         `json:"id"`
+	RestaurantID  string         `json:"restaurantId"`
+	CustomerID    string         `json:"customerId"`
+	PartySize     int            `json:"partySize"`
+	RequestedTime string         `json:"requestedTime"`
+	Status        WaitlistStatus `json:"status"`
+	CreatedAt     string         `json:"createdAt"`
+}
+
+type BookingSource string
+
+const (
+	BookingSourcePhone      BookingSource = "PHONE"
+	BookingSourceWeb        BookingSource = "WEB"
+	BookingSourceWalkIn     BookingSource = "WALK_IN"
+	BookingSourceThirdParty BookingSource = "THIRD_PARTY"
+)
+
+var AllBookingSource = []BookingSource{
+	BookingSourcePhone,
+	BookingSourceWeb,
+	BookingSourceWalkIn,
+	BookingSourceThirdParty,
+}
+
+func (e BookingSource) IsValid() bool {
+	switch e {
+	case BookingSourcePhone, BookingSourceWeb, BookingSourceWalkIn, BookingSourceThirdParty:
+		return true
+	}
+	return false
+}
+
+func (e BookingSource) String() string {
+	return string(e)
+}
+
+func (e *BookingSource) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = BookingSource(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid BookingSource", str)
+	}
+	return nil
+}
+
+func (e BookingSource) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *BookingSource) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e BookingSource) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type BookingStatus string
+
+const (
+	BookingStatusPending   BookingStatus = "PENDING"
+	BookingStatusConfirmed BookingStatus = "CONFIRMED"
+	BookingStatusSeated    BookingStatus = "SEATED"
+	BookingStatusCompleted BookingStatus = "COMPLETED"
+	BookingStatusCancelled BookingStatus = "CANCELLED"
+	BookingStatusNoShow    BookingStatus = "NO_SHOW"
+)
+
+var AllBookingStatus = []BookingStatus{
+	BookingStatusPending,
+	BookingStatusConfirmed,
+	BookingStatusSeated,
+	BookingStatusCompleted,
+	BookingStatusCancelled,
+	BookingStatusNoShow,
+}
+
+func (e BookingStatus) IsValid() bool {
+	switch e {
+	case BookingStatusPending, BookingStatusConfirmed, BookingStatusSeated, BookingStatusCompleted, BookingStatusCancelled, BookingStatusNoShow:
+		return true
+	}
+	return false
+}
+
+func (e BookingStatus) String() string {
+	return string(e)
+}
+
+func (e *BookingStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = BookingStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid BookingStatus", str)
+	}
+	return nil
+}
+
+func (e BookingStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *BookingStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e BookingStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type CallOutcome string
+
+const (
+	CallOutcomeBooked         CallOutcome = "BOOKED"
+	CallOutcomeNoAvailability CallOutcome = "NO_AVAILABILITY"
+	CallOutcomeTransferred    CallOutcome = "TRANSFERRED"
+	CallOutcomeAbandoned      CallOutcome = "ABANDONED"
+)
+
+var AllCallOutcome = []CallOutcome{
+	CallOutcomeBooked,
+	CallOutcomeNoAvailability,
+	CallOutcomeTransferred,
+	CallOutcomeAbandoned,
+}
+
+func (e CallOutcome) IsValid() bool {
+	switch e {
+	case CallOutcomeBooked, CallOutcomeNoAvailability, CallOutcomeTransferred, CallOutcomeAbandoned:
+		return true
+	}
+	return false
+}
+
+func (e CallOutcome) String() string {
+	return string(e)
+}
+
+func (e *CallOutcome) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CallOutcome(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CallOutcome", str)
+	}
+	return nil
+}
+
+func (e CallOutcome) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *CallOutcome) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e CallOutcome) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PaymentStatus string
+
+const (
+	PaymentStatusNone     PaymentStatus = "NONE"
+	PaymentStatusPending  PaymentStatus = "PENDING"
+	PaymentStatusPaid     PaymentStatus = "PAID"
+	PaymentStatusRefunded PaymentStatus = "REFUNDED"
+)
+
+var AllPaymentStatus = []PaymentStatus{
+	PaymentStatusNone,
+	PaymentStatusPending,
+	PaymentStatusPaid,
+	PaymentStatusRefunded,
+}
+
+func (e PaymentStatus) IsValid() bool {
+	switch e {
+	case PaymentStatusNone, PaymentStatusPending, PaymentStatusPaid, PaymentStatusRefunded:
+		return true
+	}
+	return false
+}
+
+func (e PaymentStatus) String() string {
+	return string(e)
+}
+
+func (e *PaymentStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PaymentStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PaymentStatus", str)
+	}
+	return nil
+}
+
+func (e PaymentStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PaymentStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PaymentStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type RestaurantUserRole string
+
+const (
+	RestaurantUserRoleOwner   RestaurantUserRole = "OWNER"
+	RestaurantUserRoleManager RestaurantUserRole = "MANAGER"
+	RestaurantUserRoleStaff   RestaurantUserRole = "STAFF"
+)
+
+var AllRestaurantUserRole = []RestaurantUserRole{
+	RestaurantUserRoleOwner,
+	RestaurantUserRoleManager,
+	RestaurantUserRoleStaff,
+}
+
+func (e RestaurantUserRole) IsValid() bool {
+	switch e {
+	case RestaurantUserRoleOwner, RestaurantUserRoleManager, RestaurantUserRoleStaff:
+		return true
+	}
+	return false
+}
+
+func (e RestaurantUserRole) String() string {
+	return string(e)
+}
+
+func (e *RestaurantUserRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RestaurantUserRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RestaurantUserRole", str)
+	}
+	return nil
+}
+
+func (e RestaurantUserRole) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *RestaurantUserRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e RestaurantUserRole) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type SeatingType string
+
+const (
+	SeatingTypeStandard     SeatingType = "STANDARD"
+	SeatingTypeFixedSitting SeatingType = "FIXED_SITTING"
+)
+
+var AllSeatingType = []SeatingType{
+	SeatingTypeStandard,
+	SeatingTypeFixedSitting,
+}
+
+func (e SeatingType) IsValid() bool {
+	switch e {
+	case SeatingTypeStandard, SeatingTypeFixedSitting:
+		return true
+	}
+	return false
+}
+
+func (e SeatingType) String() string {
+	return string(e)
+}
+
+func (e *SeatingType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SeatingType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SeatingType", str)
+	}
+	return nil
+}
+
+func (e SeatingType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SeatingType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SeatingType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type WaitlistStatus string
+
+const (
+	WaitlistStatusWaiting   WaitlistStatus = "WAITING"
+	WaitlistStatusNotified  WaitlistStatus = "NOTIFIED"
+	WaitlistStatusConverted WaitlistStatus = "CONVERTED"
+	WaitlistStatusExpired   WaitlistStatus = "EXPIRED"
+)
+
+var AllWaitlistStatus = []WaitlistStatus{
+	WaitlistStatusWaiting,
+	WaitlistStatusNotified,
+	WaitlistStatusConverted,
+	WaitlistStatusExpired,
+}
+
+func (e WaitlistStatus) IsValid() bool {
+	switch e {
+	case WaitlistStatusWaiting, WaitlistStatusNotified, WaitlistStatusConverted, WaitlistStatusExpired:
+		return true
+	}
+	return false
+}
+
+func (e WaitlistStatus) String() string {
+	return string(e)
+}
+
+func (e *WaitlistStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WaitlistStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WaitlistStatus", str)
+	}
+	return nil
+}
+
+func (e WaitlistStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WaitlistStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WaitlistStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

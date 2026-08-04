@@ -1,0 +1,371 @@
+# ============================================================================
+# RESTAURANT BOOKING SYSTEM — GraphQL Schema
+# Mirrors your existing auth schema conventions: types, inputs, and
+# `extend type Query/Mutation` blocks grouped per feature.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# ENUMS
+# ----------------------------------------------------------------------------
+
+enum SeatingType {
+  STANDARD       # casual, walk-in-friendly, turn-based tables
+  FIXED_SITTING  # fine dining, fixed seating times (e.g. 6pm / 8:30pm)
+}
+
+enum RestaurantUserRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  NONE
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum BookingSource {
+  PHONE
+  WEB
+  WALK_IN
+  THIRD_PARTY
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  CONVERTED
+  EXPIRED
+}
+
+enum CallOutcome {
+  BOOKED
+  NO_AVAILABILITY
+  TRANSFERRED
+  ABANDONED
+}
+
+# ----------------------------------------------------------------------------
+# CORE TYPES
+# ----------------------------------------------------------------------------
+
+type Restaurant {
+  id: String!
+  name: String!
+  phone: String!
+  email: String
+  addressLine1: String!
+  suburb: String!
+  state: String!
+  postcode: String!
+  timezone: String!
+  cuisineType: String
+  seatingType: SeatingType!
+  defaultTurnDurationMin: Int!
+  bookingBufferMin: Int!
+  maxPartySize: Int!
+  isActive: Boolean!
+  tables: [RestaurantTable!]!
+  operatingHours: [OperatingHours!]!
+  closures: [Closure!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type RestaurantUser {
+  id: String!
+  restaurantId: String!
+  name: String!
+  email: String!
+  phone: String
+  role: RestaurantUserRole!
+  createdAt: String!
+}
+
+type RestaurantTable {
+  id: String!
+  restaurantId: String!
+  tableNumber: String!
+  capacityMin: Int!
+  capacityMax: Int!
+  section: String
+  isActive: Boolean!
+}
+
+type OperatingHours {
+  id: String!
+  dayOfWeek: Int!       # 0 = Sunday
+  openTime: String
+  closeTime: String
+  isClosed: Boolean!
+}
+
+type Closure {
+  id: String!
+  closureDate: String!
+  reason: String
+}
+
+type Customer {
+  id: String!
+  phone: String!
+  name: String
+  email: String
+  createdAt: String!
+}
+
+type Booking {
+  id: String!
+  restaurantId: String!
+  customerId: String!
+  tableId: String
+  partySize: Int!
+  bookingTime: String!
+  durationMinutes: Int!
+  status: BookingStatus!
+  specialRequests: String
+  paymentStatus: PaymentStatus!
+  source: BookingSource!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type WaitlistEntry {
+  id: String!
+  restaurantId: String!
+  customerId: String!
+  partySize: Int!
+  requestedTime: String!
+  status: WaitlistStatus!
+  createdAt: String!
+}
+
+type CallLog {
+  id: String!
+  restaurantId: String
+  vapiCallId: String!
+  customerPhone: String
+  bookingId: String
+  transcript: String
+  outcome: CallOutcome
+  createdAt: String!
+}
+
+# Used by the voice agent to check open tables for a given time/party size
+type AvailableSlot {
+  table: RestaurantTable!
+  startTime: String!
+  endTime: String!
+}
+
+# ----------------------------------------------------------------------------
+# RESTAURANT — inputs & mutations
+# ----------------------------------------------------------------------------
+
+input CreateRestaurantInput {
+  name: String!
+  phone: String!
+  email: String
+  addressLine1: String!
+  suburb: String!
+  state: String!
+  postcode: String!
+  timezone: String
+  cuisineType: String
+  seatingType: SeatingType
+  defaultTurnDurationMin: Int
+  bookingBufferMin: Int
+  maxPartySize: Int
+}
+
+input UpdateRestaurantInput {
+  name: String
+  phone: String
+  email: String
+  addressLine1: String
+  suburb: String
+  state: String
+  postcode: String
+  cuisineType: String
+  seatingType: SeatingType
+  defaultTurnDurationMin: Int
+  bookingBufferMin: Int
+  maxPartySize: Int
+  isActive: Boolean
+}
+
+extend type Query {
+  restaurant(id: String!): Restaurant
+  restaurants(suburb: String, cuisineType: String): [Restaurant!]!
+}
+
+extend type Mutation {
+  createRestaurant(input: CreateRestaurantInput!): Restaurant!
+  updateRestaurant(id: String!, input: UpdateRestaurantInput!): Restaurant!
+}
+
+# ----------------------------------------------------------------------------
+# TABLES — inputs & mutations
+# ----------------------------------------------------------------------------
+
+input CreateTableInput {
+  restaurantId: String!
+  tableNumber: String!
+  capacityMin: Int!
+  capacityMax: Int!
+  section: String
+}
+
+input UpdateTableInput {
+  tableNumber: String
+  capacityMin: Int
+  capacityMax: Int
+  section: String
+  isActive: Boolean
+}
+
+extend type Mutation {
+  createTable(input: CreateTableInput!): RestaurantTable!
+  updateTable(id: String!, input: UpdateTableInput!): RestaurantTable!
+  deleteTable(id: String!): Boolean!
+}
+
+# ----------------------------------------------------------------------------
+# OPERATING HOURS & CLOSURES — inputs & mutations
+# ----------------------------------------------------------------------------
+
+input SetOperatingHoursInput {
+  dayOfWeek: Int!
+  openTime: String
+  closeTime: String
+  isClosed: Boolean
+}
+
+input CreateClosureInput {
+  restaurantId: String!
+  closureDate: String!
+  reason: String
+}
+
+extend type Mutation {
+  setOperatingHours(restaurantId: String!, hours: [SetOperatingHoursInput!]!): [OperatingHours!]!
+  createClosure(input: CreateClosureInput!): Closure!
+  deleteClosure(id: String!): Boolean!
+}
+
+# ----------------------------------------------------------------------------
+# CUSTOMERS — inputs & mutations
+# ----------------------------------------------------------------------------
+
+input FindOrCreateCustomerInput {
+  phone: String!
+  name: String
+  email: String
+}
+
+extend type Query {
+  customer(phone: String!): Customer
+}
+
+extend type Mutation {
+  # Used by the voice agent flow: look up by phone, create if new
+  findOrCreateCustomer(input: FindOrCreateCustomerInput!): Customer!
+}
+
+# ----------------------------------------------------------------------------
+# BOOKINGS — inputs, queries & mutations
+# ----------------------------------------------------------------------------
+
+input CheckAvailabilityInput {
+  restaurantId: String!
+  partySize: Int!
+  requestedTime: String!   # ISO 8601
+}
+
+input CreateBookingInput {
+  restaurantId: String!
+  customerId: String!
+  tableId: String            # optional — can be assigned later
+  partySize: Int!
+  bookingTime: String!       # ISO 8601
+  specialRequests: String
+  source: BookingSource
+  idempotencyKey: String!    # required — prevents duplicate bookings on retry
+}
+
+input UpdateBookingInput {
+  tableId: String
+  partySize: Int
+  bookingTime: String
+  status: BookingStatus
+  specialRequests: String
+  paymentStatus: PaymentStatus
+}
+
+extend type Query {
+  booking(id: String!): Booking
+  bookings(restaurantId: String!, date: String, status: BookingStatus): [Booking!]!
+  checkAvailability(input: CheckAvailabilityInput!): [AvailableSlot!]!
+}
+
+extend type Mutation {
+  createBooking(input: CreateBookingInput!): Booking!
+  updateBooking(id: String!, input: UpdateBookingInput!): Booking!
+  cancelBooking(id: String!): Booking!
+  assignTable(bookingId: String!, tableId: String!): Booking!
+}
+
+# ----------------------------------------------------------------------------
+# WAITLIST — inputs & mutations
+# ----------------------------------------------------------------------------
+
+input CreateWaitlistEntryInput {
+  restaurantId: String!
+  customerId: String!
+  partySize: Int!
+  requestedTime: String!
+}
+
+extend type Query {
+  waitlist(restaurantId: String!, status: WaitlistStatus): [WaitlistEntry!]!
+}
+
+extend type Mutation {
+  createWaitlistEntry(input: CreateWaitlistEntryInput!): WaitlistEntry!
+  updateWaitlistStatus(id: String!, status: WaitlistStatus!): WaitlistEntry!
+  # Converts a waitlist entry into an actual booking once a table frees up
+  convertWaitlistToBooking(id: String!, tableId: String!): Booking!
+}
+
+# ----------------------------------------------------------------------------
+# CALL LOGS — inputs & mutations
+# (mainly written to by the Go webhook handler that Vapi/Groq call into)
+# ----------------------------------------------------------------------------
+
+input LogCallInput {
+  restaurantId: String
+  vapiCallId: String!
+  customerPhone: String
+  bookingId: String
+  transcript: String
+  outcome: CallOutcome
+}
+
+extend type Query {
+  callLog(vapiCallId: String!): CallLog
+}
+
+extend type Mutation {
+  logCall(input: LogCallInput!): CallLog!
+}

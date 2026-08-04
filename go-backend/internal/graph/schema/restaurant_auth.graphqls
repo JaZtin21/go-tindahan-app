@@ -1,0 +1,75 @@
+# ============================================================================
+# RESTAURANT OWNER AUTH
+# Separate login system from diner auth (User/loginWithGoogle) — email +
+# password, since this is a business dashboard. One RestaurantOwner account
+# can be linked to many restaurants via RestaurantStaff.
+# ============================================================================
+
+
+type RestaurantOwner {
+  id: String!
+  firstName: String!
+  lastName: String!
+  email: String!
+  # Restaurants this account has a role on
+  restaurants: [RestaurantStaffRole!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type RestaurantStaffRole {
+  restaurant: Restaurant!
+  role: RestaurantUserRole!
+}
+
+type RestaurantAuthResponse {
+  owner: RestaurantOwner!
+  accessToken: String!
+}
+
+type RestaurantRefreshResponse {
+  accessToken: String!
+  owner: RestaurantOwner!
+}
+
+input RestaurantRegisterInput {
+  firstName: String!
+  lastName: String!
+  email: String!
+  password: String!
+}
+
+input RestaurantLoginInput {
+  email: String!
+  password: String!
+}
+
+input InviteRestaurantStaffInput {
+  restaurantId: String!
+  email: String!             # must be an existing RestaurantOwner account
+  role: RestaurantUserRole!  # MANAGER or STAFF — never OWNER via invite
+}
+
+extend type Mutation {
+  # Creates the account only — does NOT create a restaurant or grant any
+  # role. Call createRestaurant afterward, which grants OWNER role on that
+  # restaurant automatically.
+  registerRestaurantOwner(input: RestaurantRegisterInput!): RestaurantAuthResponse!
+
+  loginRestaurantOwner(input: RestaurantLoginInput!): RestaurantAuthResponse!
+
+  # Swaps the HttpOnly cookie for a fresh Redis-backed access token, same
+  # pattern as your diner-facing refreshToken.
+  refreshRestaurantToken: RestaurantRefreshResponse!
+
+  logoutRestaurantOwner: Boolean!
+
+  # Owner/manager grants another existing account access to their restaurant.
+  inviteRestaurantStaff(input: InviteRestaurantStaffInput!): RestaurantStaffRole!
+
+  revokeRestaurantStaff(restaurantId: String!, ownerId: String!): Boolean!
+}
+
+extend type Query {
+  currentRestaurantOwner: RestaurantOwner
+}

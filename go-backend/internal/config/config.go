@@ -15,7 +15,7 @@ func LoadConfig() *Config {
 	return &Config{
 		Port:        getEnv("Port", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
-		RedisAddr:   getEnv("REDDIS_ADDR", ""),
+		RedisAddr:   getEnv("REDIS_ADDR", ""),
 	}
 }
 
