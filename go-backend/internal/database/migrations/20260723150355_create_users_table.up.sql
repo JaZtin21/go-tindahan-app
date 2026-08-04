@@ -7,19 +7,13 @@ ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS server_updated_at TIMESTAMP
 
 ALTER TABLE checkout_batches ADD COLUMN IF NOT EXISTS server_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
--- Phase 2: Create Missing Log Tables
-CREATE TABLE IF NOT EXISTS item_action_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    shop_id UUID NOT NULL,
-    inventory_item_id UUID,
-    item_name VARCHAR(150) NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    quantity INT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    server_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_item_action_history_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
-    CONSTRAINT fk_item_action_history_inventory FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL
-);
+-- Phase 2: Backfill the Sync Column on the Existing Log Table
+-- NOTE: item_action_history is already created by 20260717090000 WITHOUT
+-- server_updated_at. A CREATE TABLE IF NOT EXISTS here would silently no-op
+-- (table already exists) so the column would never be added, and Phase 3's
+-- idx_item_action_history_sync would fail with 42703 on any fresh database.
+-- An explicit ALTER is the only correct way to backfill it.
+ALTER TABLE item_action_history ADD COLUMN IF NOT EXISTS server_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
 -- Phase 3: Build Tracking Indices
 CREATE INDEX IF NOT EXISTS idx_shops_sync ON shops (server_updated_at);
