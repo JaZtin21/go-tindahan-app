@@ -8,12 +8,13 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setTables, upsertTable, removeTable, setTablesError } from '~/store';
+import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { RestaurantTable } from '~/types/restaurant';
 import { TableFormModal } from './components/TableFormModal';
 
 export const TablesPage = () => {
     const dispatch = useAppDispatch();
-    const activeRestaurantId = useAppSelector((s) => s.restaurant.activeRestaurantId);
+    const activeRestaurantId = useRestaurantId();
     const tables = useAppSelector((s) => s.tables.tables);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<RestaurantTable | null>(null);

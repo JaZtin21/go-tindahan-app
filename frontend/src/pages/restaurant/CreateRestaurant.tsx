@@ -1,26 +1,37 @@
-import React, { useState } from 'react';
-import { useMutation } from '@apollo/client/react'; // Standard clean import path
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation } from '@apollo/client/react';
 import { CREATE_RESTAURANT_MUTATION } from '~/api/graphql';
 import { useRestaurantAuth } from '~/config';
 import { useAppDispatch } from '~/store';
 import { addRestaurantRole } from '~/store';
 import type { Restaurant } from '~/types/restaurant';
 
-// 1. IMPORT YOUR DEDICATED RESTAURANT CLIENT HERE
-import { restaurantClient } from '~/config/restaurantApolloClient'; // Adjust path to matching file setup
+// Dedicated restaurant client so the mutation goes through the restaurant
+// token interceptors (not the diner app's client).
+import { restaurantClient } from '~/config/restaurantApolloClient';
 
 const AUSTRALIAN_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 
 export const CreateRestaurant = () => {
     const { isAuthenticated } = useRestaurantAuth();
     const dispatch = useAppDispatch();
+    const navigate = useNavigate();
 
-    // 2. PASS THE CLIENT EXPLICITLY AS AN OPTION OVERWRITE
     const [createRestaurant, { loading, error }] = useMutation(CREATE_RESTAURANT_MUTATION, {
-        client: restaurantClient, // 👈 FORCES the hook to execute through the restaurant interceptors
+        client: restaurantClient,
     });
 
     const [createdName, setCreatedName] = useState<string | null>(null);
+    // Guarded so an early manual navigation (Sign out, nav link) cancels the
+    // pending redirect instead of yanking the user back after creation.
+    const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (navTimer.current) clearTimeout(navTimer.current);
+        };
+    }, []);
 
     const [form, setForm] = useState({
         name: '',
@@ -45,8 +56,11 @@ export const CreateRestaurant = () => {
             setCreatedName(created?.name ?? form.name);
             if (created) {
                 // Keep the Redux restaurant slice in sync so the dashboard
-                // shows the new restaurant without a refetch.
+                // shows the new restaurant without a refetch, then land the
+                // user directly in the new restaurant's scoped dashboard route
+                // (id lives in the URL so a refresh keeps context).
                 dispatch(addRestaurantRole(created));
+                navTimer.current = setTimeout(() => navigate(`/${created.id}`), 1200);
             }
         } catch {
             // error state below already surfaces the message

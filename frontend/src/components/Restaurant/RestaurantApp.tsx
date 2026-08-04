@@ -4,6 +4,7 @@ import { useRestaurantAuth } from '~/config/RestaurantAuthProvider';
 import {
     RestaurantLogin,
     RestaurantRegister,
+    RestaurantList,
     RestaurantDashboard,
     CreateRestaurant,
     BookingsPage,
@@ -46,13 +47,23 @@ export const RestaurantApp = () => {
                     Layout itself rather than individual routes inside it. */}
                 <Route element={<ProtectedRouteGuard />}>
                     <Route element={<RestaurantLayout />}>
-                        <Route path="/" element={<RestaurantDashboard />} />
+                        {/* Landing page: all of the owner's restaurants, each
+                            opening its own dashboard below. */}
+                        <Route path="/" element={<RestaurantList />} />
                         <Route path="/create-restaurant" element={<CreateRestaurant />} />
-                        <Route path="/bookings" element={<BookingsPage />} />
-                        <Route path="/waitlist" element={<WaitlistPage />} />
-                        <Route path="/tables" element={<TablesPage />} />
-                        <Route path="/calls" element={<CallsPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
+
+                    {/* Restaurant-scoped routes — /{id} is the restaurant's
+                        dashboard (feature navigation), /{id}/bookings etc are
+                        the feature pages. The id lives in the URL so a refresh /
+                        deep link keeps context and each page queries with it. */}
+                    <Route path="/:restaurantId" element={<RestaurantLayout />}>
+                        <Route index element={<RestaurantDashboard />} />
+                        <Route path="bookings" element={<BookingsPage />} />
+                        <Route path="waitlist" element={<WaitlistPage />} />
+                        <Route path="tables" element={<TablesPage />} />
+                        <Route path="calls" element={<CallsPage />} />
+                        <Route path="settings" element={<SettingsPage />} />
                     </Route>
                 </Route>
 

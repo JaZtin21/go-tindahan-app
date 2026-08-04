@@ -3,13 +3,14 @@ import { useQuery } from '@apollo/client/react';
 import { GET_CALL_LOGS_QUERY } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setCallLogs, setCallLogsError } from '~/store';
+import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { CallLog } from '~/types/restaurant';
 import { CallLogTable } from './components/CallLogTable';
 import { CallDetailPanel } from './components/CallDetailPanel';
 
 export const CallsPage = () => {
     const dispatch = useAppDispatch();
-    const activeRestaurantId = useAppSelector((s) => s.restaurant.activeRestaurantId);
+    const activeRestaurantId = useRestaurantId();
     const logs = useAppSelector((s) => s.callLogs.logs);
     const [selected, setSelected] = useState<CallLog | null>(null);
 

@@ -1,5 +1,6 @@
 export * from './CreateRestaurant'
 export * from './RestaurantDashboard'
+export * from './RestaurantList'
 export * from './RestaurantRegister'
 export * from './bookings'
 export * from './calls'

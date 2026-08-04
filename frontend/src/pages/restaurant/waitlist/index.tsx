@@ -8,12 +8,13 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setWaitlist, removeWaitlistEntry, setWaitlistError } from '~/store';
+import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { RestaurantTable, WaitlistEntry } from '~/types/restaurant';
 import { WaitlistRow } from './components/WaitlistRow';
 
 export const WaitlistPage = () => {
     const dispatch = useAppDispatch();
-    const activeRestaurantId = useAppSelector((s) => s.restaurant.activeRestaurantId);
+    const activeRestaurantId = useRestaurantId();
     const entries = useAppSelector((s) => s.waitlist.entries);
     const [statusFilter, setStatusFilter] = useState<'WAITING' | 'NOTIFIED' | null>('WAITING');
 

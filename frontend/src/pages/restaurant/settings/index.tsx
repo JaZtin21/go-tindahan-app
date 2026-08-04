@@ -3,13 +3,14 @@ import { useQuery } from '@apollo/client/react';
 import { GET_OPERATING_HOURS_QUERY, GET_CLOSURES_QUERY } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setOperatingHours, setClosures } from '~/store';
+import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { Closure, OperatingHours } from '~/types/restaurant';
 import { OperatingHoursEditor } from './components/OperatingHoursEditor';
 import { ClosuresPanel } from './components/ClosuresPanel';
 
 export const SettingsPage = () => {
     const dispatch = useAppDispatch();
-    const activeRestaurantId = useAppSelector((s) => s.restaurant.activeRestaurantId);
+    const activeRestaurantId = useRestaurantId();
     const hours = useAppSelector((s) => s.settings.hours);
     const closures = useAppSelector((s) => s.settings.closures);
 

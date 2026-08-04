@@ -9,12 +9,13 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setBookings, setBookingsLoading, setBookingsError, setSelectedDate, removeBooking, upsertBooking } from '~/store';
+import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 import { BookingTimeline } from './components/BookingTimeline';
 
 export const BookingsPage = () => {
     const dispatch = useAppDispatch();
-    const activeRestaurantId = useAppSelector((s) => s.restaurant.activeRestaurantId);
+    const activeRestaurantId = useRestaurantId();
     const bookings = useAppSelector((s) => s.bookings.bookings);
     const selectedDate = useAppSelector((s) => s.bookings.selectedDate);
 

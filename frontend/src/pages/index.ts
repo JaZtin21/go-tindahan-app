@@ -5,6 +5,7 @@ export { ScanPage } from './scan';
 export {
     RestaurantRegister,
     CreateRestaurant,
+    RestaurantList,
     RestaurantDashboard,
     BookingsPage,
     WaitlistPage,
