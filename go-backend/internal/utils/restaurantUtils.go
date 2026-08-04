@@ -84,6 +84,14 @@ func IsUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// IsForeignKeyViolation detects Postgres error 23503 — fires when an insert
+// references a row that doesn't exist (e.g. a waitlist entry pointing at a
+// missing restaurant or customer).
+func IsForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
 // ----------------------------------------------------------------------------
 // PASSWORD + SESSION HELPERS (for the restaurant owner auth resolvers)
 // ----------------------------------------------------------------------------

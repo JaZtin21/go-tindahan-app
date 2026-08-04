@@ -166,43 +166,46 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddInventoryItem        func(childComplexity int, input model.AddInventoryItemInput) int
-		AssignTable             func(childComplexity int, bookingID string, tableID string) int
-		CancelBooking           func(childComplexity int, id string) int
-		CheckoutCart            func(childComplexity int, input model.CheckoutCartInput) int
-		CreateBooking           func(childComplexity int, input model.CreateBookingInput) int
-		CreateClosure           func(childComplexity int, input model.CreateClosureInput) int
-		CreatePost              func(childComplexity int, input model.CreatePostInput) int
-		CreateRestaurant        func(childComplexity int, input model.CreateRestaurantInput) int
-		CreateShop              func(childComplexity int, input model.CreateShopInput) int
-		CreateTable             func(childComplexity int, input model.CreateTableInput) int
-		DecrementStock          func(childComplexity int, input model.DecrementStockInput) int
-		DeleteClosure           func(childComplexity int, id string) int
-		DeleteInventoryItem     func(childComplexity int, itemID string) int
-		DeletePost              func(childComplexity int, id string) int
-		DeleteShop              func(childComplexity int, shopID string) int
-		DeleteTable             func(childComplexity int, id string) int
-		FindOrCreateCustomer    func(childComplexity int, input model.FindOrCreateCustomerInput) int
-		IncrementStock          func(childComplexity int, input model.IncrementStockInput) int
-		InviteRestaurantStaff   func(childComplexity int, input model.InviteRestaurantStaffInput) int
-		LoginRestaurantOwner    func(childComplexity int, input model.RestaurantLoginInput) int
-		LoginWithGoogle         func(childComplexity int, input model.GoogleLoginInput) int
-		Logout                  func(childComplexity int) int
-		LogoutRestaurantOwner   func(childComplexity int) int
-		Ping                    func(childComplexity int) int
-		RecordScanEvent         func(childComplexity int, input model.RecordScanEventInput) int
-		RefreshRestaurantToken  func(childComplexity int) int
-		RefreshToken            func(childComplexity int) int
-		RegisterRestaurantOwner func(childComplexity int, input model.RestaurantRegisterInput) int
-		RevokeRestaurantStaff   func(childComplexity int, restaurantID string, ownerID string) int
-		SetOperatingHours       func(childComplexity int, restaurantID string, hours []*model.SetOperatingHoursInput) int
-		UnifiedBatchSync        func(childComplexity int, input model.UnifiedBatchSyncInput) int
-		UpdateBooking           func(childComplexity int, id string, input model.UpdateBookingInput) int
-		UpdateInventoryItem     func(childComplexity int, input model.UpdateInventoryItemInput) int
-		UpdatePost              func(childComplexity int, input model.UpdatePostInput) int
-		UpdateRestaurant        func(childComplexity int, id string, input model.UpdateRestaurantInput) int
-		UpdateShop              func(childComplexity int, input model.UpdateShopInput) int
-		UpdateTable             func(childComplexity int, id string, input model.UpdateTableInput) int
+		AddInventoryItem         func(childComplexity int, input model.AddInventoryItemInput) int
+		AssignTable              func(childComplexity int, bookingID string, tableID string) int
+		CancelBooking            func(childComplexity int, id string) int
+		CheckoutCart             func(childComplexity int, input model.CheckoutCartInput) int
+		ConvertWaitlistToBooking func(childComplexity int, id string, tableID string) int
+		CreateBooking            func(childComplexity int, input model.CreateBookingInput) int
+		CreateClosure            func(childComplexity int, input model.CreateClosureInput) int
+		CreatePost               func(childComplexity int, input model.CreatePostInput) int
+		CreateRestaurant         func(childComplexity int, input model.CreateRestaurantInput) int
+		CreateShop               func(childComplexity int, input model.CreateShopInput) int
+		CreateTable              func(childComplexity int, input model.CreateTableInput) int
+		CreateWaitlistEntry      func(childComplexity int, input model.CreateWaitlistEntryInput) int
+		DecrementStock           func(childComplexity int, input model.DecrementStockInput) int
+		DeleteClosure            func(childComplexity int, id string) int
+		DeleteInventoryItem      func(childComplexity int, itemID string) int
+		DeletePost               func(childComplexity int, id string) int
+		DeleteShop               func(childComplexity int, shopID string) int
+		DeleteTable              func(childComplexity int, id string) int
+		FindOrCreateCustomer     func(childComplexity int, input model.FindOrCreateCustomerInput) int
+		IncrementStock           func(childComplexity int, input model.IncrementStockInput) int
+		InviteRestaurantStaff    func(childComplexity int, input model.InviteRestaurantStaffInput) int
+		LoginRestaurantOwner     func(childComplexity int, input model.RestaurantLoginInput) int
+		LoginWithGoogle          func(childComplexity int, input model.GoogleLoginInput) int
+		Logout                   func(childComplexity int) int
+		LogoutRestaurantOwner    func(childComplexity int) int
+		Ping                     func(childComplexity int) int
+		RecordScanEvent          func(childComplexity int, input model.RecordScanEventInput) int
+		RefreshRestaurantToken   func(childComplexity int) int
+		RefreshToken             func(childComplexity int) int
+		RegisterRestaurantOwner  func(childComplexity int, input model.RestaurantRegisterInput) int
+		RevokeRestaurantStaff    func(childComplexity int, restaurantID string, ownerID string) int
+		SetOperatingHours        func(childComplexity int, restaurantID string, hours []*model.SetOperatingHoursInput) int
+		UnifiedBatchSync         func(childComplexity int, input model.UnifiedBatchSyncInput) int
+		UpdateBooking            func(childComplexity int, id string, input model.UpdateBookingInput) int
+		UpdateInventoryItem      func(childComplexity int, input model.UpdateInventoryItemInput) int
+		UpdatePost               func(childComplexity int, input model.UpdatePostInput) int
+		UpdateRestaurant         func(childComplexity int, id string, input model.UpdateRestaurantInput) int
+		UpdateShop               func(childComplexity int, input model.UpdateShopInput) int
+		UpdateTable              func(childComplexity int, id string, input model.UpdateTableInput) int
+		UpdateWaitlistStatus     func(childComplexity int, id string, status model.WaitlistStatus) int
 	}
 
 	OperatingHours struct {
@@ -539,6 +542,9 @@ type MutationResolver interface {
 	UpdateBooking(ctx context.Context, id string, input model.UpdateBookingInput) (*model.Booking, error)
 	CancelBooking(ctx context.Context, id string) (*model.Booking, error)
 	AssignTable(ctx context.Context, bookingID string, tableID string) (*model.Booking, error)
+	CreateWaitlistEntry(ctx context.Context, input model.CreateWaitlistEntryInput) (*model.WaitlistEntry, error)
+	UpdateWaitlistStatus(ctx context.Context, id string, status model.WaitlistStatus) (*model.WaitlistEntry, error)
+	ConvertWaitlistToBooking(ctx context.Context, id string, tableID string) (*model.Booking, error)
 	RegisterRestaurantOwner(ctx context.Context, input model.RestaurantRegisterInput) (*model.RestaurantAuthResponse, error)
 	LoginRestaurantOwner(ctx context.Context, input model.RestaurantLoginInput) (*model.RestaurantAuthResponse, error)
 	RefreshRestaurantToken(ctx context.Context) (*model.RestaurantRefreshResponse, error)
@@ -1138,6 +1144,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CheckoutCart(childComplexity, args["input"].(model.CheckoutCartInput)), true
+	case "Mutation.convertWaitlistToBooking":
+		if e.ComplexityRoot.Mutation.ConvertWaitlistToBooking == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_convertWaitlistToBooking_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ConvertWaitlistToBooking(childComplexity, args["id"].(string), args["tableId"].(string)), true
 	case "Mutation.createBooking":
 		if e.ComplexityRoot.Mutation.CreateBooking == nil {
 			break
@@ -1204,6 +1221,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateTable(childComplexity, args["input"].(model.CreateTableInput)), true
+	case "Mutation.createWaitlistEntry":
+		if e.ComplexityRoot.Mutation.CreateWaitlistEntry == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createWaitlistEntry_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateWaitlistEntry(childComplexity, args["input"].(model.CreateWaitlistEntryInput)), true
 	case "Mutation.decrementStock":
 		if e.ComplexityRoot.Mutation.DecrementStock == nil {
 			break
@@ -1476,6 +1504,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateTable(childComplexity, args["id"].(string), args["input"].(model.UpdateTableInput)), true
+	case "Mutation.updateWaitlistStatus":
+		if e.ComplexityRoot.Mutation.UpdateWaitlistStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateWaitlistStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateWaitlistStatus(childComplexity, args["id"].(string), args["status"].(model.WaitlistStatus)), true
 
 	case "OperatingHours.closeTime":
 		if e.ComplexityRoot.OperatingHours.CloseTime == nil {
@@ -4007,6 +4046,28 @@ func (ec *executionContext) field_Mutation_checkoutCart_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_convertWaitlistToBooking_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "tableId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["tableId"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createBooking_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4083,6 +4144,20 @@ func (ec *executionContext) field_Mutation_createTable_args(ctx context.Context,
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateTableInput, error) {
 			return ec.unmarshalNCreateTableInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateTableInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createWaitlistEntry_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateWaitlistEntryInput, error) {
+			return ec.unmarshalNCreateWaitlistEntryInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateWaitlistEntryInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -4436,6 +4511,28 @@ func (ec *executionContext) field_Mutation_updateTable_args(ctx context.Context,
 		return nil, err
 	}
 	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateWaitlistStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status",
+		func(ctx context.Context, v any) (model.WaitlistStatus, error) {
+			return ec.unmarshalNWaitlistStatus2goᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistStatus(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg1
 	return args, nil
 }
 
@@ -7186,7 +7283,20 @@ func (ec *executionContext) _Mutation_createRestaurant(ctx context.Context, fiel
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().CreateRestaurant(ctx, fc.Args["input"].(model.CreateRestaurantInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Restaurant
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Restaurant) graphql.Marshaler {
 			return ec.marshalNRestaurant2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurant(ctx, selections, v)
 		},
@@ -7230,7 +7340,20 @@ func (ec *executionContext) _Mutation_updateRestaurant(ctx context.Context, fiel
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().UpdateRestaurant(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateRestaurantInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Restaurant
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Restaurant) graphql.Marshaler {
 			return ec.marshalNRestaurant2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurant(ctx, selections, v)
 		},
@@ -7274,7 +7397,20 @@ func (ec *executionContext) _Mutation_createTable(ctx context.Context, field gra
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().CreateTable(ctx, fc.Args["input"].(model.CreateTableInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.RestaurantTable
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.RestaurantTable) graphql.Marshaler {
 			return ec.marshalNRestaurantTable2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurantTable(ctx, selections, v)
 		},
@@ -7318,7 +7454,20 @@ func (ec *executionContext) _Mutation_updateTable(ctx context.Context, field gra
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().UpdateTable(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateTableInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.RestaurantTable
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.RestaurantTable) graphql.Marshaler {
 			return ec.marshalNRestaurantTable2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurantTable(ctx, selections, v)
 		},
@@ -7362,7 +7511,20 @@ func (ec *executionContext) _Mutation_deleteTable(ctx context.Context, field gra
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().DeleteTable(ctx, fc.Args["id"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
 			return ec.marshalNBoolean2bool(ctx, selections, v)
 		},
@@ -7406,7 +7568,20 @@ func (ec *executionContext) _Mutation_setOperatingHours(ctx context.Context, fie
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().SetOperatingHours(ctx, fc.Args["restaurantId"].(string), fc.Args["hours"].([]*model.SetOperatingHoursInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.OperatingHours
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.OperatingHours) graphql.Marshaler {
 			return ec.marshalNOperatingHours2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOperatingHoursᚄ(ctx, selections, v)
 		},
@@ -7450,7 +7625,20 @@ func (ec *executionContext) _Mutation_createClosure(ctx context.Context, field g
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().CreateClosure(ctx, fc.Args["input"].(model.CreateClosureInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Closure
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Closure) graphql.Marshaler {
 			return ec.marshalNClosure2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐClosure(ctx, selections, v)
 		},
@@ -7494,7 +7682,20 @@ func (ec *executionContext) _Mutation_deleteClosure(ctx context.Context, field g
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().DeleteClosure(ctx, fc.Args["id"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
 			return ec.marshalNBoolean2bool(ctx, selections, v)
 		},
@@ -7626,7 +7827,20 @@ func (ec *executionContext) _Mutation_updateBooking(ctx context.Context, field g
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().UpdateBooking(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateBookingInput))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
 			return ec.marshalNBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
 		},
@@ -7670,7 +7884,20 @@ func (ec *executionContext) _Mutation_cancelBooking(ctx context.Context, field g
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().CancelBooking(ctx, fc.Args["id"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
 			return ec.marshalNBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
 		},
@@ -7714,7 +7941,20 @@ func (ec *executionContext) _Mutation_assignTable(ctx context.Context, field gra
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Mutation().AssignTable(ctx, fc.Args["bookingId"].(string), fc.Args["tableId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
 			return ec.marshalNBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
 		},
@@ -7740,6 +7980,164 @@ func (ec *executionContext) fieldContext_Mutation_assignTable(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_assignTable_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createWaitlistEntry(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createWaitlistEntry(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateWaitlistEntry(ctx, fc.Args["input"].(model.CreateWaitlistEntryInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.WaitlistEntry) graphql.Marshaler {
+			return ec.marshalNWaitlistEntry2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createWaitlistEntry(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WaitlistEntry(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createWaitlistEntry_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateWaitlistStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateWaitlistStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateWaitlistStatus(ctx, fc.Args["id"].(string), fc.Args["status"].(model.WaitlistStatus))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.WaitlistEntry
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.WaitlistEntry) graphql.Marshaler {
+			return ec.marshalNWaitlistEntry2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateWaitlistStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WaitlistEntry(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateWaitlistStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_convertWaitlistToBooking(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_convertWaitlistToBooking(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ConvertWaitlistToBooking(ctx, fc.Args["id"].(string), fc.Args["tableId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
+			return ec.marshalNBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_convertWaitlistToBooking(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Booking(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_convertWaitlistToBooking_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10845,7 +11243,20 @@ func (ec *executionContext) _Query_tables(ctx context.Context, field graphql.Col
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Tables(ctx, fc.Args["restaurantId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.RestaurantTable
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.RestaurantTable) graphql.Marshaler {
 			return ec.marshalNRestaurantTable2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐRestaurantTableᚄ(ctx, selections, v)
 		},
@@ -10889,7 +11300,20 @@ func (ec *executionContext) _Query_operatingHours(ctx context.Context, field gra
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().OperatingHours(ctx, fc.Args["restaurantId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.OperatingHours
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.OperatingHours) graphql.Marshaler {
 			return ec.marshalNOperatingHours2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐOperatingHoursᚄ(ctx, selections, v)
 		},
@@ -10933,7 +11357,20 @@ func (ec *executionContext) _Query_closures(ctx context.Context, field graphql.C
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Closures(ctx, fc.Args["restaurantId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.Closure
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Closure) graphql.Marshaler {
 			return ec.marshalNClosure2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐClosureᚄ(ctx, selections, v)
 		},
@@ -10977,7 +11414,20 @@ func (ec *executionContext) _Query_customer(ctx context.Context, field graphql.C
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Customer(ctx, fc.Args["phone"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Customer
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Customer) graphql.Marshaler {
 			return ec.marshalOCustomer2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCustomer(ctx, selections, v)
 		},
@@ -11021,7 +11471,20 @@ func (ec *executionContext) _Query_booking(ctx context.Context, field graphql.Co
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Booking(ctx, fc.Args["id"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
 			return ec.marshalOBooking2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBooking(ctx, selections, v)
 		},
@@ -11065,7 +11528,20 @@ func (ec *executionContext) _Query_bookings(ctx context.Context, field graphql.C
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Bookings(ctx, fc.Args["restaurantId"].(string), fc.Args["date"].(*string), fc.Args["status"].(*model.BookingStatus))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.Booking
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Booking) graphql.Marshaler {
 			return ec.marshalNBooking2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐBookingᚄ(ctx, selections, v)
 		},
@@ -11153,7 +11629,20 @@ func (ec *executionContext) _Query_waitlist(ctx context.Context, field graphql.C
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().Waitlist(ctx, fc.Args["restaurantId"].(string), fc.Args["status"].(*model.WaitlistStatus))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.WaitlistEntry
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.WaitlistEntry) graphql.Marshaler {
 			return ec.marshalNWaitlistEntry2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntryᚄ(ctx, selections, v)
 		},
@@ -11197,7 +11686,20 @@ func (ec *executionContext) _Query_callLogs(ctx context.Context, field graphql.C
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().CallLogs(ctx, fc.Args["restaurantId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal []*model.CallLog
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.CallLog) graphql.Marshaler {
 			return ec.marshalNCallLog2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLogᚄ(ctx, selections, v)
 		},
@@ -11241,7 +11743,20 @@ func (ec *executionContext) _Query_callLog(ctx context.Context, field graphql.Co
 			fc := graphql.GetFieldContext(ctx)
 			return ec.Resolvers.Query().CallLog(ctx, fc.Args["vapiCallId"].(string))
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.IsAuthenticated == nil {
+					var zeroVal *model.CallLog
+					return zeroVal, errors.New("directive isAuthenticated is not implemented")
+				}
+				return ec.Directives.IsAuthenticated(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.CallLog) graphql.Marshaler {
 			return ec.marshalOCallLog2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCallLog(ctx, selections, v)
 		},
@@ -19003,6 +19518,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createWaitlistEntry":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createWaitlistEntry(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateWaitlistStatus":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateWaitlistStatus(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "convertWaitlistToBooking":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_convertWaitlistToBooking(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "registerRestaurantOwner":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_registerRestaurantOwner(ctx, field)
@@ -22461,6 +22997,11 @@ func (ec *executionContext) unmarshalNCreateTableInput2goᚑbackendᚋinternal�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateWaitlistEntryInput2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCreateWaitlistEntryInput(ctx context.Context, v any) (model.CreateWaitlistEntryInput, error) {
+	res, err := ec.unmarshalInputCreateWaitlistEntryInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNCustomer2goᚑbackendᚋinternalᚋgraphᚋmodelᚐCustomer(ctx context.Context, sel ast.SelectionSet, v model.Customer) graphql.Marshaler {
 	return ec._Customer(ctx, sel, &v)
 }
@@ -23474,6 +24015,10 @@ func (ec *executionContext) marshalNVerification2ᚖgoᚑbackendᚋinternalᚋgr
 		return graphql.Null
 	}
 	return ec._Verification(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNWaitlistEntry2goᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntry(ctx context.Context, sel ast.SelectionSet, v model.WaitlistEntry) graphql.Marshaler {
+	return ec._WaitlistEntry(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNWaitlistEntry2ᚕᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐWaitlistEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.WaitlistEntry) graphql.Marshaler {

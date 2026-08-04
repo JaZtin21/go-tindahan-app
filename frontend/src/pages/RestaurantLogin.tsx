@@ -82,6 +82,12 @@ export const RestaurantLogin = () => {
                 <Link to="/register" className="text-xs font-bold text-brand-gold hover:text-brand-gold-hover text-center no-underline transition-colors duration-200">
                     Don't have an account? Create one
                 </Link>
+
+                <div className="pt-3 border-t border-border-main">
+                    <Link to="/book" className="block text-xs font-bold text-brand-green hover:text-brand-green-hover text-center no-underline transition-colors duration-200">
+                        🧑 Customer demo — book a table without logging in
+                    </Link>
+                </div>
             </form>
         </div>
     );

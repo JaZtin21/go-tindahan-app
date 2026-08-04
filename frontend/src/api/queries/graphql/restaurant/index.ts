@@ -5,3 +5,4 @@ export * from './settings';
 export * from './bookings';
 export * from './waitlist';
 export * from './calls';
+export * from './public';

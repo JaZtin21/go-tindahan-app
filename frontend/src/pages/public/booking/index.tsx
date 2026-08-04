@@ -1,0 +1,154 @@
+import React, { useState } from 'react';
+import type { AvailableSlot, Booking, Customer, Restaurant } from '~/types/restaurant';
+import { PublicHeader, StepShell } from './components/Shared';
+import { RestaurantPicker } from './components/RestaurantPicker';
+import { AvailabilityStep } from './components/AvailabilityStep';
+import { CustomerStep } from './components/CustomerStep';
+
+// ============================================================================
+// PUBLIC BOOKING FLOW  (/book)
+// No auth required — mirrors what a website customer (or the Vapi phone
+// agent) goes through: find → check availability → confirm → done.
+// ============================================================================
+
+type Step = 'pick' | 'availability' | 'details' | 'done';
+
+const STEP_LABELS: Record<Step, string> = {
+    pick: 'Find a restaurant',
+    availability: 'Pick a table',
+    details: 'Your details',
+    done: 'Confirmed',
+};
+
+export const PublicBookingPage = () => {
+    const [step, setStep] = useState<Step>('pick');
+    const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+    const [slot, setSlot] = useState<AvailableSlot | null>(null);
+    const [partySize, setPartySize] = useState(2);
+    const [requestedTime, setRequestedTime] = useState('');
+    const [result, setResult] = useState<{ booking: Booking; customer: Customer } | null>(null);
+
+    const handlePickRestaurant = (r: Restaurant) => {
+        setRestaurant(r);
+        setStep('availability');
+    };
+
+    const handleSlotPicked = (s: AvailableSlot, size: number, time: string) => {
+        setSlot(s);
+        setPartySize(size);
+        setRequestedTime(time);
+        setStep('details');
+    };
+
+    const handleDone = (booking: Booking, customer: Customer) => {
+        setResult({ booking, customer });
+        setStep('done');
+    };
+
+    return (
+        <div className="min-h-screen bg-bg-primary text-text-main transition-colors duration-300">
+            <PublicHeader stepLabel={STEP_LABELS[step]} stepCount={step === 'done' ? 3 : ['pick', 'availability', 'details'].indexOf(step) + 1} />
+
+            <main className="mx-auto w-full max-w-3xl px-4 md:px-6 py-8">
+                {/* Stepper indicator */}
+                <div className="mb-6 flex items-center gap-2">
+                    {(['pick', 'availability', 'details'] as Step[]).map((s, i) => {
+                        const idx = step === 'done' ? 3 : ['pick', 'availability', 'details'].indexOf(step);
+                        const active = i === idx;
+                        const passed = i < idx || step === 'done';
+                        return (
+                            <React.Fragment key={s}>
+                                <div
+                                    className={`flex items-center gap-2 ${
+                                        active ? 'text-brand-gold' : passed ? 'text-brand-green' : 'text-text-muted'
+                                    }`}
+                                >
+                                    <span
+                                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black border ${
+                                            active
+                                                ? 'border-brand-gold bg-brand-gold/15'
+                                                : passed
+                                                ? 'border-brand-green bg-brand-green/15'
+                                                : 'border-border-main bg-bg-secondary'
+                                        }`}
+                                    >
+                                        {passed ? '✓' : i + 1}
+                                    </span>
+                                    <span className="hidden sm:block text-xs font-bold">{STEP_LABELS[s]}</span>
+                                </div>
+                                {i < 2 && <div className="h-px flex-1 bg-border-main" />}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+
+                {step === 'pick' && (
+                    <StepShell
+                        title="Book a table"
+                        subtitle="Find a restaurant and check live availability — no login needed."
+                    >
+                        <RestaurantPicker onSelect={handlePickRestaurant} />
+                    </StepShell>
+                )}
+
+                {step === 'availability' && restaurant && (
+                    <StepShell
+                        title={restaurant.name}
+                        subtitle={`${restaurant.cuisineType ?? 'Restaurant'} · ${restaurant.suburb}, ${restaurant.state}`}
+                        onBack={() => setStep('pick')}
+                    >
+                        <AvailabilityStep
+                            restaurant={restaurant}
+                            onSlotPicked={handleSlotPicked}
+                        />
+                    </StepShell>
+                )}
+
+                {step === 'details' && restaurant && slot && (
+                    <StepShell title="Almost there" subtitle="Tell us who's coming so we can hold your table." onBack={() => setStep('availability')}>
+                        <CustomerStep
+                            restaurant={restaurant}
+                            slot={slot}
+                            partySize={partySize}
+                            requestedTime={requestedTime}
+                            onDone={handleDone}
+                            onBack={() => setStep('availability')}
+                        />
+                    </StepShell>
+                )}
+
+                {step === 'done' && result && (
+                    <div className="rounded-2xl border border-brand-green/40 bg-brand-green/5 p-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-green/15 text-2xl">
+                            ✓
+                        </div>
+                        <h2 className="text-xl font-black tracking-tight text-text-main">Table booked!</h2>
+                        <p className="mt-1 text-sm text-text-muted">
+                            {result.customer.name || 'You'} · {result.booking.partySize} guests ·{' '}
+                            {new Date(result.booking.bookingTime).toLocaleString([], {
+                                weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                            })}
+                        </p>
+                        <div className="mx-auto mt-4 inline-block rounded-xl border border-border-main bg-bg-secondary px-4 py-2 text-xs font-bold text-text-sub">
+                            Booking ref: <span className="text-brand-green">{result.booking.id.slice(0, 8).toUpperCase()}</span>
+                        </div>
+                        <p className="mt-4 text-xs text-text-muted">
+                            A staff member will confirm shortly — check your phone for a message.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setStep('pick');
+                                setRestaurant(null);
+                                setSlot(null);
+                                setResult(null);
+                            }}
+                            className="mt-6 rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-bg-black hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-[0.99]"
+                        >
+                            Book another table
+                        </button>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};

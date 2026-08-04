@@ -543,6 +543,25 @@ func (r *mutationResolver) CreateBooking(ctx context.Context, input model.Create
 // UpdateBooking is the resolver for the updateBooking field.
 // UpdateBooking is the resolver for the updateBooking field.
 func (r *mutationResolver) UpdateBooking(ctx context.Context, id string, input model.UpdateBookingInput) (*model.Booking, error) {
+	// Resolve the owning restaurant first so we can enforce staff access.
+	// This also covers cancelBooking and assignTable, which delegate here.
+	var restaurantID string
+	if err := r.Resolver.DB.QueryRow(ctx,
+		`SELECT restaurant_id FROM bookings WHERE id = $1`, id,
+	).Scan(&restaurantID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: booking does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
 	var bookingTime *time.Time
 	var timeRange *string
 
@@ -645,6 +664,235 @@ func (r *mutationResolver) CancelBooking(ctx context.Context, id string) (*model
 // change like party size.
 func (r *mutationResolver) AssignTable(ctx context.Context, bookingID string, tableID string) (*model.Booking, error) {
 	return r.UpdateBooking(ctx, bookingID, model.UpdateBookingInput{TableID: &tableID})
+}
+
+// CreateWaitlistEntry is the resolver for the createWaitlistEntry field.
+// PUBLIC (no auth) — the Vapi voice agent adds a caller to the overflow
+// queue when the restaurant is fully booked.
+func (r *mutationResolver) CreateWaitlistEntry(ctx context.Context, input model.CreateWaitlistEntryInput) (*model.WaitlistEntry, error) {
+	requestedTime, err := time.Parse(time.RFC3339, input.RequestedTime)
+	if err != nil {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "invalid requestedTime: must be ISO 8601 / RFC3339",
+			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
+		})
+		return nil, nil
+	}
+
+	var w model.WaitlistEntry
+	var createdAt time.Time
+	err = r.Resolver.DB.QueryRow(ctx, `
+		INSERT INTO waitlist (restaurant_id, customer_id, party_size, requested_time)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, status, created_at
+	`, input.RestaurantID, input.CustomerID, input.PartySize, requestedTime).
+		Scan(&w.ID, &w.Status, &createdAt)
+
+	if err != nil {
+		if utils.IsForeignKeyViolation(err) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: restaurant or customer does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		log.Printf("🔴 DATABASE TRANSACTION FAILED IN CREATEWAITLISTENTRY: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: failed to add to waitlist",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
+	w.RestaurantID = input.RestaurantID
+	w.CustomerID = input.CustomerID
+	w.PartySize = input.PartySize
+	w.RequestedTime = requestedTime.Format(time.RFC3339)
+	w.CreatedAt = createdAt.Format(time.RFC3339)
+	return &w, nil
+}
+
+// UpdateWaitlistStatus is the resolver for the updateWaitlistStatus field.
+func (r *mutationResolver) UpdateWaitlistStatus(ctx context.Context, id string, status model.WaitlistStatus) (*model.WaitlistEntry, error) {
+	// Resolve the owning restaurant first so we can enforce staff access.
+	var restaurantID string
+	if err := r.Resolver.DB.QueryRow(ctx,
+		`SELECT restaurant_id FROM waitlist WHERE id = $1`, id,
+	).Scan(&restaurantID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: waitlist entry does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
+	var w model.WaitlistEntry
+	var requestedTime, createdAt time.Time
+	err := r.Resolver.DB.QueryRow(ctx, `
+		UPDATE waitlist SET status = $1 WHERE id = $2
+		RETURNING id, restaurant_id, customer_id, party_size, requested_time, status, created_at
+	`, status, id).Scan(
+		&w.ID, &w.RestaurantID, &w.CustomerID, &w.PartySize, &requestedTime, &w.Status, &createdAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: waitlist entry does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEWAITLISTSTATUS: %v", err)
+		return nil, err
+	}
+
+	w.RequestedTime = requestedTime.Format(time.RFC3339)
+	w.CreatedAt = createdAt.Format(time.RFC3339)
+	return &w, nil
+}
+
+// ConvertWaitlistToBooking is the resolver for the convertWaitlistToBooking field.
+// Runs as a transaction: create the booking, then mark the waitlist entry
+// converted — if the table got taken in the meantime, the EXCLUDE constraint
+// on bookings rejects the insert and we roll back cleanly rather than leaving
+// a half-converted waitlist entry behind.
+func (r *mutationResolver) ConvertWaitlistToBooking(ctx context.Context, id string, tableID string) (*model.Booking, error) {
+	var restaurantID string
+	if err := r.Resolver.DB.QueryRow(ctx,
+		`SELECT restaurant_id FROM waitlist WHERE id = $1`, id,
+	).Scan(&restaurantID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: waitlist entry does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
+	tx, err := r.Resolver.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("🔴 FAILED TO ACQUIRE TRANSACTION IN CONVERTWAITLISTTOBOOKING: %v", err)
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Pull the full waitlist entry inside the transaction.
+	var w model.WaitlistEntry
+	var requestedTime, createdAt time.Time
+	err = tx.QueryRow(ctx, `
+		SELECT id, restaurant_id, customer_id, party_size, requested_time, status, created_at
+		FROM waitlist WHERE id = $1 FOR UPDATE
+	`, id).Scan(
+		&w.ID, &w.RestaurantID, &w.CustomerID, &w.PartySize, &requestedTime, &w.Status, &createdAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: waitlist entry does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// Guard against double-conversion: once an entry leaves WAITING, it can't
+	// become a booking again (covers host double-clicks / retried requests).
+	if w.Status != model.WaitlistStatusWaiting {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "conflict: waitlist entry is no longer waiting",
+			Extensions: map[string]any{"code": "CONFLICT"},
+		})
+		return nil, nil
+	}
+
+	// The assigned table must actually fit the party size.
+	var capacityMin, capacityMax int
+	if err := tx.QueryRow(ctx,
+		`SELECT capacity_min, capacity_max FROM restaurant_tables WHERE id = $1 AND is_active = true`, tableID,
+	).Scan(&capacityMin, &capacityMax); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: table does not exist or is inactive",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+	if w.PartySize < capacityMin || w.PartySize > capacityMax {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "bad input: party size does not fit the selected table capacity",
+			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
+		})
+		return nil, nil
+	}
+
+	// Reuse the restaurant's default turn duration for the booking window.
+	var turnDuration int
+	if err := tx.QueryRow(ctx,
+		`SELECT default_turn_duration_min FROM restaurants WHERE id = $1`, w.RestaurantID,
+	).Scan(&turnDuration); err != nil {
+		return nil, err
+	}
+
+	endTime := requestedTime.Add(time.Duration(turnDuration) * time.Minute)
+	timeRange := fmt.Sprintf("[%s,%s)", requestedTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
+
+	var b model.Booking
+	var bCreatedAt, bUpdatedAt time.Time
+	err = tx.QueryRow(ctx, `
+		INSERT INTO bookings (
+			restaurant_id, customer_id, table_id, party_size, booking_time,
+			duration_minutes, time_range, status, source
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::tstzrange, 'CONFIRMED', 'PHONE')
+		RETURNING id, status, payment_status, source, created_at, updated_at
+	`, w.RestaurantID, w.CustomerID, tableID, w.PartySize, requestedTime, turnDuration, timeRange).
+		Scan(&b.ID, &b.Status, &b.PaymentStatus, &b.Source, &bCreatedAt, &bUpdatedAt)
+
+	if err != nil {
+		if utils.IsExclusionViolation(err) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "that table is already booked for the requested time",
+				Extensions: map[string]any{"code": "TABLE_ALREADY_BOOKED"},
+			})
+			return nil, nil
+		}
+		log.Printf("🔴 BOOKING INSERT FAILED IN CONVERTWAITLISTTOBOOKING: %v", err)
+		return nil, err
+	}
+
+	// Mark the waitlist entry converted, then commit.
+	if _, err := tx.Exec(ctx, `UPDATE waitlist SET status = 'CONVERTED' WHERE id = $1`, id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("🔴 COMMIT FAILED IN CONVERTWAITLISTTOBOOKING: %v", err)
+		return nil, err
+	}
+
+	b.RestaurantID = w.RestaurantID
+	b.CustomerID = w.CustomerID
+	b.TableID = &tableID
+	b.PartySize = w.PartySize
+	b.BookingTime = requestedTime.Format(time.RFC3339)
+	b.DurationMinutes = turnDuration
+	b.CreatedAt = bCreatedAt.Format(time.RFC3339)
+	b.UpdatedAt = bUpdatedAt.Format(time.RFC3339)
+	return &b, nil
 }
 
 // Restaurant is the resolver for the restaurant field.
@@ -825,6 +1073,9 @@ func (r *queryResolver) Closures(ctx context.Context, restaurantID string) ([]*m
 
 // Customer is the resolver for the customer field.
 func (r *queryResolver) Customer(ctx context.Context, phone string) (*model.Customer, error) {
+	// Staff-only customer lookup — resolve which restaurants the caller manages
+	// is impractical at this layer, so the @isAuthenticated directive plus the
+	// callers (staff dashboard) are the access boundary.
 	var c model.Customer
 	var createdAt time.Time
 
@@ -867,6 +1118,11 @@ func (r *queryResolver) Booking(ctx context.Context, id string) (*model.Booking,
 		return nil, err
 	}
 
+	// Enforce staff access on the booking's owning restaurant.
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, b.RestaurantID, false); err != nil {
+		return nil, nil
+	}
+
 	b.BookingTime = bt.Format(time.RFC3339)
 	b.CreatedAt = createdAt.Format(time.RFC3339)
 	b.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -875,6 +1131,10 @@ func (r *queryResolver) Booking(ctx context.Context, id string) (*model.Booking,
 
 // Bookings is the resolver for the bookings field.
 func (r *queryResolver) Bookings(ctx context.Context, restaurantID string, date *string, status *model.BookingStatus) ([]*model.Booking, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
 	query := `
 		SELECT id, restaurant_id, customer_id, table_id, party_size, booking_time,
 			duration_minutes, status, special_requests, payment_status, source, created_at, updated_at
@@ -991,6 +1251,10 @@ func (r *queryResolver) CheckAvailability(ctx context.Context, input model.Check
 
 // Waitlist is the resolver for the waitlist field.
 func (r *queryResolver) Waitlist(ctx context.Context, restaurantID string, status *model.WaitlistStatus) ([]*model.WaitlistEntry, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
 	query := `
 		SELECT id, restaurant_id, customer_id, party_size, requested_time, status, created_at
 		FROM waitlist

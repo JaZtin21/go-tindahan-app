@@ -205,15 +205,17 @@ input UpdateRestaurantInput {
   isActive: Boolean
 }
 
+# Public (no auth): restaurant discovery for customers/Vapi
+# Private (@isAuthenticated): staff-only floor management
 extend type Query {
   restaurant(id: String!): Restaurant
   restaurants(suburb: String, cuisineType: String): [Restaurant!]!
-  tables(restaurantId: String!): [RestaurantTable!]!
+  tables(restaurantId: String!): [RestaurantTable!]! @isAuthenticated
 }
 
 extend type Mutation {
-  createRestaurant(input: CreateRestaurantInput!): Restaurant!
-  updateRestaurant(id: String!, input: UpdateRestaurantInput!): Restaurant!
+  createRestaurant(input: CreateRestaurantInput!): Restaurant! @isAuthenticated
+  updateRestaurant(id: String!, input: UpdateRestaurantInput!): Restaurant! @isAuthenticated
 }
 
 # ----------------------------------------------------------------------------
@@ -237,9 +239,9 @@ input UpdateTableInput {
 }
 
 extend type Mutation {
-  createTable(input: CreateTableInput!): RestaurantTable!
-  updateTable(id: String!, input: UpdateTableInput!): RestaurantTable!
-  deleteTable(id: String!): Boolean!
+  createTable(input: CreateTableInput!): RestaurantTable! @isAuthenticated
+  updateTable(id: String!, input: UpdateTableInput!): RestaurantTable! @isAuthenticated
+  deleteTable(id: String!): Boolean! @isAuthenticated
 }
 
 # ----------------------------------------------------------------------------
@@ -260,14 +262,14 @@ input CreateClosureInput {
 }
 
 extend type Mutation {
-  setOperatingHours(restaurantId: String!, hours: [SetOperatingHoursInput!]!): [OperatingHours!]!
-  createClosure(input: CreateClosureInput!): Closure!
-  deleteClosure(id: String!): Boolean!
+  setOperatingHours(restaurantId: String!, hours: [SetOperatingHoursInput!]!): [OperatingHours!]! @isAuthenticated
+  createClosure(input: CreateClosureInput!): Closure! @isAuthenticated
+  deleteClosure(id: String!): Boolean! @isAuthenticated
 }
 
 extend type Query {
-  operatingHours(restaurantId: String!): [OperatingHours!]!
-  closures(restaurantId: String!): [Closure!]!
+  operatingHours(restaurantId: String!): [OperatingHours!]! @isAuthenticated
+  closures(restaurantId: String!): [Closure!]! @isAuthenticated
 }
 
 # ----------------------------------------------------------------------------
@@ -281,11 +283,12 @@ input FindOrCreateCustomerInput {
 }
 
 extend type Query {
-  customer(phone: String!): Customer
+  # Private: staff-only customer lookup
+  customer(phone: String!): Customer @isAuthenticated
 }
 
 extend type Mutation {
-  # Used by the voice agent flow: look up by phone, create if new
+  # Public: used by the voice agent / customer flow — look up by phone, create if new
   findOrCreateCustomer(input: FindOrCreateCustomerInput!): Customer!
 }
 
@@ -320,16 +323,18 @@ input UpdateBookingInput {
 }
 
 extend type Query {
-  booking(id: String!): Booking
-  bookings(restaurantId: String!, date: String, status: BookingStatus): [Booking!]!
+  booking(id: String!): Booking @isAuthenticated
+  bookings(restaurantId: String!, date: String, status: BookingStatus): [Booking!]! @isAuthenticated
+  # Public: customers/Vapi check open tables without a session
   checkAvailability(input: CheckAvailabilityInput!): [AvailableSlot!]!
 }
 
 extend type Mutation {
+  # Public: website customers & Vapi create bookings without a session
   createBooking(input: CreateBookingInput!): Booking!
-  updateBooking(id: String!, input: UpdateBookingInput!): Booking!
-  cancelBooking(id: String!): Booking!
-  assignTable(bookingId: String!, tableId: String!): Booking!
+  updateBooking(id: String!, input: UpdateBookingInput!): Booking! @isAuthenticated
+  cancelBooking(id: String!): Booking! @isAuthenticated
+  assignTable(bookingId: String!, tableId: String!): Booking! @isAuthenticated
 }
 
 # ----------------------------------------------------------------------------
@@ -344,10 +349,21 @@ input CreateWaitlistEntryInput {
 }
 
 extend type Query {
-  waitlist(restaurantId: String!, status: WaitlistStatus): [WaitlistEntry!]!
+  waitlist(restaurantId: String!, status: WaitlistStatus): [WaitlistEntry!]! @isAuthenticated
 }
 
 extend type Query {
-  callLogs(restaurantId: String!): [CallLog!]!
-  callLog(vapiCallId: String!): CallLog
+  callLogs(restaurantId: String!): [CallLog!]! @isAuthenticated
+  callLog(vapiCallId: String!): CallLog @isAuthenticated
+}
+
+# ----------------------------------------------------------------------------
+# WAITLIST — mutations
+# ----------------------------------------------------------------------------
+
+extend type Mutation {
+  # Public: Vapi adds a caller to the overflow queue when the restaurant is full
+  createWaitlistEntry(input: CreateWaitlistEntryInput!): WaitlistEntry!
+  updateWaitlistStatus(id: String!, status: WaitlistStatus!): WaitlistEntry! @isAuthenticated
+  convertWaitlistToBooking(id: String!, tableId: String!): Booking! @isAuthenticated
 }

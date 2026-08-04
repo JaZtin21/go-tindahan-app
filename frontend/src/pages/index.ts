@@ -13,4 +13,5 @@ export {
     SettingsPage,
 } from './restaurant';
 export { RestaurantLogin } from './RestaurantLogin'
+export * from './public';
 export * from './my-shops';

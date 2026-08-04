@@ -11,6 +11,7 @@ import {
     TablesPage,
     CallsPage,
     SettingsPage,
+    PublicBookingPage,
 } from '~/pages';
 import { RestaurantLayout } from './RestaurantLayout';
 
@@ -33,9 +34,10 @@ export const RestaurantApp = () => {
     return (
         <BrowserRouter>
             <Routes>
-                {/* Public auth gates */}
+                {/* Public routes — NO auth required (customers, Vapi testing) */}
                 <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <RestaurantLogin />} />
                 <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RestaurantRegister />} />
+                <Route path="/book" element={<PublicBookingPage />} />
 
                 {/* Everything below requires a session — unlike your shop app's
                     reference, restaurant dashboard data (bookings, tables, staff)
