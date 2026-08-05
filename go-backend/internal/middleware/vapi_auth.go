@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -61,14 +63,14 @@ func VapiSignatureMiddleware() gin.HandlerFunc {
 		if !verifySignature(secret, signature, body, c) {
 			log.Printf("🔴 VAPI WEBHOOK AUTH: signature mismatch from %s — received=%s..., timestampHeader=%s. Check VAPI_WEBHOOK_SECRET matches the dashboard secret and Include Timestamp/Payload Format match",
 				remote, truncate(signature, 12), c.GetHeader("x-timestamp"))
-
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
 			return
 		}
 
-		// NOTE: Gin's GetRawData caches the body and re-seats c.Request.Body
-		// with a fresh reader, so the handler can read it again (it calls
-		// GetRawData too and gets the cached bytes).
+		// CRITICAL: gin v1.12.0's GetRawData() only does io.ReadAll — it does
+		// NOT cache or re-seat the body. We drained it to verify the signature,
+		// so restore a fresh reader or the handler receives an empty body.
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 		c.Next()
 	}
 }
