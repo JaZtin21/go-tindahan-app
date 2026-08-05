@@ -412,132 +412,32 @@ func (r *mutationResolver) DeleteClosure(ctx context.Context, id string) (bool, 
 // FindOrCreateCustomer is the resolver for the findOrCreateCustomer field.
 // Called by the Go webhook handler when Vapi passes through the caller's
 // phone number — no dashboard auth guard, see assumptions note at top.
+// Delegates to utils.FindOrCreateCustomer (single source of truth shared
+// with the Vapi webhook).
 func (r *mutationResolver) FindOrCreateCustomer(ctx context.Context, input model.FindOrCreateCustomerInput) (*model.Customer, error) {
-	var c model.Customer
-	var createdAt time.Time
-
-	err := r.Resolver.DB.QueryRow(ctx, `
-		INSERT INTO customers (phone, name, email)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (phone) DO UPDATE SET
-			name = COALESCE(EXCLUDED.name, customers.name),
-			email = COALESCE(EXCLUDED.email, customers.email)
-		RETURNING id, phone, name, email, created_at
-	`, input.Phone, input.Name, input.Email).Scan(&c.ID, &c.Phone, &c.Name, &c.Email, &createdAt)
-
+	c, err := utils.FindOrCreateCustomer(ctx, r.Resolver.DB, input)
 	if err != nil {
-		log.Printf("🔴 DATABASE TRANSACTION FAILED IN FINDORCREATECUSTOMER: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to resolve customer",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
+		if utils.HandleBookingError(ctx, err) {
+			return nil, nil
+		}
+		return nil, err
 	}
-
-	c.CreatedAt = createdAt.Format(time.RFC3339)
-	return &c, nil
+	return c, nil
 }
 
 // CreateBooking is the resolver for the createBooking field.
 // CreateBooking is the resolver for the createBooking field.
+// Delegates to utils.CreateBooking (single source of truth shared with the
+// Vapi webhook, including idempotency + EXCLUDE-conflict handling).
 func (r *mutationResolver) CreateBooking(ctx context.Context, input model.CreateBookingInput) (*model.Booking, error) {
-	// Idempotency check first — if a webhook retry sends the same key, return
-	// the existing booking instead of erroring or double-inserting.
-	var existingID string
-	err := r.Resolver.DB.QueryRow(ctx,
-		`SELECT id FROM bookings WHERE idempotency_key = $1`, input.IdempotencyKey,
-	).Scan(&existingID)
-	if err == nil {
-		return r.Query().Booking(ctx, existingID)
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("🔴 DATABASE QUERY FAILED IN CREATEBOOKING IDEMPOTENCY CHECK: %v", err)
-		return nil, err
-	}
-
-	var turnDuration int
-	if err := r.Resolver.DB.QueryRow(ctx,
-		`SELECT default_turn_duration_min FROM restaurants WHERE id = $1`, input.RestaurantID,
-	).Scan(&turnDuration); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "not found: restaurant does not exist",
-				Extensions: map[string]any{"code": "NOT_FOUND"},
-			})
+	b, err := utils.CreateBooking(ctx, r.Resolver.DB, input)
+	if err != nil {
+		if utils.HandleBookingError(ctx, err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	bookingTime, err := time.Parse(time.RFC3339, input.BookingTime)
-	if err != nil {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "invalid bookingTime: must be ISO 8601 / RFC3339",
-			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
-		})
-		return nil, nil
-	}
-
-	endTime := bookingTime.Add(time.Duration(turnDuration) * time.Minute)
-	timeRange := fmt.Sprintf("[%s,%s)", bookingTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
-
-	source := model.BookingSourcePhone
-	if input.Source != nil {
-		source = *input.Source
-	}
-
-	query := `
-		INSERT INTO bookings (
-			restaurant_id, customer_id, table_id, party_size, booking_time,
-			duration_minutes, time_range, special_requests, source, idempotency_key
-		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::tstzrange, $8, $9, $10)
-		RETURNING id, status, payment_status, created_at, updated_at
-	`
-
-	var b model.Booking
-	b.RestaurantID = input.RestaurantID
-	b.CustomerID = input.CustomerID
-	b.TableID = input.TableID
-	b.PartySize = input.PartySize
-	b.BookingTime = input.BookingTime
-	b.DurationMinutes = turnDuration
-	b.SpecialRequests = input.SpecialRequests
-	b.Source = source
-
-	var createdAt, updatedAt time.Time
-	err = r.Resolver.DB.QueryRow(ctx, query,
-		input.RestaurantID, input.CustomerID, input.TableID, input.PartySize, bookingTime,
-		turnDuration, timeRange, input.SpecialRequests, source, input.IdempotencyKey,
-	).Scan(&b.ID, &b.Status, &b.PaymentStatus, &createdAt, &updatedAt)
-
-	if err != nil {
-		if utils.IsExclusionViolation(err) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "that table is already booked for the requested time",
-				Extensions: map[string]any{"code": "TABLE_ALREADY_BOOKED"},
-			})
-			return nil, nil
-		}
-		if utils.IsUniqueViolation(err) {
-			var raceID string
-			if lookupErr := r.Resolver.DB.QueryRow(ctx,
-				`SELECT id FROM bookings WHERE idempotency_key = $1`, input.IdempotencyKey,
-			).Scan(&raceID); lookupErr == nil {
-				return r.Query().Booking(ctx, raceID)
-			}
-		}
-		log.Printf("🔴 DATABASE TRANSACTION FAILED IN CREATEBOOKING: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to create booking",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
-	}
-
-	b.CreatedAt = createdAt.Format(time.RFC3339)
-	b.UpdatedAt = updatedAt.Format(time.RFC3339)
-	return &b, nil
+	return b, nil
 }
 
 // UpdateBooking is the resolver for the updateBooking field.
@@ -669,47 +569,17 @@ func (r *mutationResolver) AssignTable(ctx context.Context, bookingID string, ta
 // CreateWaitlistEntry is the resolver for the createWaitlistEntry field.
 // PUBLIC (no auth) — the Vapi voice agent adds a caller to the overflow
 // queue when the restaurant is fully booked.
+// Delegates to utils.CreateWaitlistEntry (single source of truth shared with
+// the Vapi webhook).
 func (r *mutationResolver) CreateWaitlistEntry(ctx context.Context, input model.CreateWaitlistEntryInput) (*model.WaitlistEntry, error) {
-	requestedTime, err := time.Parse(time.RFC3339, input.RequestedTime)
+	w, err := utils.CreateWaitlistEntry(ctx, r.Resolver.DB, input)
 	if err != nil {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "invalid requestedTime: must be ISO 8601 / RFC3339",
-			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
-		})
-		return nil, nil
-	}
-
-	var w model.WaitlistEntry
-	var createdAt time.Time
-	err = r.Resolver.DB.QueryRow(ctx, `
-		INSERT INTO waitlist (restaurant_id, customer_id, party_size, requested_time)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, status, created_at
-	`, input.RestaurantID, input.CustomerID, input.PartySize, requestedTime).
-		Scan(&w.ID, &w.Status, &createdAt)
-
-	if err != nil {
-		if utils.IsForeignKeyViolation(err) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "not found: restaurant or customer does not exist",
-				Extensions: map[string]any{"code": "NOT_FOUND"},
-			})
+		if utils.HandleBookingError(ctx, err) {
 			return nil, nil
 		}
-		log.Printf("🔴 DATABASE TRANSACTION FAILED IN CREATEWAITLISTENTRY: %v", err)
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "internal server error: failed to add to waitlist",
-			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
-		})
-		return nil, nil
+		return nil, err
 	}
-
-	w.RestaurantID = input.RestaurantID
-	w.CustomerID = input.CustomerID
-	w.PartySize = input.PartySize
-	w.RequestedTime = requestedTime.Format(time.RFC3339)
-	w.CreatedAt = createdAt.Format(time.RFC3339)
-	return &w, nil
+	return w, nil
 }
 
 // UpdateWaitlistStatus is the resolver for the updateWaitlistStatus field.
@@ -1109,80 +979,16 @@ func (r *queryResolver) Bookings(ctx context.Context, restaurantID string, date 
 // for 4 at 7pm". Correctness is ultimately backed by the EXCLUDE constraint
 // on bookings — this query is the fast-path check, the constraint is the
 // guarantee if two requests race.
+// Delegates to utils.CheckAvailability (single source of truth shared with
+// the Vapi webhook).
 func (r *queryResolver) CheckAvailability(ctx context.Context, input model.CheckAvailabilityInput) ([]*model.AvailableSlot, error) {
-	requestedTime, err := time.Parse(time.RFC3339, input.RequestedTime)
+	slots, err := utils.CheckAvailability(ctx, r.Resolver.DB, input)
 	if err != nil {
-		graphql.AddError(ctx, &gqlerror.Error{
-			Message:    "invalid requestedTime: must be ISO 8601 / RFC3339",
-			Extensions: map[string]any{"code": "BAD_USER_INPUT"},
-		})
-		return nil, nil
-	}
-
-	var turnDuration int
-	if err := r.Resolver.DB.QueryRow(ctx,
-		`SELECT default_turn_duration_min FROM restaurants WHERE id = $1`, input.RestaurantID,
-	).Scan(&turnDuration); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			graphql.AddError(ctx, &gqlerror.Error{
-				Message:    "not found: restaurant does not exist",
-				Extensions: map[string]any{"code": "NOT_FOUND"},
-			})
+		if utils.HandleBookingError(ctx, err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	// NOTE: status literals must match the migration's CHECK constraint
-	// exactly — chk_bookings_status only allows 'CANCELLED', 'NO_SHOW', etc.
-	// (uppercase). Lowercase never matched, so cancelled/no-show bookings
-	// were incorrectly still blocking their table.
-	//
-	// FIXED: previously computed the window end as `$4 || ' minutes'` in SQL,
-	// which forced $4 (an int) to encode as text and pgx blew up with
-	// "unable to encode ... into text format". Compute endTime in Go and pass
-	// both bounds as timestamptz params instead.
-	endTime := requestedTime.Add(time.Duration(turnDuration) * time.Minute)
-
-	query := `
-		SELECT rt.id, rt.table_number, rt.capacity_min, rt.capacity_max, rt.section
-		FROM restaurant_tables rt
-		WHERE rt.restaurant_id = $1
-			AND rt.is_active = true
-			AND rt.capacity_max >= $2
-			AND rt.capacity_min <= $2
-			AND NOT EXISTS (
-				SELECT 1 FROM bookings b
-				WHERE b.table_id = rt.id
-					AND b.status NOT IN ('CANCELLED', 'NO_SHOW')
-					AND b.time_range && tstzrange($3::timestamptz, $4::timestamptz)
-			)
-		ORDER BY rt.capacity_max ASC
-	`
-
-	rows, err := r.Resolver.DB.Query(ctx, query, input.RestaurantID, input.PartySize, requestedTime, endTime)
-	if err != nil {
-		log.Printf("🔴 DATABASE QUERY FAILED IN CHECKAVAILABILITY: %v", err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	var slots []*model.AvailableSlot
-	for rows.Next() {
-		var t model.RestaurantTable
-		t.RestaurantID = input.RestaurantID
-		t.IsActive = true
-		if err := rows.Scan(&t.ID, &t.TableNumber, &t.CapacityMin, &t.CapacityMax, &t.Section); err != nil {
-			log.Printf("⚠️ Failed to scan table row in checkAvailability: %v", err)
-			continue
-		}
-		slots = append(slots, &model.AvailableSlot{
-			Table:     &t,
-			StartTime: requestedTime.Format(time.RFC3339),
-			EndTime:   endTime.Format(time.RFC3339),
-		})
-	}
-
 	return slots, nil
 }
 

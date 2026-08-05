@@ -21,6 +21,7 @@ import (
 	resolver "go-backend/internal/graph/resolvers"
 
 	"go-backend/internal/middleware"
+	"go-backend/internal/vapi"
 
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
@@ -141,6 +142,12 @@ func main() {
 
 		srv.ServeHTTP(c.Writer, c.Request)
 	})
+
+	// 7b. Vapi voice-agent webhook — HMAC-signed, standalone (no GraphQL).
+	// Vapi tool calls arrive here; the dispatcher reuses the same booking
+	// logic as the public GraphQL resolvers via internal/utils.
+	vapiHandler := vapi.NewHandler(dbPool)
+	r.POST("/vapi/webhook", middleware.VapiSignatureMiddleware(), vapiHandler.Handle)
 
 	// 8. Configure server network performance timeouts
 	server := &http.Server{
