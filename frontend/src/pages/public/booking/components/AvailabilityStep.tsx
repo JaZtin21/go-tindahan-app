@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import { useLazyQuery, useQuery } from '@apollo/client/react';
 import { CHECK_AVAILABILITY_QUERY, GET_PUBLIC_RESTAURANT_QUERY } from '~/api/queries/graphql/restaurant';
 import type { AvailableSlot, OperatingHours, Restaurant } from '~/types/restaurant';
+import { formatFull, formatTime, tzAbbrev, toLocalInputValue } from './timeFormat';
 
 // ============================================================================
 // STEP 2 — CHECK AVAILABILITY
 // Party size + requested time → public checkAvailability → free table slots.
 // Also shows the restaurant's weekly opening hours so customers know when
 // they can book (data comes from the public restaurant(id) query).
+//
+// TIMEZONE RULE: the datetime-local picker + every displayed slot are in the
+// CUSTOMER's local timezone; the value sent to the backend is the UTC instant
+// (toISOString). The restaurant's operating hours are shown in the
+// restaurant's own timezone (its `timezone` column) — hence the explicit
+// labels so the two zones never get confused.
 // ============================================================================
 
 interface AvailabilityStepProps {
@@ -19,20 +26,10 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const formatHoursTime = (t?: string | null) => {
     if (!t) return '—';
-    // Backend returns TIME as "HH:MM:SS"
+    // Backend returns TIME as "HH:MM:SS" (restaurant wall-clock — display as-is)
     const [h, m] = t.split(':').map(Number);
     const d = new Date();
     d.setHours(h, m ?? 0, 0, 0);
-    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-};
-
-const toLocalInputValue = (date: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
-const formatTime = (iso: string) => {
-    const d = new Date(iso);
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
@@ -45,12 +42,13 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
         return toLocalInputValue(d);
     });
 
-    const [check, { data, loading, error }] = useLazyQuery(CHECK_AVAILABILITY_QUERY);
+    // no-cache: availability must NEVER come from Apollo's cache — otherwise
+    // re-checking the same time after a booking was just created still shows
+    // the stale (now-taken) table until a full page refresh.
+    const [check, { data, loading, error }] = useLazyQuery(CHECK_AVAILABILITY_QUERY, { fetchPolicy: 'no-cache' });
 
-    // NOTE: the picked datetime-local value is the *user's* local wall-clock
-    // time; toISOString() converts it to UTC RFC3339, which the backend parses
-    // as timestamptz for its tstzrange overlap checks. Fine for this demo — a
-    // multi-timezone rollout would render back in the restaurant's timezone.
+    // The picked datetime-local value is the customer's local wall-clock time;
+    // toISOString() converts it to the UTC instant the backend stores/checks.
     const { data: detailData } = useQuery(GET_PUBLIC_RESTAURANT_QUERY, {
         variables: { id: restaurant.id },
     });
@@ -67,9 +65,15 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
 
     return (
         <div>
-            {/* Opening hours strip — public data, no login needed */}
+            {/* Opening hours strip — restaurant wall-clock, labelled so it's
+                not mistaken for the customer's local time */}
             <div className="mb-5 rounded-2xl border border-border-main bg-bg-secondary/50 px-4 py-3">
-                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-text-muted">Opening hours</p>
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-text-muted">
+                    Opening hours{' '}
+                    <span className="font-bold normal-case text-text-sub">
+                        · {restaurant.timezone || 'restaurant local time'}
+                    </span>
+                </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
                     {operatingHours.map((h) => (
                         <div key={h.id} className="flex items-center justify-between text-xs">
@@ -140,15 +144,22 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
 
             {!loading && !error && slots.length > 0 && (
                 <div className="mt-6">
-                    <h3 className="mb-3 text-sm font-black text-text-main">
+                    <h3 className="text-sm font-black text-text-main">
                         {slots.length} available {slots.length === 1 ? 'table' : 'tables'} for {partySize} ·{' '}
                         {new Date(requestedTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                     </h3>
+                    <p className="mb-3 mt-0.5 text-[11px] font-bold text-text-muted">
+                        Times shown in your local timezone ({tzAbbrev(new Date(requestedTime))})
+                        {restaurant.timezone
+                            ? ` — ${formatFull(slots[0].startTime, restaurant.timezone)} at the restaurant`
+                            : ''}
+                    </p>
                     <ul className="flex flex-col gap-2.5">
                         {slots.map((slot) => (
                             <li key={slot.table.id}>
                                 <button
                                     onClick={() => onSlotPicked(slot, partySize, new Date(requestedTime).toISOString())}
+                                    title={`${formatFull(slot.startTime)} (your local time)`}
                                     className="w-full flex items-center justify-between gap-3 rounded-xl border border-border-main bg-bg-secondary/60 px-4 py-3 text-left hover:border-brand-green/60 hover:bg-item-hover transition-all duration-200 cursor-pointer group"
                                 >
                                     <div>

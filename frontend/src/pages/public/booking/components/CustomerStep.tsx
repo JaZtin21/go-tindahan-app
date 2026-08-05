@@ -5,6 +5,7 @@ import {
     FIND_OR_CREATE_CUSTOMER_MUTATION,
 } from '~/api/queries/graphql/restaurant';
 import type { AvailableSlot, Booking, Customer, Restaurant } from '~/types/restaurant';
+import { formatFull, tzAbbrev } from './timeFormat';
 
 // ============================================================================
 // STEP 3 — YOUR DETAILS + CONFIRM
@@ -22,11 +23,6 @@ interface CustomerStepProps {
 
 const inputCls =
     'w-full rounded-xl border border-border-main bg-bg-secondary px-4 py-2.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 transition-all';
-
-const formatFull = (iso: string) =>
-    new Date(iso).toLocaleString([], {
-        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
 
 export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDone, onBack }: CustomerStepProps) => {
     const [name, setName] = useState('');
@@ -103,7 +99,8 @@ export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDon
                     <div>
                         <p className="text-sm font-black text-text-main">{restaurant.name}</p>
                         <p className="text-xs text-text-muted mt-0.5">
-                            Table {slot.table.tableNumber} · {partySize} guests · {formatFull(requestedTime)}
+                            Table {slot.table.tableNumber} · {partySize} guests · {formatFull(requestedTime)}{' '}
+                            <span className="font-bold text-text-sub">{tzAbbrev(new Date(requestedTime))}</span>
                         </p>
                     </div>
                     <span className="rounded-lg bg-brand-green/15 px-2.5 py-1 text-[11px] font-bold text-brand-green">

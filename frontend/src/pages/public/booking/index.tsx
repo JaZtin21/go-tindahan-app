@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { AvailableSlot, Booking, Customer, Restaurant } from '~/types/restaurant';
 import { PublicHeader, StepShell } from './components/Shared';
+import { tzAbbrev } from './components/timeFormat';
 import { RestaurantPicker } from './components/RestaurantPicker';
 import { AvailabilityStep } from './components/AvailabilityStep';
 import { CustomerStep } from './components/CustomerStep';
@@ -127,7 +128,8 @@ export const PublicBookingPage = () => {
                             {result.customer.name || 'You'} · {result.booking.partySize} guests ·{' '}
                             {new Date(result.booking.bookingTime).toLocaleString([], {
                                 weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                            })}
+                            })}{' '}
+                            <span className="font-bold text-text-sub">{tzAbbrev(new Date(result.booking.bookingTime))}</span>
                         </p>
                         <div className="mx-auto mt-4 inline-block rounded-xl border border-border-main bg-bg-secondary px-4 py-2 text-xs font-bold text-text-sub">
                             Booking ref: <span className="text-brand-green">{result.booking.id.slice(0, 8).toUpperCase()}</span>

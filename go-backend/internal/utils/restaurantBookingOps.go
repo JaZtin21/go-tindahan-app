@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"go-backend/internal/graph/model"
@@ -137,13 +139,26 @@ func CheckAvailability(ctx context.Context, db *pgxpool.Pool, input model.CheckA
 	}
 
 	var turnDuration int
+	var tzName string
 	if err := db.QueryRow(ctx,
-		`SELECT default_turn_duration_min FROM restaurants WHERE id = $1`, input.RestaurantID,
-	).Scan(&turnDuration); err != nil {
+		`SELECT default_turn_duration_min, timezone FROM restaurants WHERE id = $1`, input.RestaurantID,
+	).Scan(&turnDuration, &tzName); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, NewBookingError(CodeNotFound, "not found: restaurant does not exist", err)
 		}
 		return nil, err
+	}
+
+	// Operating-hours gate: if the restaurant is closed that day (or has no
+	// hours configured), or the requested window falls outside the day's
+	// open/close times, there is no availability regardless of table capacity.
+	// Wall-clock hours are interpreted in the restaurant's own timezone.
+	open, err := operatingWindow(ctx, db, input.RestaurantID, requestedTime, tzName, turnDuration)
+	if err != nil {
+		return nil, err
+	}
+	if !open {
+		return []*model.AvailableSlot{}, nil
 	}
 
 	// Compute the window end in Go and pass both bounds as timestamptz —
@@ -194,6 +209,163 @@ func CheckAvailability(ctx context.Context, db *pgxpool.Pool, input model.CheckA
 		slots = []*model.AvailableSlot{}
 	}
 	return slots, nil
+}
+
+// operatingWindow reports whether the booking window starting at start (with
+// the given duration in minutes) falls inside the restaurant's operating hours
+// for that local day and is not on a closure date. Wall-clock open/close times
+// are interpreted in the restaurant's own timezone (the operating_hours table
+// stores plain TIME values). A day with no hours row, a row marked closed, or
+// NULL open/close is treated as closed. Overnight service (close < open) is
+// supported for windows that begin on the service day; windows that start
+// before the day's open time are rejected even if the previous day's service
+// wrapped past midnight.
+func operatingWindow(ctx context.Context, db *pgxpool.Pool, restaurantID string, start time.Time, tzName string, durationMin int) (bool, error) {
+	loc := time.UTC
+	if tzName != "" {
+		if l, err := time.LoadLocation(tzName); err == nil {
+			loc = l
+		} else {
+			log.Printf("⚠️ operatingWindow: unknown timezone %q, falling back to UTC: %v", tzName, err)
+		}
+	}
+	local := start.In(loc)
+
+	// One-off closure on the local calendar date.
+	var closedDay bool
+	if err := db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM closures WHERE restaurant_id = $1 AND closure_date = $2::date)`,
+		restaurantID, local.Format("2006-01-02"),
+	).Scan(&closedDay); err != nil {
+		log.Printf("🔴 CLOSURES QUERY FAILED IN OPERATINGWINDOW: %v", err)
+		return false, err
+	}
+	if closedDay {
+		return false, nil
+	}
+
+	// Weekly hours for the local weekday (day_of_week: 0 = Sunday).
+	var openStr, closeStr *string
+	var isClosed bool
+	err := db.QueryRow(ctx,
+		`SELECT open_time::text, close_time::text, is_closed
+		 FROM operating_hours
+		 WHERE restaurant_id = $1 AND day_of_week = $2`,
+		restaurantID, int(local.Weekday()),
+	).Scan(&openStr, &closeStr, &isClosed)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// No hours configured for this day → treat as closed (never offer
+			// a table when we can't confirm the restaurant is open), but log it
+			// so a new restaurant that hasn't set hours yet is diagnosable.
+			log.Printf("⚠️ operatingWindow: no operating_hours row for restaurant %s on weekday %d — treating as closed", restaurantID, int(local.Weekday()))
+			return false, nil
+		}
+		log.Printf("🔴 OPERATING HOURS QUERY FAILED IN OPERATINGWINDOW: %v", err)
+		return false, err
+	}
+	if isClosed || openStr == nil || closeStr == nil {
+		return false, nil
+	}
+
+	openMin, ok := parseClockMinutes(*openStr)
+	closeMin, ok2 := parseClockMinutes(*closeStr)
+	if !ok || !ok2 {
+		return false, nil
+	}
+	// Service that crosses midnight (close < open) ends on the following day.
+	if closeMin < openMin {
+		closeMin += 24 * 60
+	}
+
+	startMin := local.Hour()*60 + local.Minute()
+	endMin := startMin + durationMin
+	return startMin >= openMin && endMin <= closeMin, nil
+}
+
+// parseClockMinutes converts an "HH:MM" / "HH:MM:SS" TIME string to minutes
+// since midnight. ok is false if the value can't be parsed. Lenient about
+// fractional seconds — Postgres TIME defaults to microsecond precision, so
+// ::text can include a ".ffffff" suffix that strict time.Parse rejects.
+func parseClockMinutes(hhmmss string) (int, bool) {
+	if i := strings.IndexByte(hhmmss, '.'); i >= 0 {
+		hhmmss = hhmmss[:i]
+	}
+	parts := strings.Split(hhmmss, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, false
+	}
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, false
+	}
+	return h*60 + m, true
+}
+
+// ResolveRestaurantInstant interprets a wall-clock date+time pair in the
+// restaurant's OWN timezone (restaurants.timezone) and returns the absolute
+// instant as RFC3339. This is the voice-agent contract: the model only passes
+// the date and time exactly as the caller said them ("2026-08-07" + "19:00") —
+// it never does timezone math. The instant is then checked against operating
+// hours / closures / overlaps in the same restaurant-local frame downstream.
+func ResolveRestaurantInstant(ctx context.Context, db *pgxpool.Pool, restaurantID, date, timeOfDay string) (string, error) {
+	var tzName string
+	if err := db.QueryRow(ctx, `SELECT timezone FROM restaurants WHERE id = $1`, restaurantID).Scan(&tzName); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", NewBookingError(CodeNotFound, "not found: restaurant does not exist", err)
+		}
+		log.Printf("🔴 DATABASE QUERY FAILED IN RESOLVERESTAURANTINSTANT: %v", err)
+		return "", err
+	}
+
+	// Restaurant-local time is unresolvable without the restaurant's own
+	// timezone — never guess (UTC would silently shift the booking by hours).
+	if tzName == "" {
+		return "", NewBookingError(CodeBadInput, "restaurant has no timezone configured — cannot interpret the requested time", nil)
+	}
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		log.Printf("⚠️ ResolveRestaurantInstant: unknown timezone %q, falling back to UTC: %v", tzName, err)
+		loc = time.UTC
+	}
+
+	parsedDate, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(date), loc)
+	if err != nil {
+		// Lenient fallback: "8/7/2026"
+		parsedDate, err = time.ParseInLocation("1/2/2006", strings.TrimSpace(date), loc)
+		if err != nil {
+			return "", NewBookingError(CodeBadInput, "invalid date: expected YYYY-MM-DD (e.g. 2026-08-07)", err)
+		}
+	}
+
+	clock, err := parseWallClockTime(timeOfDay)
+	if err != nil {
+		return "", NewBookingError(CodeBadInput, "invalid time: expected 24-hour HH:MM (e.g. 19:00)", err)
+	}
+
+	// time.Date normalizes DST gap/ambiguous local times (e.g. 2:30 AM during
+	// a spring-forward) to a valid instant rather than erroring — acceptable:
+	// the caller's stated wall-clock time simply doesn't exist that day.
+	instant := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(),
+		clock.Hour(), clock.Minute(), 0, 0, loc)
+	return instant.Format(time.RFC3339), nil
+}
+
+// parseWallClockTime accepts 24-hour ("19:00", "19:00:00") and 12-hour
+// ("7:00 PM", "7:00pm", "7 PM") clock strings. Go's time.Parse matches
+// AM/PM case-insensitively, so the 12-hour layouts cover both cases.
+func parseWallClockTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	layouts := []string{
+		"15:04", "15:04:05", "3:04 PM", "3 PM",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("could not parse time %q", s)
 }
 
 // CreateBooking inserts a booking with an idempotency key so retried requests
