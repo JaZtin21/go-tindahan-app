@@ -99,23 +99,32 @@ type webhookResponse struct {
 
 // Handle is the gin handler for POST /vapi/webhook.
 func (h *Handler) Handle(c *gin.Context) {
+	remote := c.ClientIP()
+
 	body, err := c.GetRawData()
 	if err != nil {
+		log.Printf("🔴 VAPI WEBHOOK: rejected request from %s — cannot read body: %v", remote, err)
 		c.JSON(http.StatusBadRequest, webhookResponse{})
 		return
 	}
 
 	var req webhookRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		log.Printf("🔴 VAPI WEBHOOK: failed to decode payload: %v", err)
+		log.Printf("🔴 VAPI WEBHOOK: rejected request from %s — failed to decode payload: %v", remote, err)
 		c.JSON(http.StatusBadRequest, webhookResponse{})
 		return
 	}
+
+	callID := vapiCallID(req)
+	phone := callerPhone(req)
+	log.Printf("📥 VAPI WEBHOOK: received message type=%q callId=%s phone=%s tools=%d from %s",
+		req.Message.Type, callID, phone, len(req.Message.ToolCallList), remote)
 
 	// Vapi also sends non-tool messages (status-update, end-of-call-report,
 	// etc.). Acknowledge them with an empty results array — they carry no
 	// tool calls to answer.
 	if req.Message.Type != "tool-calls" {
+		log.Printf("↪️ VAPI WEBHOOK: acknowledged non-tool message (type=%q) — no results returned", req.Message.Type)
 		c.JSON(http.StatusOK, webhookResponse{Results: []toolResult{}})
 		return
 	}
@@ -124,9 +133,9 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	// One call_logs row per Vapi call; enrich it as tools run.
 	callLog := utils.CallLogEntry{
-		VapiCallID: vapiCallID(req),
+		VapiCallID: callID,
 	}
-	if phone := callerPhone(req); phone != "" {
+	if phone != "" {
 		p := phone
 		callLog.CustomerPhone = &p
 	}
@@ -139,17 +148,43 @@ func (h *Handler) Handle(c *gin.Context) {
 
 		// Fold per-tool facts into the call log (first non-nil wins).
 		mergeCallLog(&callLog, res)
+
+		log.Printf("⚙️ VAPI WEBHOOK: tool call callId=%s toolId=%s name=%q -> %s",
+			callID, tc.ID, tc.Name, summarizeResult(res.Result))
 	}
 
 	// Persist the call log row best-effort — a logging hiccup should never
 	// fail the voice call itself.
 	if callLog.VapiCallID != "" {
 		if err := utils.UpsertCallLog(ctx, h.DB, callLog); err != nil {
-			log.Printf("⚠️ VAPI WEBHOOK: call log not written: %v", err)
+			log.Printf("🔴 VAPI WEBHOOK: call log not written for callId=%s: %v", callID, err)
+		} else {
+			log.Printf("💾 VAPI WEBHOOK: call log upserted for callId=%s outcome=%v bookingId=%v restaurantId=%v",
+				callID, deref(callLog.Outcome), deref(callLog.BookingID), deref(callLog.RestaurantID))
 		}
 	}
 
 	c.JSON(http.StatusOK, webhookResponse{Results: results})
+}
+
+// summarizeResult shortens a tool result for log output (the packed facts
+// include natural-language messages that would flood the logs). Truncates on
+// a rune boundary so multi-byte UTF-8 (emojis, em-dashes) is never cut mid-
+// sequence in the log output.
+func summarizeResult(result string) string {
+	const maxLen = 200
+	if len(result) <= maxLen {
+		return result
+	}
+	runes := []rune(result)
+	return string(runes[:maxLen]) + "..."
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func vapiCallID(req webhookRequest) string {
@@ -220,6 +255,8 @@ func (h *Handler) dispatch(ctx context.Context, tc toolCall, req webhookRequest)
 		res.Result = h.toolAddToWaitlist(ctx, tc.Arguments)
 	default:
 		res.Result = fmt.Sprintf(`{"error":"unknown tool %q"}`, tc.Name)
+		log.Printf("⚠️ VAPI WEBHOOK: unknown tool name %q (callId=%s) — check the tool names in your Vapi assistant match the contract",
+			tc.Name, vapiCallID(req))
 	}
 	return res
 }
@@ -272,13 +309,18 @@ func (h *Handler) toolCheckAvailability(ctx context.Context, args map[string]any
 	if err != nil {
 		var be *utils.BookingError
 		if errors.As(err, &be) {
+			log.Printf("⚠️ VAPI check_availability: %s (code=%s restaurant=%s party=%d time=%s)",
+				be.Message, be.Code, input.RestaurantID, input.PartySize, input.RequestedTime)
 			return fmt.Sprintf("I couldn't check availability: %s", be.Message)
 		}
-		log.Printf("🔴 VAPI check_availability failed: %v", err)
+		log.Printf("🔴 VAPI check_availability failed: %v (restaurant=%s party=%d time=%s)",
+			err, input.RestaurantID, input.PartySize, input.RequestedTime)
 		return "I'm sorry, I couldn't check availability right now. Please try again."
 	}
 
 	if len(slots) == 0 {
+		log.Printf("ℹ️ VAPI check_availability: no tables for restaurant=%s party=%d time=%s",
+			input.RestaurantID, input.PartySize, input.RequestedTime)
 		return packFacts(
 			"outcome=NO_AVAILABILITY",
 			"restaurantId="+input.RestaurantID,
@@ -290,6 +332,8 @@ func (h *Handler) toolCheckAvailability(ctx context.Context, args map[string]any
 	for _, s := range slots {
 		names = append(names, s.Table.TableNumber)
 	}
+	log.Printf("ℹ️ VAPI check_availability: %d table(s) for restaurant=%s party=%d time=%s",
+		len(slots), input.RestaurantID, input.PartySize, input.RequestedTime)
 	return packFacts(
 		"restaurantId="+input.RestaurantID,
 		"message="+fmt.Sprintf(
@@ -315,10 +359,11 @@ func (h *Handler) toolFindOrCreateCustomer(ctx context.Context, args map[string]
 
 	customer, err := utils.FindOrCreateCustomer(ctx, h.DB, input)
 	if err != nil {
-		log.Printf("🔴 VAPI find_or_create_customer failed: %v", err)
+		log.Printf("🔴 VAPI find_or_create_customer failed: %v (phone=%s)", err, phone)
 		return "I'm sorry, I had trouble looking up your details. Please try again."
 	}
 
+	log.Printf("ℹ️ VAPI find_or_create_customer: ok phone=%s customerId=%s", phone, customer.ID)
 	return packFacts(
 		"customerId="+customer.ID,
 		"message="+fmt.Sprintf("Found you! Your account is ready — customer id %s.", customer.ID),
@@ -354,12 +399,15 @@ func (h *Handler) toolCreateBooking(ctx context.Context, args map[string]any, ca
 	if err != nil {
 		var be *utils.BookingError
 		if errors.As(err, &be) {
+			log.Printf("⚠️ VAPI create_booking: %s (code=%s idem=%s)", be.Message, be.Code, idem)
 			return fmt.Sprintf("I couldn't complete the booking: %s", be.Message)
 		}
-		log.Printf("🔴 VAPI create_booking failed: %v", err)
+		log.Printf("🔴 VAPI create_booking failed: %v (idem=%s)", err, idem)
 		return "I'm sorry, I couldn't complete the booking. Please try again."
 	}
 
+	log.Printf("✅ VAPI create_booking: bookingId=%s restaurant=%s party=%d time=%s idem=%s",
+		booking.ID, booking.RestaurantID, booking.PartySize, booking.BookingTime, idem)
 	return packFacts(
 		"outcome=BOOKED",
 		"bookingId="+booking.ID,
@@ -388,12 +436,15 @@ func (h *Handler) toolAddToWaitlist(ctx context.Context, args map[string]any) st
 	if err != nil {
 		var be *utils.BookingError
 		if errors.As(err, &be) {
+			log.Printf("⚠️ VAPI add_to_waitlist: %s (code=%s restaurant=%s party=%d)",
+				be.Message, be.Code, input.RestaurantID, input.PartySize)
 			return fmt.Sprintf("I couldn't add you to the waitlist: %s", be.Message)
 		}
-		log.Printf("🔴 VAPI add_to_waitlist failed: %v", err)
+		log.Printf("🔴 VAPI add_to_waitlist failed: %v (restaurant=%s party=%d)", err, input.RestaurantID, input.PartySize)
 		return "I'm sorry, I couldn't add you to the waitlist. Please try again."
 	}
 
+	log.Printf("ℹ️ VAPI add_to_waitlist: waitlistId=%s restaurant=%s party=%d", entry.ID, entry.RestaurantID, entry.PartySize)
 	return packFacts(
 		"outcome=NO_AVAILABILITY",
 		"restaurantId="+entry.RestaurantID,
