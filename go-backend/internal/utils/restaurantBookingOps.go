@@ -97,6 +97,31 @@ func FindOrCreateCustomer(ctx context.Context, db *pgxpool.Pool, input model.Fin
 	return &c, nil
 }
 
+// ResolveTableID accepts either a table UUID or a table number (the form the
+// voice model reports from check_availability results, e.g. "2") and returns
+// the table's UUID for the given restaurant. Returns ("", nil) when nothing
+// matches, so callers can fail with a clear message instead of letting the
+// raw value hit a uuid column (invalid input syntax for type uuid).
+func ResolveTableID(ctx context.Context, db *pgxpool.Pool, restaurantID, tableRef string) (string, error) {
+	ref := strings.TrimSpace(tableRef)
+	if ref == "" {
+		return "", nil
+	}
+	var id string
+	err := db.QueryRow(ctx, `
+		SELECT id FROM restaurant_tables
+		WHERE restaurant_id = $1 AND is_active = true
+		  AND (id::text = $2 OR table_number = $2)
+	`, restaurantID, ref).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN RESOLVETABLEID: %v (restaurant=%s ref=%q)", err, restaurantID, ref)
+	}
+	return id, err
+}
+
 // GetBookingByID loads a booking by id with no access guard. Used by the
 // create-booking idempotency paths (a retried webhook request should return
 // the original booking, not require a staff session to read it back).

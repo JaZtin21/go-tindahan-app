@@ -51,7 +51,8 @@ import (
 //	check_availability        restaurantId/restaurant_id, partySize/party_size,
 //	                          date (YYYY-MM-DD) + time (HH:MM), OR requestedTime/requested_time (ISO 8601)
 //	find_or_create_customer  phone/phone_number, name/caller_name, email
-//	create_booking           restaurantId, customerId, tableId (optional),
+//	create_booking           restaurantId, customerId, tableId (optional — the
+//	                          table UUID or number from check_availability),
 //	                          partySize, date + time, OR bookingTime (ISO 8601),
 //	                          specialRequests, idempotencyKey (recommended — see below)
 //	add_to_waitlist          restaurantId, customerId, partySize, date + time,
@@ -575,7 +576,9 @@ func (h *Handler) toolCheckAvailability(ctx context.Context, args map[string]any
 
 	names := make([]string, 0, len(slots))
 	for _, s := range slots {
-		names = append(names, s.Table.TableNumber)
+		// Include the table's UUID so the model can pass the real id to
+		// create_booking — a bare table number ("2") fails the uuid column.
+		names = append(names, fmt.Sprintf("%s (id %s)", s.Table.TableNumber, s.Table.ID))
 	}
 	log.Printf("ℹ️ VAPI check_availability: %d table(s) for restaurant=%s party=%d time=%s",
 		len(slots), input.RestaurantID, input.PartySize, input.RequestedTime)
@@ -654,7 +657,51 @@ func (h *Handler) toolCreateBooking(ctx context.Context, args map[string]any, ca
 	input.BookingTime = rt
 
 	if v := arg(args, "tableId", "table_id"); v != "" {
-		input.TableID = &v
+		// The model reports tables by NUMBER ("table 2") from check_availability;
+		// bookings.table_id is a UUID column, so resolve the reference first.
+		// Otherwise Postgres rejects it with "invalid input syntax for type uuid".
+		tableID, err := utils.ResolveTableID(ctx, h.DB, input.RestaurantID, v)
+		if err != nil {
+			log.Printf("🔴 VAPI create_booking: table lookup failed for ref=%q (idem=%s): %v", v, idem, err)
+			return "I'm sorry, I couldn't complete the booking. Please try again."
+		}
+		if tableID == "" {
+			log.Printf("⚠️ VAPI create_booking: table ref %q not found for restaurant %s (idem=%s)", v, input.RestaurantID, idem)
+			return fmt.Sprintf("I couldn't complete the booking: I couldn't find table %s.", v)
+		}
+		input.TableID = &tableID
+	} else {
+		// Auto-assign: the model omitted tableId. Re-run the availability check
+		// so the booking is never created unassigned (unassigned bookings skip
+		// the EXCLUDE constraint and can silently overbook). If nothing is free,
+		// return the same NO_AVAILABILITY outcome the check tool uses, so the
+		// model tells the caller there's no table and offers a different time.
+		slots, err := utils.CheckAvailability(ctx, h.DB, model.CheckAvailabilityInput{
+			RestaurantID:  input.RestaurantID,
+			PartySize:     input.PartySize,
+			RequestedTime: input.BookingTime,
+		})
+		if err != nil {
+			var be *utils.BookingError
+			if errors.As(err, &be) {
+				log.Printf("⚠️ VAPI create_booking: auto-assign availability failed: %s (code=%s idem=%s)", be.Message, be.Code, idem)
+				return fmt.Sprintf("I couldn't complete the booking: %s", be.Message)
+			}
+			log.Printf("🔴 VAPI create_booking: auto-assign availability failed: %v (idem=%s)", err, idem)
+			return "I'm sorry, I couldn't complete the booking. Please try again."
+		}
+		if len(slots) == 0 {
+			log.Printf("ℹ️ VAPI create_booking: no tables available for auto-assign (idem=%s restaurant=%s party=%d time=%s)",
+				idem, input.RestaurantID, input.PartySize, input.BookingTime)
+			return packFacts(
+				"outcome=NO_AVAILABILITY",
+				"restaurantId="+input.RestaurantID,
+				"message=Sorry, there are no tables available for "+strconv.Itoa(input.PartySize)+" guests at the requested time.",
+			)
+		}
+		tid := slots[0].Table.ID
+		input.TableID = &tid
+		log.Printf("ℹ️ VAPI create_booking: auto-assigned table %s ("+slots[0].Table.TableNumber+") idem=%s", tid, idem)
 	}
 	if v := arg(args, "specialRequests", "special_requests"); v != "" {
 		input.SpecialRequests = &v
