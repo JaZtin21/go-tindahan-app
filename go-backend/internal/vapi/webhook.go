@@ -93,21 +93,42 @@ type toolCall struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
+// callInfo is the Call Object Vapi attaches to webhook payloads. Per Vapi's
+// server-message docs it nests under message.call; some tool configurations
+// (and our own smoke tests) put it at the top level instead. Both locations
+// are read via vapiCallID/callerPhone.
+type callInfo struct {
+	ID       string `json:"id"`
+	Customer *struct {
+		Number *struct {
+			E164 string `json:"e164"`
+		} `json:"number"`
+	} `json:"customer"`
+}
+
+// artifactInfo is the artifact block Vapi sends with end-of-call-report
+// (transcript + structured messages).
+type artifactInfo struct {
+	Transcript string `json:"transcript"`
+	Messages   []struct {
+		Role    string `json:"role"`
+		Message string `json:"message"`
+	} `json:"messages"`
+}
+
 type message struct {
-	Type         string     `json:"type"`
-	ToolCallList []toolCall `json:"toolCallList"`
+	Type         string        `json:"type"`
+	ToolCallList []toolCall    `json:"toolCallList"`
+	Call         *callInfo     `json:"call"`
+	Artifact     *artifactInfo `json:"artifact"`
+	EndedReason  string        `json:"endedReason"`
+	Transcript   string        `json:"transcript"`
+	Summary      string        `json:"summary"`
 }
 
 type webhookRequest struct {
-	Message message `json:"message"`
-	Call    *struct {
-		ID       string `json:"id"`
-		Customer *struct {
-			Number *struct {
-				E164 string `json:"e164"`
-			} `json:"number"`
-		} `json:"customer"`
-	} `json:"call"`
+	Message message   `json:"message"`
+	Call    *callInfo `json:"call"`
 }
 
 type toolResult struct {
@@ -163,6 +184,16 @@ func (h *Handler) Handle(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "I couldn't read the booking details — please try again."})
 			return
 		}
+		// apiRequest bodies carry no call block — the call id and caller phone
+		// only reach us via static body fields on the tool (callId: {{call.id}},
+		// phone: {{customer.number}}). Fall back to those so call_logs still
+		// gets a row keyed by the real Vapi call id.
+		if callID == "" {
+			callID = arg(args, "callId", "call_id")
+		}
+		if phone == "" {
+			phone = arg(args, "phone", "phone_number")
+		}
 		log.Printf("📥 VAPI WEBHOOK: apiRequest bare tool call name=%q args=%d callId=%q from %s",
 			name, len(args), callID, remote)
 
@@ -196,6 +227,16 @@ func (h *Handler) Handle(c *gin.Context) {
 		// apiRequest feeds the raw response body back to the voice model —
 		// return the human message, not the packed facts.
 		c.JSON(http.StatusOK, gin.H{"message": unpackMessage(res.Result)})
+		return
+	}
+
+	// end-of-call-report carries the call's transcript + ended reason — the
+	// richest log we can capture without calling Vapi's API. Store it so staff
+	// can review every call (booking/outcome facts were already folded into
+	// the same row by the tool calls during the call).
+	if req.Message.Type == "end-of-call-report" {
+		h.handleEndOfCallReport(ctx, req, callID, phone)
+		c.JSON(http.StatusOK, webhookResponse{Results: []toolResult{}})
 		return
 	}
 
@@ -248,6 +289,69 @@ func (h *Handler) handleEnvelope(ctx context.Context, c *gin.Context, req webhoo
 	}
 
 	c.JSON(http.StatusOK, webhookResponse{Results: results})
+}
+
+// handleEndOfCallReport stores the transcript and a derived outcome for a
+// finished call. The row is keyed by the Vapi call id — tool calls during the
+// call already created/updated it with booking+outcome facts, so this only
+// fills the transcript and any still-missing outcome (COALESCE in
+// UpsertCallLog keeps the first value, so a BOOKED outcome is never
+// overwritten).
+func (h *Handler) handleEndOfCallReport(ctx context.Context, req webhookRequest, callID, phone string) {
+	callLog := utils.CallLogEntry{VapiCallID: callID}
+	if phone != "" {
+		p := phone
+		callLog.CustomerPhone = &p
+	}
+
+	// Transcript: prefer the ready-made string, then flatten the messages
+	// array, then the top-level fallback field.
+	var transcript string
+	if req.Message.Artifact != nil && req.Message.Artifact.Transcript != "" {
+		transcript = req.Message.Artifact.Transcript
+	} else if req.Message.Artifact != nil && len(req.Message.Artifact.Messages) > 0 {
+		parts := make([]string, 0, len(req.Message.Artifact.Messages))
+		for _, m := range req.Message.Artifact.Messages {
+			if m.Message == "" {
+				continue
+			}
+			parts = append(parts, strings.ToUpper(m.Role)+": "+m.Message)
+		}
+		transcript = strings.Join(parts, "\n")
+	} else {
+		transcript = req.Message.Transcript
+	}
+	if req.Message.Summary != "" {
+		if transcript != "" {
+			transcript = "Summary: " + req.Message.Summary + "\n\n" + transcript
+		} else {
+			transcript = "Summary: " + req.Message.Summary
+		}
+	}
+	if transcript != "" {
+		callLog.Transcript = &transcript
+	}
+
+	// Outcome: only fills a null column. A call that ended via transfer maps to
+	// TRANSFERRED; anything else that never booked maps to ABANDONED.
+	if strings.Contains(strings.ToLower(req.Message.EndedReason), "transfer") {
+		outcome := "TRANSFERRED"
+		callLog.Outcome = &outcome
+	} else {
+		outcome := "ABANDONED"
+		callLog.Outcome = &outcome
+	}
+
+	if callLog.VapiCallID == "" {
+		log.Printf("⚠️ VAPI WEBHOOK: end-of-call-report had no call id — add a callId: {{call.id}} static body field to your tools so calls are logged")
+		return
+	}
+	if err := utils.UpsertCallLog(ctx, h.DB, callLog); err != nil {
+		log.Printf("🔴 VAPI WEBHOOK: end-of-call-report log not written for callId=%s: %v", callID, err)
+		return
+	}
+	log.Printf("💾 VAPI WEBHOOK: end-of-call-report logged callId=%s outcome=%v transcript=%d chars",
+		callID, deref(callLog.Outcome), len(deref(callLog.Transcript)))
 }
 
 // detectBareTool recognizes Vapi's apiRequest tool format: the arguments object
@@ -409,17 +513,26 @@ func deref(s *string) string {
 }
 
 func vapiCallID(req webhookRequest) string {
-	if req.Call != nil {
+	if req.Call != nil && req.Call.ID != "" {
 		return req.Call.ID
+	}
+	if req.Message.Call != nil {
+		return req.Message.Call.ID
 	}
 	return ""
 }
 
 func callerPhone(req webhookRequest) string {
-	if req.Call != nil && req.Call.Customer != nil && req.Call.Customer.Number != nil {
-		return req.Call.Customer.Number.E164
+	extract := func(c *callInfo) string {
+		if c != nil && c.Customer != nil && c.Customer.Number != nil {
+			return c.Customer.Number.E164
+		}
+		return ""
 	}
-	return ""
+	if p := extract(req.Call); p != "" {
+		return p
+	}
+	return extract(req.Message.Call)
 }
 
 // mergeCallLog folds outcome/booking/restaurant facts collected during a tool
@@ -832,6 +945,14 @@ func (h *Handler) toolRestaurantInfo(ctx context.Context, args map[string]any) s
 			}
 		}
 		if len(matches) == 0 {
+			// Dead-end recovery: when the query matches nothing, hand the model
+			// the actual menu so it can offer alternatives ("we have pork and
+			// chicken — which would you like?") instead of a hard stop.
+			menu, n := menuNameList(info.MenuItems, 15)
+			if n > 0 {
+				log.Printf("ℹ️ VAPI restaurant_info: no menu matches for %q — offering %d item(s) instead (restaurant=%s)", itemQuery, n, restaurantID)
+				return fmt.Sprintf("I couldn't find anything matching %q — here's what's on the menu: %s.", itemQuery, menu)
+			}
 			log.Printf("ℹ️ VAPI restaurant_info: no menu matches for %q (restaurant=%s)", itemQuery, restaurantID)
 			return fmt.Sprintf("I couldn't find anything on the menu matching %q.", itemQuery)
 		}
@@ -845,7 +966,11 @@ func (h *Handler) toolRestaurantInfo(ctx context.Context, args map[string]any) s
 	// "later at 4pm") — no timezone is hardcoded in the prompt; it comes live
 	// from the database on every call.
 	msg := fmt.Sprintf("Today is %s and the current time is %s (restaurant local time). ", info.TodayLocalDisplay, info.NowLocalTime)
-	msg += fmt.Sprintf("%s is open %s on %s. ", info.Name, info.DayHours, info.DayDate)
+	if info.DayHours == "Closed" {
+		msg += fmt.Sprintf("%s is closed on %s. ", info.Name, info.DayDate)
+	} else {
+		msg += fmt.Sprintf("%s is open %s on %s. ", info.Name, info.DayHours, info.DayDate)
+	}
 	if info.CuisineType != nil && *info.CuisineType != "" {
 		msg += fmt.Sprintf("We serve %s cuisine. ", *info.CuisineType)
 	}
@@ -859,8 +984,13 @@ func (h *Handler) toolRestaurantInfo(ctx context.Context, args map[string]any) s
 	if len(info.WeeklyHours) > 0 {
 		msg += "Weekly hours: " + strings.Join(info.WeeklyHours, ", ") + ". "
 	}
-	if len(info.MenuItems) > 0 {
-		msg += fmt.Sprintf("We have %d items on the menu — ask me about a specific dish, price, or allergens.", len(info.MenuItems))
+	// The full menu rides along with the general result so ONE restaurant_info
+	// call arms the model with the menu for the rest of the call — no repeated
+	// itemQuery calls are needed to answer "what's on the menu?".
+	menu, n := menuNameList(info.MenuItems, 15)
+	if n > 0 {
+		msg += fmt.Sprintf("Menu: %s. ", menu)
+		msg += "Ask me about a specific dish for its description or allergens."
 	} else {
 		msg += "We don't have menu details listed yet."
 	}
@@ -979,6 +1109,31 @@ func formatBookingDate(rfc3339 string, loc *time.Location) string {
 		return rfc3339
 	}
 	return t.In(loc).Format("January 2, 2006")
+}
+
+// menuNameList renders the available menu items as "Name ($X.XX)" joined by
+// ", ", capped so huge menus don't blow up the tool result. Returns the joined
+// string and the total number of available items.
+func menuNameList(items []*model.MenuItem, limit int) (string, int) {
+	var available []*model.MenuItem
+	for _, m := range items {
+		if m.IsAvailable {
+			available = append(available, m)
+		}
+	}
+	n := len(available)
+	names := make([]string, 0, n)
+	for i, m := range available {
+		if i >= limit {
+			break
+		}
+		names = append(names, fmt.Sprintf("%s ($%.2f)", m.Name, float64(m.PriceCents)/100))
+	}
+	out := strings.Join(names, ", ")
+	if n > limit {
+		out += fmt.Sprintf(", and %d more", n-limit)
+	}
+	return out, n
 }
 
 // formatMenuItem renders a menu item for the model: name (category) — price,
