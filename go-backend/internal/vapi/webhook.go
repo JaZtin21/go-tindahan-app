@@ -93,17 +93,20 @@ type toolCall struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
+// customerInfo is the Customer Object Vapi attaches to webhook payloads.
+// Number is accepted as either a plain E.164 string or an {e164: "..."} object
+// (Vapi's payload shape varies by message type) — see customerNumber().
+type customerInfo struct {
+	Number any `json:"number"`
+}
+
 // callInfo is the Call Object Vapi attaches to webhook payloads. Per Vapi's
 // server-message docs it nests under message.call; some tool configurations
 // (and our own smoke tests) put it at the top level instead. Both locations
 // are read via vapiCallID/callerPhone.
 type callInfo struct {
-	ID       string `json:"id"`
-	Customer *struct {
-		Number *struct {
-			E164 string `json:"e164"`
-		} `json:"number"`
-	} `json:"customer"`
+	ID       string        `json:"id"`
+	Customer *customerInfo `json:"customer"`
 }
 
 // artifactInfo is the artifact block Vapi sends with end-of-call-report
@@ -120,6 +123,7 @@ type message struct {
 	Type         string        `json:"type"`
 	ToolCallList []toolCall    `json:"toolCallList"`
 	Call         *callInfo     `json:"call"`
+	Customer     *customerInfo `json:"customer"`
 	Artifact     *artifactInfo `json:"artifact"`
 	EndedReason  string        `json:"endedReason"`
 	Transcript   string        `json:"transcript"`
@@ -186,13 +190,19 @@ func (h *Handler) Handle(c *gin.Context) {
 		}
 		// apiRequest bodies carry no call block — the call id and caller phone
 		// only reach us via static body fields on the tool (callId: {{call.id}},
-		// phone: {{customer.number}}). Fall back to those so call_logs still
-		// gets a row keyed by the real Vapi call id.
+		// phone / callerNumber: {{customer.number}}). Fall back to those so
+		// call_logs still gets a row keyed by the real Vapi call id and the
+		// caller's number. callerNumber is the logging-only key that is safe to
+		// add to EVERY tool (routing never looks at it); phone stays on the
+		// customer tools where the booking flow needs it.
 		if callID == "" {
 			callID = arg(args, "callId", "call_id")
 		}
 		if phone == "" {
 			phone = arg(args, "phone", "phone_number")
+		}
+		if phone == "" {
+			phone = arg(args, "callerNumber", "caller_number")
 		}
 		log.Printf("📥 VAPI WEBHOOK: apiRequest bare tool call name=%q args=%d callId=%q from %s",
 			name, len(args), callID, remote)
@@ -523,16 +533,31 @@ func vapiCallID(req webhookRequest) string {
 }
 
 func callerPhone(req webhookRequest) string {
-	extract := func(c *callInfo) string {
-		if c != nil && c.Customer != nil && c.Customer.Number != nil {
-			return c.Customer.Number.E164
+	extract := func(c *customerInfo) string {
+		if c == nil {
+			return ""
+		}
+		switch v := c.Number.(type) {
+		case string:
+			return v
+		case map[string]any:
+			if s, ok := v["e164"].(string); ok {
+				return s
+			}
 		}
 		return ""
 	}
-	if p := extract(req.Call); p != "" {
-		return p
+	if req.Call != nil {
+		if p := extract(req.Call.Customer); p != "" {
+			return p
+		}
 	}
-	return extract(req.Message.Call)
+	if req.Message.Call != nil {
+		if p := extract(req.Message.Call.Customer); p != "" {
+			return p
+		}
+	}
+	return extract(req.Message.Customer)
 }
 
 // mergeCallLog folds outcome/booking/restaurant facts collected during a tool

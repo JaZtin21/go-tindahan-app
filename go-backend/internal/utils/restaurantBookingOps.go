@@ -530,13 +530,18 @@ type CallLogEntry struct {
 // inserts a fresh one. The call_logs.vapi_call_id column is a plain index
 // (not unique), so do an explicit update-then-insert rather than ON CONFLICT.
 func UpsertCallLog(ctx context.Context, db *pgxpool.Pool, e CallLogEntry) error {
+	// Column-first COALESCE: the FIRST non-null value written to a row wins.
+	// A call fires many webhook messages, and the end-of-call-report arrives
+	// last — it must enrich the row without clobbering facts the tool calls
+	// already stored (e.g. outcome=BOOKED must survive the report's ABANDONED
+	// fallback, and the caller phone set on the first tool call must stick).
 	tag, err := db.Exec(ctx, `
 		UPDATE call_logs SET
-			restaurant_id  = COALESCE($2, restaurant_id),
-			customer_phone = COALESCE($3, customer_phone),
-			booking_id     = COALESCE($4, booking_id),
-			transcript     = COALESCE($5, transcript),
-			outcome        = COALESCE($6, outcome)
+			restaurant_id  = COALESCE(restaurant_id, $2),
+			customer_phone = COALESCE(customer_phone, $3),
+			booking_id     = COALESCE(booking_id, $4),
+			transcript     = COALESCE(transcript, $5),
+			outcome        = COALESCE(outcome, $6)
 		WHERE vapi_call_id = $1
 	`, e.VapiCallID, e.RestaurantID, e.CustomerPhone, e.BookingID, e.Transcript, e.Outcome)
 	if err != nil {
