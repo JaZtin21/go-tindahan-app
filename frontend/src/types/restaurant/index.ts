@@ -40,6 +40,8 @@ export interface Restaurant {
     defaultTurnDurationMin: number;
     bookingBufferMin: number;
     maxPartySize: number;
+    description?: string | null;
+    parkingInfo?: string | null;
     isActive: boolean;
     tables?: RestaurantTable[];
     operatingHours?: OperatingHours[];
@@ -111,6 +113,18 @@ export interface Booking {
     updatedAt: string;
 }
 
+export interface MenuItem {
+    id: string;
+    restaurantId: string;
+    name: string;
+    description?: string | null;
+    priceCents: number;
+    category?: string | null;
+    isAvailable: boolean;
+    allergens: string[];
+    sortOrder: number;
+}
+
 export interface WaitlistEntry {
     id: string;
     restaurantId: string;
@@ -168,7 +182,28 @@ export interface UpdateRestaurantInput {
     defaultTurnDurationMin?: number | null;
     bookingBufferMin?: number | null;
     maxPartySize?: number | null;
+    description?: string | null;
+    parkingInfo?: string | null;
     isActive?: boolean | null;
+}
+
+export interface CreateMenuItemInput {
+    restaurantId: string;
+    name: string;
+    description?: string | null;
+    priceCents: number;
+    category?: string | null;
+    allergens?: string[] | null;
+}
+
+export interface UpdateMenuItemInput {
+    name?: string | null;
+    description?: string | null;
+    priceCents?: number | null;
+    category?: string | null;
+    isAvailable?: boolean | null;
+    allergens?: string[] | null;
+    sortOrder?: number | null;
 }
 
 export interface CreateTableInput {

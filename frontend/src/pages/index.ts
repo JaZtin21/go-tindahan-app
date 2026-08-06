@@ -12,6 +12,7 @@ export {
     TablesPage,
     CallsPage,
     SettingsPage,
+    InfoPage,
 } from './restaurant';
 export { RestaurantLogin } from './RestaurantLogin'
 export * from './public';

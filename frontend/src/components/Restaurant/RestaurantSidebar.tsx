@@ -10,6 +10,7 @@ import {
     Armchair,
     PhoneCall,
     Settings as SettingsIcon,
+    UtensilsCrossed,
 } from 'lucide-react';
 
 interface RestaurantSidebarProps {
@@ -30,6 +31,7 @@ export const RestaurantSidebar: React.FC<RestaurantSidebarProps> = ({ isOpen, se
         { path: '/tables', label: 'Tables', icon: Armchair },
         { path: '/calls', label: 'AI Calls', icon: PhoneCall },
         { path: '/settings', label: 'Settings', icon: SettingsIcon },
+        { path: '/info', label: 'Info & Menu', icon: UtensilsCrossed },
     ];
 
     const menuItems = restaurantId

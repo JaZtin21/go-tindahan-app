@@ -12,6 +12,7 @@ import {
     TablesPage,
     CallsPage,
     SettingsPage,
+    InfoPage,
     PublicBookingPage,
 } from '~/pages';
 import { RestaurantLayout } from './RestaurantLayout';
@@ -64,6 +65,7 @@ export const RestaurantApp = () => {
                         <Route path="tables" element={<TablesPage />} />
                         <Route path="calls" element={<CallsPage />} />
                         <Route path="settings" element={<SettingsPage />} />
+                        <Route path="info" element={<InfoPage />} />
                     </Route>
                 </Route>
 

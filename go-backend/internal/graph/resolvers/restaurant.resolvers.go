@@ -148,12 +148,14 @@ func (r *mutationResolver) UpdateRestaurant(ctx context.Context, id string, inpu
 			default_turn_duration_min = COALESCE($10, default_turn_duration_min),
 			booking_buffer_min = COALESCE($11, booking_buffer_min),
 			max_party_size = COALESCE($12, max_party_size),
-			is_active = COALESCE($13, is_active),
+			description = COALESCE($13, description),
+			parking_info = COALESCE($14, parking_info),
+			is_active = COALESCE($15, is_active),
 			updated_at = NOW()
-		WHERE id = $14
+		WHERE id = $16
 		RETURNING id, name, phone, email, address_line1, suburb, state, postcode, timezone,
 			cuisine_type, seating_type, default_turn_duration_min, booking_buffer_min,
-			max_party_size, is_active, created_at, updated_at
+			max_party_size, description, parking_info, is_active, created_at, updated_at
 	`
 
 	var res model.Restaurant
@@ -162,11 +164,11 @@ func (r *mutationResolver) UpdateRestaurant(ctx context.Context, id string, inpu
 	err := r.Resolver.DB.QueryRow(ctx, query,
 		input.Name, input.Phone, input.Email, input.AddressLine1, input.Suburb, input.State, input.Postcode,
 		input.CuisineType, input.SeatingType, input.DefaultTurnDurationMin, input.BookingBufferMin,
-		input.MaxPartySize, input.IsActive, id,
+		input.MaxPartySize, input.Description, input.ParkingInfo, input.IsActive, id,
 	).Scan(
 		&res.ID, &res.Name, &res.Phone, &res.Email, &res.AddressLine1, &res.Suburb, &res.State, &res.Postcode,
 		&res.Timezone, &res.CuisineType, &res.SeatingType, &res.DefaultTurnDurationMin, &res.BookingBufferMin,
-		&res.MaxPartySize, &res.IsActive, &createdAt, &updatedAt,
+		&res.MaxPartySize, &res.Description, &res.ParkingInfo, &res.IsActive, &createdAt, &updatedAt,
 	)
 
 	if err != nil {
@@ -188,6 +190,131 @@ func (r *mutationResolver) UpdateRestaurant(ctx context.Context, id string, inpu
 	res.CreatedAt = createdAt.Format(time.RFC3339)
 	res.UpdatedAt = updatedAt.Format(time.RFC3339)
 	return &res, nil
+}
+
+// CreateMenuItem is the resolver for the createMenuItem field.
+// Staff-edited — the voice agent reads these aloud via the restaurant_info tool.
+func (r *mutationResolver) CreateMenuItem(ctx context.Context, input model.CreateMenuItemInput) (*model.MenuItem, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, input.RestaurantID, true); err != nil {
+		return nil, nil
+	}
+
+	allergens := input.Allergens
+	if allergens == nil {
+		allergens = []string{}
+	}
+
+	var m model.MenuItem
+	err := r.Resolver.DB.QueryRow(ctx, `
+		INSERT INTO menu_items (restaurant_id, name, description, price_cents, category, allergens)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, is_available, sort_order
+	`, input.RestaurantID, input.Name, input.Description, input.PriceCents, input.Category, allergens).
+		Scan(&m.ID, &m.IsAvailable, &m.SortOrder)
+
+	if err != nil {
+		log.Printf("🔴 DATABASE INSERT FAILED IN CREATEMENUITEM: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: failed to create menu item",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
+	m.RestaurantID = input.RestaurantID
+	m.Name = input.Name
+	m.Description = input.Description
+	m.PriceCents = input.PriceCents
+	m.Category = input.Category
+	m.Allergens = allergens
+	return &m, nil
+}
+
+// UpdateMenuItem is the resolver for the updateMenuItem field.
+func (r *mutationResolver) UpdateMenuItem(ctx context.Context, id string, input model.UpdateMenuItemInput) (*model.MenuItem, error) {
+	var restaurantID string
+	if err := r.Resolver.DB.QueryRow(ctx, `SELECT restaurant_id FROM menu_items WHERE id = $1`, id).Scan(&restaurantID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: menu item does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		return nil, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+
+	query := `
+		UPDATE menu_items SET
+			name = COALESCE($1, name),
+			description = COALESCE($2, description),
+			price_cents = COALESCE($3, price_cents),
+			category = COALESCE($4, category),
+			is_available = COALESCE($5, is_available),
+			allergens = COALESCE($6, allergens),
+			sort_order = COALESCE($7, sort_order),
+			updated_at = NOW()
+		WHERE id = $8
+		RETURNING id, restaurant_id, name, description, price_cents, category, is_available, allergens, sort_order
+	`
+
+	var m model.MenuItem
+	var desc, category string
+	var allergens []string
+	err := r.Resolver.DB.QueryRow(ctx, query,
+		input.Name, input.Description, input.PriceCents, input.Category, input.IsAvailable, input.Allergens, input.SortOrder, id,
+	).Scan(
+		&m.ID, &m.RestaurantID, &m.Name, &desc, &m.PriceCents, &category, &m.IsAvailable, &allergens, &m.SortOrder,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: menu item does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return nil, nil
+		}
+		log.Printf("🔴 DATABASE UPDATE FAILED IN UPDATEMENUITEM: %v", err)
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "internal server error: failed saving menu item",
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
+		})
+		return nil, nil
+	}
+
+	m.Description = &desc
+	m.Category = &category
+	m.Allergens = allergens
+	return &m, nil
+}
+
+// DeleteMenuItem is the resolver for the deleteMenuItem field.
+// Hard delete — menu items are not referenced by bookings, so no orphaning.
+func (r *mutationResolver) DeleteMenuItem(ctx context.Context, id string) (bool, error) {
+	var restaurantID string
+	if err := r.Resolver.DB.QueryRow(ctx, `SELECT restaurant_id FROM menu_items WHERE id = $1`, id).Scan(&restaurantID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			graphql.AddError(ctx, &gqlerror.Error{
+				Message:    "not found: menu item does not exist",
+				Extensions: map[string]any{"code": "NOT_FOUND"},
+			})
+			return false, nil
+		}
+		return false, err
+	}
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return false, nil
+	}
+
+	if _, err := r.Resolver.DB.Exec(ctx, `DELETE FROM menu_items WHERE id = $1`, id); err != nil {
+		log.Printf("🔴 DATABASE DELETE FAILED IN DELETEMENUITEM: %v", err)
+		return false, err
+	}
+	return true, nil
 }
 
 // CreateTable is the resolver for the createTable field.
@@ -773,7 +900,7 @@ func (r *queryResolver) Restaurant(ctx context.Context, id string) (*model.Resta
 	query := `
 		SELECT id, name, phone, email, address_line1, suburb, state, postcode, timezone,
 			cuisine_type, seating_type, default_turn_duration_min, booking_buffer_min,
-			max_party_size, is_active, created_at, updated_at
+			max_party_size, description, parking_info, is_active, created_at, updated_at
 		FROM restaurants WHERE id = $1
 	`
 
@@ -783,7 +910,7 @@ func (r *queryResolver) Restaurant(ctx context.Context, id string) (*model.Resta
 	err := r.Resolver.DB.QueryRow(ctx, query, id).Scan(
 		&res.ID, &res.Name, &res.Phone, &res.Email, &res.AddressLine1, &res.Suburb, &res.State, &res.Postcode,
 		&res.Timezone, &res.CuisineType, &res.SeatingType, &res.DefaultTurnDurationMin, &res.BookingBufferMin,
-		&res.MaxPartySize, &res.IsActive, &createdAt, &updatedAt,
+		&res.MaxPartySize, &res.Description, &res.ParkingInfo, &res.IsActive, &createdAt, &updatedAt,
 	)
 
 	if err != nil {
@@ -814,7 +941,7 @@ func (r *queryResolver) Restaurants(ctx context.Context, suburb *string, cuisine
 	query := `
 		SELECT id, name, phone, email, address_line1, suburb, state, postcode, timezone,
 			cuisine_type, seating_type, default_turn_duration_min, booking_buffer_min,
-			max_party_size, is_active, created_at, updated_at
+			max_party_size, description, parking_info, is_active, created_at, updated_at
 		FROM restaurants
 		WHERE is_active = true
 			AND ($1::text IS NULL OR suburb ILIKE $1)
@@ -836,7 +963,7 @@ func (r *queryResolver) Restaurants(ctx context.Context, suburb *string, cuisine
 		if err := rows.Scan(
 			&res.ID, &res.Name, &res.Phone, &res.Email, &res.AddressLine1, &res.Suburb, &res.State, &res.Postcode,
 			&res.Timezone, &res.CuisineType, &res.SeatingType, &res.DefaultTurnDurationMin, &res.BookingBufferMin,
-			&res.MaxPartySize, &res.IsActive, &createdAt, &updatedAt,
+			&res.MaxPartySize, &res.Description, &res.ParkingInfo, &res.IsActive, &createdAt, &updatedAt,
 		); err != nil {
 			log.Printf("⚠️ Failed to scan restaurant row: %v", err)
 			continue
@@ -855,6 +982,15 @@ func (r *queryResolver) Tables(ctx context.Context, restaurantID string) ([]*mod
 		return nil, nil
 	}
 	return utils.LoadTables(ctx, r.Resolver.DB, restaurantID)
+}
+
+// MenuItems is the resolver for the menuItems field.
+// MenuItems is the resolver for the menuItems field.
+func (r *queryResolver) MenuItems(ctx context.Context, restaurantID string) ([]*model.MenuItem, error) {
+	if _, err := utils.RequireRestaurantStaff(ctx, r.Resolver.DB, restaurantID, false); err != nil {
+		return nil, nil
+	}
+	return utils.LoadMenuItems(ctx, r.Resolver.DB, restaurantID)
 }
 
 // OperatingHours is the resolver for the operatingHours field.

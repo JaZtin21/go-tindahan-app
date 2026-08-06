@@ -10,6 +10,7 @@ const FEATURE_LINKS = [
     { to: 'tables', title: 'Table Layout', description: 'Build and monitor your physical seating floor.', icon: '🪑' },
     { to: 'calls', title: 'AI Voice Logs', description: 'Review transcripts and call conversion telemetry.', icon: '📞' },
     { to: 'settings', title: 'Hours & Closures', description: 'Operating hours and closure adjustments for the AI engine.', icon: '⚙️' },
+    { to: 'info', title: 'Info & Menu', description: 'Restaurant profile, parking, and menu items the AI reads aloud.', icon: '🍽️' },
 ];
 
 const cardCls =

@@ -2,6 +2,7 @@ export * from './auth';
 export * from './restaurants';
 export * from './tables';
 export * from './settings';
+export * from './info';
 export * from './bookings';
 export * from './waitlist';
 export * from './calls';

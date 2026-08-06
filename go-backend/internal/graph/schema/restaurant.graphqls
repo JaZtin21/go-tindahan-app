@@ -75,6 +75,8 @@ type Restaurant {
   defaultTurnDurationMin: Int!
   bookingBufferMin: Int!
   maxPartySize: Int!
+  description: String
+  parkingInfo: String
   isActive: Boolean!
   tables: [RestaurantTable!]!
   operatingHours: [OperatingHours!]!
@@ -202,6 +204,8 @@ input UpdateRestaurantInput {
   defaultTurnDurationMin: Int
   bookingBufferMin: Int
   maxPartySize: Int
+  description: String
+  parkingInfo: String
   isActive: Boolean
 }
 
@@ -216,6 +220,51 @@ extend type Query {
 extend type Mutation {
   createRestaurant(input: CreateRestaurantInput!): Restaurant! @isAuthenticated
   updateRestaurant(id: String!, input: UpdateRestaurantInput!): Restaurant! @isAuthenticated
+}
+
+# ----------------------------------------------------------------------------
+# MENU — inputs & mutations (staff-edited, read aloud by the voice agent)
+# ----------------------------------------------------------------------------
+
+type MenuItem {
+  id: String!
+  restaurantId: String!
+  name: String!
+  description: String
+  priceCents: Int!
+  category: String
+  isAvailable: Boolean!
+  allergens: [String!]!
+  sortOrder: Int!
+}
+
+input CreateMenuItemInput {
+  restaurantId: String!
+  name: String!
+  description: String
+  priceCents: Int!
+  category: String
+  allergens: [String!]
+}
+
+input UpdateMenuItemInput {
+  name: String
+  description: String
+  priceCents: Int
+  category: String
+  isAvailable: Boolean
+  allergens: [String!]
+  sortOrder: Int
+}
+
+extend type Query {
+  menuItems(restaurantId: String!): [MenuItem!]! @isAuthenticated
+}
+
+extend type Mutation {
+  createMenuItem(input: CreateMenuItemInput!): MenuItem! @isAuthenticated
+  updateMenuItem(id: String!, input: UpdateMenuItemInput!): MenuItem! @isAuthenticated
+  deleteMenuItem(id: String!): Boolean! @isAuthenticated
 }
 
 # ----------------------------------------------------------------------------

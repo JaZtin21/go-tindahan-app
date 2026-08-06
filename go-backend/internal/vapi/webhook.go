@@ -57,6 +57,12 @@ import (
 //	                          specialRequests, idempotencyKey (recommended — see below)
 //	add_to_waitlist          restaurantId, customerId, partySize, date + time,
 //	                          OR requestedTime (ISO 8601)
+//	cancel_booking           restaurantId, phone (the caller's own number),
+//	                          plus bookingId OR date — finds the caller's upcoming
+//	                          bookings (single match cancels directly, multiple
+//	                          matches are listed for the model to pick by bookingId)
+//	restaurant_info          restaurantId, date (optional), itemQuery (optional) —
+//	                          hours/closures/address/parking/cuisine/menu info
 //
 // TIME INTERPRETATION: if the args carry an ISO timestamp (requestedTime /
 // bookingTime) it is used as-is. Otherwise a date+time pair is interpreted in
@@ -320,19 +326,29 @@ func detectBareTool(body []byte) (string, map[string]any, bool) {
 		return "create_booking", args, true
 	case has("customerId", "customer_id") && has("date", "reservation_date", "time", "reservation_time"):
 		return "create_booking", args, true
+	// cancel_booking must win over find_or_create_customer: both carry the
+	// caller's phone. It is disambiguated by bookingId/date presence (the tool
+	// schema makes date required, and a name never appears on a cancel call).
+	case has("phone", "phone_number") && !has("name", "caller_name") && (has("bookingId", "booking_id") || has("date", "reservation_date")):
+		return "cancel_booking", args, true
 	case has("phone", "phone_number"):
 		return "find_or_create_customer", args, true
 	case has("requestedTime", "requested_time") && has("customerId", "customer_id"):
 		return "add_to_waitlist", args, true
 	case has("restaurantId", "restaurant_id") && has("partySize", "party_size") && !has("customerId", "customer_id"):
 		return "check_availability", args, true
+	// restaurant_info is the fall-through for restaurantId-only bodies (no
+	// party size, phone, or customer) — the menu-search mode also matches on
+	// itemQuery regardless of the other fields.
+	case has("restaurantId", "restaurant_id") && (has("itemQuery", "item_query") || (!has("partySize", "party_size") && !has("phone", "phone_number") && !has("customerId", "customer_id"))):
+		return "restaurant_info", args, true
 	}
 	return "", nil, false
 }
 
 func isKnownTool(name string) bool {
 	switch name {
-	case "check_availability", "find_or_create_customer", "create_booking", "add_to_waitlist":
+	case "check_availability", "find_or_create_customer", "create_booking", "add_to_waitlist", "cancel_booking", "restaurant_info":
 		return true
 	}
 	return false
@@ -458,6 +474,10 @@ func (h *Handler) dispatch(ctx context.Context, tc toolCall, req webhookRequest)
 		res.Result = h.toolCreateBooking(ctx, tc.Arguments, vapiCallID(req), tc.ID)
 	case "add_to_waitlist":
 		res.Result = h.toolAddToWaitlist(ctx, tc.Arguments)
+	case "cancel_booking":
+		res.Result = h.toolCancelBooking(ctx, tc.Arguments)
+	case "restaurant_info":
+		res.Result = h.toolRestaurantInfo(ctx, tc.Arguments)
 	default:
 		res.Result = fmt.Sprintf(`{"error":"unknown tool %q"}`, tc.Name)
 		log.Printf("⚠️ VAPI WEBHOOK: unknown tool name %q (callId=%s) — check the tool names in your Vapi assistant match the contract",
@@ -772,6 +792,210 @@ func (h *Handler) toolAddToWaitlist(ctx context.Context, args map[string]any) st
 			"You're on the waitlist. We'll call you when a table opens up.",
 		),
 	)
+}
+
+// toolRestaurantInfo answers "are you open X", "where are you / parking?",
+// "what do you serve?", and menu/allergen questions from live DB data
+// (operating_hours + closures, so a sudden closure is reflected immediately).
+// With itemQuery it searches menu items; without it, it summarizes the
+// restaurant profile and today's/requested day's hours.
+func (h *Handler) toolRestaurantInfo(ctx context.Context, args map[string]any) string {
+	restaurantID := arg(args, "restaurantId", "restaurant_id")
+	if restaurantID == "" {
+		log.Printf("⚠️ VAPI restaurant_info: missing restaurantId — the tool's static body field is probably not set")
+		return "I need the restaurant id to look that up — please set the restaurantId static field on this tool."
+	}
+
+	date := arg(args, "date", "reservation_date")
+	itemQuery := strings.ToLower(strings.TrimSpace(arg(args, "itemQuery", "item_query")))
+
+	info, err := utils.LoadRestaurantInfo(ctx, h.DB, restaurantID, date)
+	if err != nil {
+		var be *utils.BookingError
+		if errors.As(err, &be) {
+			log.Printf("⚠️ VAPI restaurant_info: %s (code=%s restaurant=%s)", be.Message, be.Code, restaurantID)
+			return fmt.Sprintf("I couldn't look that up: %s", be.Message)
+		}
+		log.Printf("🔴 VAPI restaurant_info failed: %v (restaurant=%s)", err, restaurantID)
+		return "I'm sorry, I couldn't look that up right now. Please try again."
+	}
+
+	// Menu / allergen search mode.
+	if itemQuery != "" {
+		var matches []string
+		for _, m := range info.MenuItems {
+			if !m.IsAvailable {
+				continue
+			}
+			if strings.Contains(strings.ToLower(m.Name), itemQuery) {
+				matches = append(matches, formatMenuItem(m))
+			}
+		}
+		if len(matches) == 0 {
+			log.Printf("ℹ️ VAPI restaurant_info: no menu matches for %q (restaurant=%s)", itemQuery, restaurantID)
+			return fmt.Sprintf("I couldn't find anything on the menu matching %q.", itemQuery)
+		}
+		msg := fmt.Sprintf("Here's what I found on the menu: %s.", strings.Join(matches, "; "))
+		return packFacts("restaurantId="+restaurantID, "message="+msg)
+	}
+
+	// General profile mode. Leading with today's date + current time in the
+	// restaurant's OWN timezone (from restaurants.timezone) gives the model
+	// what it needs to resolve relative dates ("tomorrow", "next Tuesday",
+	// "later at 4pm") — no timezone is hardcoded in the prompt; it comes live
+	// from the database on every call.
+	msg := fmt.Sprintf("Today is %s and the current time is %s (restaurant local time). ", info.TodayLocalDisplay, info.NowLocalTime)
+	msg += fmt.Sprintf("%s is open %s on %s. ", info.Name, info.DayHours, info.DayDate)
+	if info.CuisineType != nil && *info.CuisineType != "" {
+		msg += fmt.Sprintf("We serve %s cuisine. ", *info.CuisineType)
+	}
+	msg += fmt.Sprintf("Address: %s, %s %s %s. ", info.AddressLine1, info.Suburb, info.State, info.Postcode)
+	if info.ParkingInfo != nil && *info.ParkingInfo != "" {
+		msg += fmt.Sprintf("Parking: %s. ", *info.ParkingInfo)
+	}
+	if len(info.UpcomingClosures) > 0 {
+		msg += fmt.Sprintf("Note: we're closed on %s. ", strings.Join(info.UpcomingClosures, ", "))
+	}
+	if len(info.WeeklyHours) > 0 {
+		msg += "Weekly hours: " + strings.Join(info.WeeklyHours, ", ") + ". "
+	}
+	if len(info.MenuItems) > 0 {
+		msg += fmt.Sprintf("We have %d items on the menu — ask me about a specific dish, price, or allergens.", len(info.MenuItems))
+	} else {
+		msg += "We don't have menu details listed yet."
+	}
+
+	log.Printf("ℹ️ VAPI restaurant_info: ok restaurant=%s date=%s itemQuery=%q", restaurantID, info.DayDate, itemQuery)
+	return packFacts("restaurantId="+restaurantID, "message="+msg)
+}
+
+// toolCancelBooking cancels the caller's own booking(s). Ownership is enforced
+// by phone: the booking must belong to a customer whose phone matches the
+// caller. With a bookingId it cancels that specific one; without one it finds
+// the caller's upcoming bookings (optionally narrowed by date) and either
+// cancels the single match or lists the matches for the model to pick.
+func (h *Handler) toolCancelBooking(ctx context.Context, args map[string]any) string {
+	phone := arg(args, "phone", "phone_number")
+	if phone == "" {
+		log.Printf("⚠️ VAPI cancel_booking: missing phone — the tool's static body field is probably not set")
+		return "I need the caller's phone number to find their bookings — please set the phone static field on this tool."
+	}
+	restaurantID := arg(args, "restaurantId", "restaurant_id")
+	if restaurantID == "" {
+		log.Printf("⚠️ VAPI cancel_booking: missing restaurantId — the tool's static body field is probably not set")
+		return "I need the restaurant id — please set the restaurantId static field on this tool."
+	}
+
+	fail := func(bookingID string, err error) string {
+		var be *utils.BookingError
+		if errors.As(err, &be) {
+			log.Printf("⚠️ VAPI cancel_booking: %s (code=%s booking=%s)", be.Message, be.Code, bookingID)
+			return fmt.Sprintf("I couldn't cancel that booking: %s", be.Message)
+		}
+		log.Printf("🔴 VAPI cancel_booking failed: %v (booking=%s)", err, bookingID)
+		return "I'm sorry, I couldn't cancel that booking right now. Please try again."
+	}
+
+	loc := h.loadRestaurantLoc(ctx, restaurantID)
+
+	// Direct cancel by id — the second call after listing multiple matches.
+	if bookingID := arg(args, "bookingId", "booking_id"); bookingID != "" {
+		b, err := utils.CancelBookingByID(ctx, h.DB, bookingID, restaurantID, phone)
+		if err != nil {
+			return fail(bookingID, err)
+		}
+		msg := fmt.Sprintf("Your booking for %s at %s for %d guests has been cancelled.",
+			formatBookingDate(b.BookingTime, loc), formatBookingClock(b.BookingTime, loc), b.PartySize)
+		log.Printf("✅ VAPI cancel_booking: cancelled bookingId=%s restaurant=%s phone=%s", b.ID, restaurantID, phone)
+		return packFacts("restaurantId="+restaurantID, "bookingId="+b.ID, "message="+msg)
+	}
+
+	// Lookup mode: find the caller's upcoming bookings, optionally by date.
+	date := arg(args, "date", "reservation_date")
+	bookings, err := utils.FindBookingsByPhone(ctx, h.DB, restaurantID, phone, date)
+	if err != nil {
+		log.Printf("🔴 VAPI cancel_booking lookup failed: %v (restaurant=%s phone=%s)", err, restaurantID, phone)
+		return "I'm sorry, I couldn't look up the bookings right now. Please try again."
+	}
+
+	if len(bookings) == 0 {
+		log.Printf("ℹ️ VAPI cancel_booking: no bookings found (restaurant=%s phone=%s date=%s)", restaurantID, phone, date)
+		return "I couldn't find any upcoming bookings for this number."
+	}
+
+	// Single match — the caller has already confirmed with the model, cancel it.
+	if len(bookings) == 1 {
+		b := bookings[0]
+		cancelled, err := utils.CancelBookingByID(ctx, h.DB, b.Booking.ID, restaurantID, phone)
+		if err != nil {
+			return fail(b.Booking.ID, err)
+		}
+		msg := fmt.Sprintf("Your booking for %s at %s for %d guests has been cancelled.",
+			formatBookingDate(cancelled.BookingTime, loc), formatBookingClock(cancelled.BookingTime, loc), cancelled.PartySize)
+		log.Printf("✅ VAPI cancel_booking: cancelled bookingId=%s restaurant=%s phone=%s", cancelled.ID, restaurantID, phone)
+		return packFacts("restaurantId="+restaurantID, "bookingId="+cancelled.ID, "message="+msg)
+	}
+
+	// Multiple matches — list them (with booking ids) and ask which one.
+	parts := make([]string, 0, len(bookings))
+	for _, b := range bookings {
+		parts = append(parts, fmt.Sprintf("%s at %s for %d guests (booking id %s)",
+			formatBookingDate(b.Booking.BookingTime, loc),
+			formatBookingClock(b.Booking.BookingTime, loc),
+			b.Booking.PartySize, b.Booking.ID))
+	}
+	msg := fmt.Sprintf("I found %d upcoming bookings: %s. Which one would you like to cancel?", len(bookings), strings.Join(parts, "; "))
+	return packFacts("restaurantId="+restaurantID, "message="+msg)
+}
+
+// loadRestaurantLoc returns the restaurant's IANA timezone for display
+// formatting, falling back to UTC.
+func (h *Handler) loadRestaurantLoc(ctx context.Context, restaurantID string) *time.Location {
+	var tzName string
+	if err := h.DB.QueryRow(ctx, `SELECT timezone FROM restaurants WHERE id = $1`, restaurantID).Scan(&tzName); err != nil || tzName == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+// formatBookingClock renders a booking instant's time in the given location
+// as a 12-hour clock (e.g. "7:00 PM").
+func formatBookingClock(rfc3339 string, loc *time.Location) string {
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return rfc3339
+	}
+	return t.In(loc).Format("3:04 PM")
+}
+
+// formatBookingDate renders a booking instant's date in the given location.
+func formatBookingDate(rfc3339 string, loc *time.Location) string {
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return rfc3339
+	}
+	return t.In(loc).Format("January 2, 2006")
+}
+
+// formatMenuItem renders a menu item for the model: name (category) — price,
+// description, allergens.
+func formatMenuItem(m *model.MenuItem) string {
+	s := m.Name
+	if m.Category != nil && *m.Category != "" {
+		s += fmt.Sprintf(" (%s)", *m.Category)
+	}
+	s += fmt.Sprintf(" — $%.2f", float64(m.PriceCents)/100)
+	if m.Description != nil && *m.Description != "" {
+		s += ". " + *m.Description
+	}
+	if len(m.Allergens) > 0 {
+		s += ". Allergens: " + strings.Join(m.Allergens, ", ")
+	}
+	return s
 }
 
 func plural(n int) string {

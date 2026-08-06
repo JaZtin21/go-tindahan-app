@@ -166,6 +166,15 @@ type CreateClosureInput struct {
 	Reason       *string `json:"reason,omitempty"`
 }
 
+type CreateMenuItemInput struct {
+	RestaurantID string   `json:"restaurantId"`
+	Name         string   `json:"name"`
+	Description  *string  `json:"description,omitempty"`
+	PriceCents   int      `json:"priceCents"`
+	Category     *string  `json:"category,omitempty"`
+	Allergens    []string `json:"allergens,omitempty"`
+}
+
 type CreatePostInput struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
@@ -321,6 +330,18 @@ type ItemActionHistorySyncInput struct {
 	Action          string  `json:"action"`
 	Quantity        *int    `json:"quantity,omitempty"`
 	ClientCreatedAt string  `json:"clientCreatedAt"`
+}
+
+type MenuItem struct {
+	ID           string   `json:"id"`
+	RestaurantID string   `json:"restaurantId"`
+	Name         string   `json:"name"`
+	Description  *string  `json:"description,omitempty"`
+	PriceCents   int      `json:"priceCents"`
+	Category     *string  `json:"category,omitempty"`
+	IsAvailable  bool     `json:"isAvailable"`
+	Allergens    []string `json:"allergens"`
+	SortOrder    int      `json:"sortOrder"`
 }
 
 type Mutation struct {
@@ -487,6 +508,8 @@ type Restaurant struct {
 	DefaultTurnDurationMin int                `json:"defaultTurnDurationMin"`
 	BookingBufferMin       int                `json:"bookingBufferMin"`
 	MaxPartySize           int                `json:"maxPartySize"`
+	Description            *string            `json:"description,omitempty"`
+	ParkingInfo            *string            `json:"parkingInfo,omitempty"`
 	IsActive               bool               `json:"isActive"`
 	Tables                 []*RestaurantTable `json:"tables"`
 	OperatingHours         []*OperatingHours  `json:"operatingHours"`
@@ -677,6 +700,16 @@ type UpdateInventoryItemInput struct {
 	VisualClassKeys []string        `json:"visualClassKeys,omitempty"`
 }
 
+type UpdateMenuItemInput struct {
+	Name        *string  `json:"name,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	PriceCents  *int     `json:"priceCents,omitempty"`
+	Category    *string  `json:"category,omitempty"`
+	IsAvailable *bool    `json:"isAvailable,omitempty"`
+	Allergens   []string `json:"allergens,omitempty"`
+	SortOrder   *int     `json:"sortOrder,omitempty"`
+}
+
 type UpdatePostInput struct {
 	ID      string `json:"id"`
 	Title   string `json:"title"`
@@ -696,6 +729,8 @@ type UpdateRestaurantInput struct {
 	DefaultTurnDurationMin *int         `json:"defaultTurnDurationMin,omitempty"`
 	BookingBufferMin       *int         `json:"bookingBufferMin,omitempty"`
 	MaxPartySize           *int         `json:"maxPartySize,omitempty"`
+	Description            *string      `json:"description,omitempty"`
+	ParkingInfo            *string      `json:"parkingInfo,omitempty"`
 	IsActive               *bool        `json:"isActive,omitempty"`
 }
 
