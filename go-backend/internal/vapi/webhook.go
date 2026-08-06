@@ -199,10 +199,10 @@ func (h *Handler) Handle(c *gin.Context) {
 			callID = arg(args, "callId", "call_id")
 		}
 		if phone == "" {
-			phone = arg(args, "phone", "phone_number")
+			phone = sanitizePhone(arg(args, "phone", "phone_number"))
 		}
 		if phone == "" {
-			phone = arg(args, "callerNumber", "caller_number")
+			phone = sanitizePhone(arg(args, "callerNumber", "caller_number"))
 		}
 		log.Printf("📥 VAPI WEBHOOK: apiRequest bare tool call name=%q args=%d callId=%q from %s",
 			name, len(args), callID, remote)
@@ -488,6 +488,17 @@ func parseArguments(v any) (map[string]any, error) {
 	return nil, fmt.Errorf("unsupported arguments type %T", v)
 }
 
+// sanitizePhone rejects values that aren't real phone numbers — most
+// importantly unresolved Vapi template literals like "{{customer.number}}"
+// that can leak into static body fields when Liquid doesn't resolve them.
+// Storing those would pollute call_logs rows and customer records.
+func sanitizePhone(s string) string {
+	if s == "" || strings.Contains(s, "{{") || strings.Contains(s, "}}") {
+		return ""
+	}
+	return s
+}
+
 // unpackMessage extracts the human "message=..." fact from a packed result so
 // the apiRequest response body handed back to the LLM is clean prose (the
 // key=value facts stay server-side in the call log). Falls back to the whole
@@ -539,10 +550,10 @@ func callerPhone(req webhookRequest) string {
 		}
 		switch v := c.Number.(type) {
 		case string:
-			return v
+			return sanitizePhone(v)
 		case map[string]any:
 			if s, ok := v["e164"].(string); ok {
-				return s
+				return sanitizePhone(s)
 			}
 		}
 		return ""
@@ -750,7 +761,10 @@ func (h *Handler) toolCheckAvailability(ctx context.Context, args map[string]any
 }
 
 func (h *Handler) toolFindOrCreateCustomer(ctx context.Context, args map[string]any) string {
-	phone := arg(args, "phone", "phone_number")
+	phone := sanitizePhone(arg(args, "phone", "phone_number"))
+	if phone == "" {
+		phone = sanitizePhone(arg(args, "callerNumber", "caller_number"))
+	}
 	if phone == "" {
 		return "I need the caller's phone number to find their account."
 	}
@@ -1030,7 +1044,10 @@ func (h *Handler) toolRestaurantInfo(ctx context.Context, args map[string]any) s
 // the caller's upcoming bookings (optionally narrowed by date) and either
 // cancels the single match or lists the matches for the model to pick.
 func (h *Handler) toolCancelBooking(ctx context.Context, args map[string]any) string {
-	phone := arg(args, "phone", "phone_number")
+	phone := sanitizePhone(arg(args, "phone", "phone_number"))
+	if phone == "" {
+		phone = sanitizePhone(arg(args, "callerNumber", "caller_number"))
+	}
 	if phone == "" {
 		log.Printf("⚠️ VAPI cancel_booking: missing phone — the tool's static body field is probably not set")
 		return "I need the caller's phone number to find their bookings — please set the phone static field on this tool."
