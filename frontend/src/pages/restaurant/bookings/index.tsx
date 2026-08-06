@@ -109,7 +109,7 @@ export const BookingsPage = () => {
                         type="date"
                         value={selectedDate}
                         onChange={(e) => dispatch(setSelectedDate(e.target.value))}
-                        className="px-3 py-2 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200"
+                        className="px-3 py-2 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200 [&::-webkit-calendar-picker-indicator]:invert"
                     />
                 </div>
             </div>

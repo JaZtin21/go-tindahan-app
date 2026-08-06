@@ -70,11 +70,10 @@ export const RestaurantLogin = () => {
                 <button
                     type="submit"
                     disabled={isLoading}
-                    className={`mt-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
-                        isLoading
+                    className={`mt-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${isLoading
                             ? 'bg-brand-gold/40 text-bg-black/50 cursor-not-allowed'
                             : 'bg-brand-gold text-bg-black hover:bg-brand-gold-hover cursor-pointer'
-                    }`}
+                        }`}
                 >
                     {isLoading ? 'Signing in...' : 'Sign in'}
                 </button>
