@@ -42,6 +42,7 @@ interface InfoForm {
     cuisineType: string;
     description: string;
     parkingInfo: string;
+    defaultTurnDurationMin: string;
 }
 
 interface MenuItemInput {
@@ -69,7 +70,7 @@ export const InfoPage = () => {
 
     const [form, setForm] = useState<InfoForm>({
         name: '', phone: '', email: '', addressLine1: '', suburb: '', state: '', postcode: '',
-        cuisineType: '', description: '', parkingInfo: '',
+        cuisineType: '', description: '', parkingInfo: '', defaultTurnDurationMin: '',
     });
     const [infoSaved, setInfoSaved] = useState(false);
     // Inline banner for mutation failures (save info / menu item / delete).
@@ -89,6 +90,7 @@ export const InfoPage = () => {
                 cuisineType: r.cuisineType ?? '',
                 description: r.description ?? '',
                 parkingInfo: r.parkingInfo ?? '',
+                defaultTurnDurationMin: r.defaultTurnDurationMin != null ? String(r.defaultTurnDurationMin) : '',
             });
         }
     }, [infoData]);
@@ -99,7 +101,20 @@ export const InfoPage = () => {
         if (!activeRestaurantId) return;
         setInfoSaved(false);
         try {
-            const { data } = await updateRestaurant({ variables: { id: activeRestaurantId, input: form } });
+            // Turn duration is a number on the API — keep it as a string in the
+            // form input, convert at save time. An empty/invalid field sends
+            // undefined so the backend COALESCE leaves the existing value
+            // untouched. A zero would create an empty booking window and defeat
+            // the overlap EXCLUDE constraint, so only finite positive integers
+            // are allowed through.
+            const dur = form.defaultTurnDurationMin.trim();
+            const parsed = dur ? Number(dur) : NaN;
+            const input = {
+                ...form,
+                defaultTurnDurationMin:
+                    Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined,
+            };
+            const { data } = await updateRestaurant({ variables: { id: activeRestaurantId, input } });
             const saved = (data as any)?.updateRestaurant as Restaurant | undefined;
             if (saved) dispatch(updateRestaurantInState(saved));
             setInfoSaved(true);
@@ -331,6 +346,22 @@ export const InfoPage = () => {
                         <div>
                             <label className={labelCls}>Cuisine</label>
                             <input className={inputCls} value={form.cuisineType} onChange={(e) => setForm({ ...form, cuisineType: e.target.value })} placeholder="e.g. Italian" />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Seating duration (minutes)</label>
+                            <input
+                                type="number"
+                                min={15}
+                                max={480}
+                                step={15}
+                                className={inputCls}
+                                value={form.defaultTurnDurationMin}
+                                onChange={(e) => setForm({ ...form, defaultTurnDurationMin: e.target.value })}
+                                placeholder="e.g. 90"
+                            />
+                            <p className="mt-1 text-[10px] font-bold leading-snug text-text-muted">
+                                How long one table seating lasts — applies to new bookings only.
+                            </p>
                         </div>
                         <div className="sm:col-span-2">
                             <label className={labelCls}>Address line</label>
