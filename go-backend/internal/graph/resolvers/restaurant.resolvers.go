@@ -262,7 +262,7 @@ func (r *mutationResolver) UpdateMenuItem(ctx context.Context, id string, input 
 	`
 
 	var m model.MenuItem
-	var desc, category string
+	var desc, category *string
 	var allergens []string
 	err := r.Resolver.DB.QueryRow(ctx, query,
 		input.Name, input.Description, input.PriceCents, input.Category, input.IsAvailable, input.Allergens, input.SortOrder, id,
@@ -286,8 +286,8 @@ func (r *mutationResolver) UpdateMenuItem(ctx context.Context, id string, input 
 		return nil, nil
 	}
 
-	m.Description = &desc
-	m.Category = &category
+	m.Description = desc
+	m.Category = category
 	m.Allergens = allergens
 	return &m, nil
 }
@@ -489,11 +489,12 @@ func (r *mutationResolver) CreateClosure(ctx context.Context, input model.Create
 	}
 
 	var c model.Closure
+	var closureDate time.Time
 	err := r.Resolver.DB.QueryRow(ctx, `
 		INSERT INTO closures (restaurant_id, closure_date, reason)
 		VALUES ($1, $2, $3)
 		RETURNING id, closure_date, reason
-	`, input.RestaurantID, input.ClosureDate, input.Reason).Scan(&c.ID, &c.ClosureDate, &c.Reason)
+	`, input.RestaurantID, input.ClosureDate, input.Reason).Scan(&c.ID, &closureDate, &c.Reason)
 
 	if err != nil {
 		if utils.IsUniqueViolation(err) {
@@ -511,6 +512,7 @@ func (r *mutationResolver) CreateClosure(ctx context.Context, input model.Create
 		return nil, nil
 	}
 
+	c.ClosureDate = closureDate.Format("2006-01-02")
 	return &c, nil
 }
 
@@ -1197,10 +1199,14 @@ func (r *queryResolver) CallLogs(ctx context.Context, restaurantID string) ([]*m
 		return nil, nil
 	}
 	query := `
-		SELECT id, restaurant_id, vapi_call_id, customer_phone, booking_id, transcript, outcome, created_at
-		FROM call_logs
-		WHERE restaurant_id = $1
-		ORDER BY created_at DESC
+		SELECT cl.id, cl.restaurant_id, cl.vapi_call_id, cl.customer_phone,
+		       COALESCE(cl.customer_name, cu.name) AS customer_name,
+		       cl.booking_id, cl.transcript, cl.outcome, cl.created_at
+		FROM call_logs cl
+		LEFT JOIN bookings b ON b.id = cl.booking_id
+		LEFT JOIN customers cu ON cu.id = b.customer_id
+		WHERE cl.restaurant_id = $1
+		ORDER BY cl.created_at DESC
 	`
 
 	rows, err := r.Resolver.DB.Query(ctx, query, restaurantID)
@@ -1214,9 +1220,9 @@ func (r *queryResolver) CallLogs(ctx context.Context, restaurantID string) ([]*m
 	for rows.Next() {
 		var c model.CallLog
 		var createdAt time.Time
-		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt); err != nil {
-			log.Printf("⚠️ Failed to scan call log row: %v", err)
-			continue
+		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.CustomerName, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt); err != nil {
+		log.Printf("⚠️ Failed to scan call log row: %v", err)
+		continue
 		}
 		c.CreatedAt = createdAt.Format(time.RFC3339)
 		results = append(results, &c)
@@ -1243,9 +1249,14 @@ func (r *queryResolver) CallLog(ctx context.Context, vapiCallID string) (*model.
 	var c model.CallLog
 	var createdAt time.Time
 	err = r.Resolver.DB.QueryRow(ctx, `
-		SELECT id, restaurant_id, vapi_call_id, customer_phone, booking_id, transcript, outcome, created_at
-		FROM call_logs WHERE vapi_call_id = $1
-	`, vapiCallID).Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt)
+		SELECT cl.id, cl.restaurant_id, cl.vapi_call_id, cl.customer_phone,
+		       COALESCE(cl.customer_name, cu.name) AS customer_name,
+		       cl.booking_id, cl.transcript, cl.outcome, cl.created_at
+		FROM call_logs cl
+		LEFT JOIN bookings b ON b.id = cl.booking_id
+		LEFT JOIN customers cu ON cu.id = b.customer_id
+		WHERE cl.vapi_call_id = $1
+	`, vapiCallID).Scan(&c.ID, &c.RestaurantID, &c.VapiCallID, &c.CustomerPhone, &c.CustomerName, &c.BookingID, &c.Transcript, &c.Outcome, &createdAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

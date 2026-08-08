@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 
 interface BookingTimelineProps {
@@ -10,7 +10,10 @@ interface BookingTimelineProps {
     onSelect: (booking: Booking) => void;
     onCancel: (id: string) => void;
     onAssignTable: (bookingId: string, tableId: string) => void;
-    cancelling: boolean;
+    /** Booking id currently being cancelled (shows a spinner on its cancel button). */
+    cancellingId?: string | null;
+    /** Booking id currently being assigned a table (shows a loader on its select). */
+    assigningId?: string | null;
 }
 
 const MIN_HOUR = 0;
@@ -68,7 +71,7 @@ function fmtTime(iso: string): string {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel, onAssignTable, cancelling }: BookingTimelineProps) => {
+export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel, onAssignTable, cancellingId = null, assigningId = null }: BookingTimelineProps) => {
     const unassigned = bookings.filter((b) => !b.tableId && b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
     const HOURS = useMemo(() => buildHourRange(bookings, dayHours), [bookings, dayHours]);
 
@@ -92,19 +95,25 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel
                                     {b.specialRequests || b.source || 'No notes'}
                                 </div>
                                 {tables.length > 0 && (
-                                    <select
-                                        value=""
-                                        onClick={(e) => e.stopPropagation()}
-                                        onChange={(e) => e.target.value && onAssignTable(b.id, e.target.value)}
-                                        className="px-2 py-1.5 rounded-lg border border-border-main bg-bg-primary text-text-sub text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-gold/40 cursor-pointer"
-                                    >
-                                        <option value="">Assign table…</option>
-                                        {tables.map((t) => (
-                                            <option key={t.id} value={t.id}>
-                                                {t.section ? `${t.section} · ` : ''}{t.tableNumber}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="flex items-center gap-1.5">
+                                        <select
+                                            value=""
+                                            disabled={assigningId === b.id}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => e.target.value && onAssignTable(b.id, e.target.value)}
+                                            className="px-2 py-1.5 rounded-lg border border-border-main bg-bg-primary text-text-sub text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-gold/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <option value="">Assign table…</option>
+                                            {tables.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.section ? `${t.section} · ` : ''}{t.tableNumber}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {assigningId === b.id && (
+                                            <Loader2 size={13} strokeWidth={2.4} className="animate-spin text-brand-gold" />
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         ))}
@@ -123,7 +132,7 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel
                         const tableBookings = bookings.filter((b) => b.tableId === table.id && b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
                         return (
                             <div key={table.id} className="border border-border-main/60 rounded-xl min-w-[140px] bg-bg-primary/60 backdrop-blur-sm">
-                                <div className="px-2.5 py-2 border-b border-border-sub bg-bg-secondary/70 rounded-t-xl">
+                                <div className="px-2.5 py-2 border-b border-border-sub bg-bg-primary rounded-t-xl">
                                     <div className="font-black text-xs text-text-main">
                                         {table.section ? `${table.section} · ` : ''}{table.tableNumber}
                                     </div>
@@ -159,12 +168,16 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel
                                                                     e.stopPropagation();
                                                                     onCancel(b.id);
                                                                 }}
-                                                                disabled={cancelling}
+                                                                disabled={cancellingId === b.id}
                                                                 className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md border-none bg-white/30 text-bg-black backdrop-blur-sm transition-colors duration-150 hover:bg-white/60 disabled:opacity-50"
                                                                 title="Cancel booking"
                                                                 aria-label={`Cancel booking at ${fmtTime(b.bookingTime)}`}
                                                             >
-                                                                <X size={10} strokeWidth={3} />
+                                                                {cancellingId === b.id ? (
+                                                                    <Loader2 size={10} strokeWidth={3} className="animate-spin" />
+                                                                ) : (
+                                                                    <X size={10} strokeWidth={3} />
+                                                                )}
                                                             </button>
                                                         )}
                                                     </div>

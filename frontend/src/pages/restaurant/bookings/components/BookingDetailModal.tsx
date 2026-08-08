@@ -32,11 +32,6 @@ function fmtTime(iso: string): string {
     return d.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function fmtHour(iso: string): string {
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
 export const BookingDetailModal = ({ booking, tables, onClose }: BookingDetailModalProps) => {
     // Close on Escape.
     useEffect(() => {
@@ -65,12 +60,12 @@ export const BookingDetailModal = ({ booking, tables, onClose }: BookingDetailMo
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="glass-strong animate-[modal-pop_0.18s_ease-out] max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-3xl p-6 sm:p-7"
+                className="animate-[modal-pop_0.18s_ease-out] flex max-h-[90vh] w-full max-w-[480px] flex-col overflow-hidden rounded-3xl border border-border-main/70 bg-bg-primary shadow-xs shadow-black/10"
             >
                 {/* Header */}
-                <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border-main/60 bg-bg-secondary/60 px-6 py-5">
                     <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold/25 to-brand-green/25 text-brand-gold ring-1 ring-brand-gold/20">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold/25 to-brand-green/25 text-brand-gold ring-1 ring-brand-gold/20">
                             <CalendarDays size={20} strokeWidth={2.2} />
                         </span>
                         <div>
@@ -80,7 +75,7 @@ export const BookingDetailModal = ({ booking, tables, onClose }: BookingDetailMo
                             <p className="m-0 text-[11px] font-bold text-text-muted">Booking details</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${statusStyle}`}>
                             {booking.status.replace('_', ' ')}
                         </span>
@@ -94,66 +89,69 @@ export const BookingDetailModal = ({ booking, tables, onClose }: BookingDetailMo
                     </div>
                 </div>
 
-                {/* Customer */}
-                <div className="mb-4 rounded-2xl border border-brand-gold/25 bg-gradient-to-br from-brand-gold/10 to-transparent p-4 backdrop-blur-sm">
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-text-muted">Customer</p>
-                    <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-gold/15 text-base font-black text-brand-gold ring-1 ring-brand-gold/30">
-                            {(customer?.name ?? 'G')[0].toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                            <p className="m-0 truncate text-sm font-black text-text-main">
-                                {customer?.name || 'Guest (no name)'}
-                            </p>
-                            <div className="mt-0.5 flex flex-col gap-1">
-                                {customer?.phone && (
-                                    <span className="flex items-center gap-1.5 text-xs font-bold text-text-sub">
-                                        <Phone size={12} strokeWidth={2.2} className="text-brand-gold" />
-                                        {customer.phone}
-                                    </span>
-                                )}
-                                {customer?.email && (
-                                    <span className="flex items-center gap-1.5 truncate text-xs font-bold text-text-sub">
-                                        <Mail size={12} strokeWidth={2.2} className="text-brand-gold" />
-                                        {customer.email}
-                                    </span>
-                                )}
+                {/* Body */}
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6 sm:p-7">
+                    {/* Customer */}
+                    <div className="rounded-2xl border border-brand-gold/25 bg-gradient-to-br from-brand-gold/10 to-transparent p-4">
+                        <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-text-muted">Customer</p>
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-gold/15 text-base font-black text-brand-gold ring-1 ring-brand-gold/30">
+                                {(customer?.name ?? 'G')[0].toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="m-0 truncate text-sm font-black text-text-main">
+                                    {customer?.name || 'Guest (no name)'}
+                                </p>
+                                <div className="mt-0.5 flex flex-col gap-1">
+                                    {customer?.phone && (
+                                        <span className="flex items-center gap-1.5 text-xs font-bold text-text-sub">
+                                            <Phone size={12} strokeWidth={2.2} className="text-brand-gold" />
+                                            {customer.phone}
+                                        </span>
+                                    )}
+                                    {customer?.email && (
+                                        <span className="flex items-center gap-1.5 truncate text-xs font-bold text-text-sub">
+                                            <Mail size={12} strokeWidth={2.2} className="text-brand-gold" />
+                                            {customer.email}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Meta tiles */}
-                <div className="mb-4 grid grid-cols-2 gap-2.5">
-                    {meta.map(({ icon: Icon, label, value }) => (
-                        <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border-main/60 bg-bg-primary/60 px-3 py-2.5 backdrop-blur-sm">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-green/15 text-brand-green">
-                                <Icon size={14} strokeWidth={2.2} />
-                            </span>
-                            <div className="min-w-0">
-                                <p className="m-0 text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</p>
-                                <p className="m-0 truncate text-xs font-bold text-text-main">{value}</p>
+                    {/* Meta tiles */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {meta.map(({ icon: Icon, label, value }) => (
+                            <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border-main/60 bg-bg-secondary px-3 py-2.5">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-green/15 text-brand-green">
+                                    <Icon size={14} strokeWidth={2.2} />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="m-0 text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</p>
+                                    <p className="m-0 truncate text-xs font-bold text-text-main">{value}</p>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
 
-                {/* Notes */}
-                <div className="rounded-xl border border-border-main/60 bg-bg-primary/60 p-3.5 backdrop-blur-sm">
-                    <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-text-muted">
-                        <AlignLeft size={12} strokeWidth={2.2} className="text-brand-gold" />
-                        Notes / special requests
+                    {/* Notes */}
+                    <div className="rounded-xl border border-border-main/60 bg-bg-secondary p-3.5">
+                        <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-text-muted">
+                            <AlignLeft size={12} strokeWidth={2.2} className="text-brand-gold" />
+                            Notes / special requests
+                        </p>
+                        {booking.specialRequests ? (
+                            <p className="m-0 text-[13px] leading-relaxed text-text-sub font-medium">{booking.specialRequests}</p>
+                        ) : (
+                            <p className="m-0 text-xs font-bold text-text-muted">No special requests.</p>
+                        )}
+                    </div>
+
+                    <p className="mt-auto pt-1 text-center text-[10px] font-bold text-text-muted">
+                        Booked via {booking.source.replace('_', ' ').toLowerCase()} · {booking.paymentStatus.replace('_', ' ').toLowerCase()} payment
                     </p>
-                    {booking.specialRequests ? (
-                        <p className="m-0 text-[13px] leading-relaxed text-text-sub font-medium">{booking.specialRequests}</p>
-                    ) : (
-                        <p className="m-0 text-xs font-bold text-text-muted">No special requests.</p>
-                    )}
                 </div>
-
-                <p className="mt-4 text-center text-[10px] font-bold text-text-muted">
-                    Booked via {booking.source.replace('_', ' ').toLowerCase()} · {booking.paymentStatus.replace('_', ' ').toLowerCase()} payment
-                </p>
             </div>
         </div>
     );

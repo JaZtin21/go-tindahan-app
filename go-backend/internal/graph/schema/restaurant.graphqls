@@ -159,6 +159,7 @@ type CallLog {
   restaurantId: String
   vapiCallId: String!
   customerPhone: String
+  customerName: String
   bookingId: String
   transcript: String
   outcome: CallOutcome

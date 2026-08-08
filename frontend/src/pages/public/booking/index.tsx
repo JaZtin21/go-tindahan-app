@@ -146,7 +146,7 @@ export const PublicBookingPage = () => {
                                 setSlot(null);
                                 setResult(null);
                             }}
-                            className="mt-6 cursor-pointer rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99]"
+                            className="mt-6 cursor-pointer rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white shadow-xs shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99]"
                         >
                             Book another table
                         </button>

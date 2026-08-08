@@ -38,7 +38,7 @@ export const RestaurantList = () => {
                 </p>
                 <Link
                     to="/create-restaurant"
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-lg shadow-brand-gold/20"
+                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-xs shadow-brand-gold/20"
                 >
                     <Plus size={16} strokeWidth={2.5} />
                     Create your first restaurant
@@ -58,7 +58,7 @@ export const RestaurantList = () => {
                 </div>
                 <Link
                     to="/create-restaurant"
-                    className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-xs font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-md shadow-brand-gold/20"
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-xs font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-xs shadow-brand-gold/20"
                 >
                     <Plus size={15} strokeWidth={2.5} />
                     New restaurant

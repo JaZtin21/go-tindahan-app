@@ -76,7 +76,7 @@ export const RestaurantDashboard = () => {
                 <div className="relative">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-center gap-4">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-lg shadow-brand-gold/25">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                                 <UtensilsCrossed size={26} strokeWidth={2.2} />
                             </div>
                             <div>

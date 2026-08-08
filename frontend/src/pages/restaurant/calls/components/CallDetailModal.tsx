@@ -22,7 +22,13 @@ export const CallDetailModal = ({ call, onClose }: CallDetailModalProps) => {
     const outcomeStyle = OUTCOME_STYLES[call.outcome ?? ''] ?? OUTCOME_STYLES.ABANDONED;
 
     const details = [
-        { icon: User, label: 'Caller', value: call.customerPhone || 'Not captured', chip: 'bg-brand-gold/15 text-brand-gold' },
+        {
+            icon: User,
+            label: 'Caller',
+            value: call.customerName || call.customerPhone || 'Not captured',
+            sub: call.customerName ? call.customerPhone : undefined,
+            chip: 'bg-brand-gold/15 text-brand-gold',
+        },
         { icon: CalendarCheck, label: 'Booking', value: call.bookingId ? call.bookingId.slice(0, 8) : 'None created', chip: 'bg-brand-green/15 text-brand-green' },
         { icon: Activity, label: 'Outcome', value: call.outcome ? call.outcome.replace('_', ' ') : '—', chip: outcomeStyle },
     ];
@@ -43,10 +49,10 @@ export const CallDetailModal = ({ call, onClose }: CallDetailModalProps) => {
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="glass-strong animate-[modal-pop_0.18s_ease-out] flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden rounded-3xl"
+                className="animate-[modal-pop_0.18s_ease-out] flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden rounded-3xl border border-border-main/70 bg-bg-primary shadow-xs shadow-black/10"
             >
                 {/* Header */}
-                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-main/60 bg-bg-secondary/70 px-5 py-4">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-main/60 bg-bg-secondary/60 px-6 py-5">
                     <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
                             <PhoneCall size={18} strokeWidth={2.2} />
@@ -70,22 +76,23 @@ export const CallDetailModal = ({ call, onClose }: CallDetailModalProps) => {
                 </div>
 
                 {/* Details */}
-                <div className="grid shrink-0 grid-cols-1 gap-2.5 border-b border-border-main/60 px-5 py-4 sm:grid-cols-3">
-                    {details.map(({ icon: Icon, label, value, chip }) => (
-                        <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border-main/60 bg-bg-primary/60 px-3 py-2.5 backdrop-blur-sm">
+                <div className="grid shrink-0 grid-cols-1 gap-2.5 border-b border-border-main/60 px-6 py-4 sm:grid-cols-3">
+                    {details.map(({ icon: Icon, label, value, sub, chip }) => (
+                        <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border-main/60 bg-bg-secondary px-3 py-2.5">
                             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${chip}`}>
                                 <Icon size={14} strokeWidth={2.2} />
                             </span>
                             <div className="min-w-0">
                                 <p className="m-0 text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</p>
                                 <p className="m-0 truncate text-xs font-bold text-text-main">{value}</p>
+                                {sub && <p className="m-0 truncate text-[10px] font-bold text-text-muted">{sub}</p>}
                             </div>
                         </div>
                     ))}
                 </div>
 
                 {/* Transcript (scrollable) */}
-                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                     <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-black tracking-widest text-text-muted">
                         <FileText size={12} strokeWidth={2.2} className="text-brand-gold" />
                         TRANSCRIPT

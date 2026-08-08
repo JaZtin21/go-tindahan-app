@@ -9,6 +9,7 @@ import tablesReducer from './tablesSlice';
 import settingsReducer from './settingsSlice';
 import waitlistReducer from './waitlistSlice';
 import callLogsReducer from './callLogsSlice';
+import menuReducer from './menuSlice';
 
 export const store = configureStore({
     reducer: {
@@ -21,7 +22,8 @@ export const store = configureStore({
         tables: tablesReducer,
         settings: settingsReducer,
         waitlist: waitlistReducer,
-        callLogs: callLogsReducer
+        callLogs: callLogsReducer,
+        menu: menuReducer
     },
 });
 

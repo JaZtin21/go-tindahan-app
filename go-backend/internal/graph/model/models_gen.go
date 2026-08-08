@@ -71,6 +71,7 @@ type CallLog struct {
 	RestaurantID  *string      `json:"restaurantId,omitempty"`
 	VapiCallID    string       `json:"vapiCallId"`
 	CustomerPhone *string      `json:"customerPhone,omitempty"`
+	CustomerName  *string      `json:"customerName,omitempty"`
 	BookingID     *string      `json:"bookingId,omitempty"`
 	Transcript    *string      `json:"transcript,omitempty"`
 	Outcome       *CallOutcome `json:"outcome,omitempty"`

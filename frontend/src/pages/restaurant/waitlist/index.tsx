@@ -22,7 +22,7 @@ export const WaitlistPage = () => {
     const { data, loading } = useQuery(GET_WAITLIST_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '', status: statusFilter },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
     // Sync fetched entries into Redux whenever they arrive.
@@ -97,11 +97,10 @@ export const WaitlistPage = () => {
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
-                            className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer active:scale-95 ${
-                                statusFilter === s
-                                    ? 'bg-brand-gold text-text-white shadow-md shadow-brand-gold/20'
-                                    : 'border border-border-main/70 bg-bg-primary/70 text-text-sub hover:bg-item-hover'
-                            }`}
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer active:scale-95 ${statusFilter === s
+                                    ? 'bg-brand-gold text-text-white shadow-xs shadow-brand-gold/20'
+                                    : 'border border-border-main/70 bg-bg-primary text-text-sub hover:bg-item-hover'
+                                }`}
                         >
                             {s === 'WAITING' ? 'Waiting' : 'Notified'}
                         </button>

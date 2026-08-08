@@ -34,7 +34,7 @@ export const RestaurantLayout = () => {
             />
 
             <div className={`min-h-screen transition-all duration-200 ease-in-out ${isSidebarOpen ? 'md:pl-56' : 'md:pl-16'}`}>
-                <nav className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border-main/60 bg-bg-primary/70 px-4 py-3 shadow-sm shadow-black/[0.03] backdrop-blur-xl md:px-8">
+                <nav className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border-main/60 bg-bg-primary px-4 py-3 shadow-sm shadow-black/[0.03] backdrop-blur-xl md:px-8">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setIsSidebarOpen((v) => !v)}
@@ -48,7 +48,7 @@ export const RestaurantLayout = () => {
                             to="/"
                             className="flex items-center gap-2.5 no-underline transition-colors duration-200"
                         >
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-md shadow-brand-gold/25">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                                 <UtensilsCrossed size={16} strokeWidth={2.2} />
                             </span>
                             <span className="text-base font-black tracking-tight text-text-main">Hostly</span>
@@ -75,7 +75,7 @@ export const RestaurantLayout = () => {
                         )}
                         <button
                             onClick={handleLogout}
-                            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-border-main/70 bg-bg-primary/70 px-3 py-2 text-xs font-bold text-text-sub transition-all duration-200 hover:border-brand-red/40 hover:bg-brand-red/10 hover:text-brand-red active:scale-95"
+                            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-border-main/70 bg-bg-primary px-3 py-2 text-xs font-bold text-text-sub transition-all duration-200 hover:border-brand-red/40 hover:bg-brand-red/10 hover:text-brand-red active:scale-95"
                         >
                             <LogOut size={14} strokeWidth={2.2} />
                             <span className="hidden sm:inline">Sign out</span>

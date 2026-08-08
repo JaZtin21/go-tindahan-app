@@ -75,6 +75,7 @@ type ComplexityRoot struct {
 	CallLog struct {
 		BookingID     func(childComplexity int) int
 		CreatedAt     func(childComplexity int) int
+		CustomerName  func(childComplexity int) int
 		CustomerPhone func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Outcome       func(childComplexity int) int
@@ -781,6 +782,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CallLog.CreatedAt(childComplexity), true
+	case "CallLog.customerName":
+		if e.ComplexityRoot.CallLog.CustomerName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CallLog.CustomerName(childComplexity), true
 	case "CallLog.customerPhone":
 		if e.ComplexityRoot.CallLog.CustomerPhone == nil {
 			break
@@ -3306,6 +3313,8 @@ func (ec *executionContext) childFields_CallLog(ctx context.Context, field graph
 		return ec.fieldContext_CallLog_vapiCallId(ctx, field)
 	case "customerPhone":
 		return ec.fieldContext_CallLog_customerPhone(ctx, field)
+	case "customerName":
+		return ec.fieldContext_CallLog_customerName(ctx, field)
 	case "bookingId":
 		return ec.fieldContext_CallLog_bookingId(ctx, field)
 	case "transcript":
@@ -5996,6 +6005,29 @@ func (ec *executionContext) _CallLog_customerPhone(ctx context.Context, field gr
 	)
 }
 func (ec *executionContext) fieldContext_CallLog_customerPhone(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CallLog", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CallLog_customerName(ctx context.Context, field graphql.CollectedField, obj *model.CallLog) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CallLog_customerName(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CustomerName, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CallLog_customerName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("CallLog", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -19606,6 +19638,11 @@ func (ec *executionContext) _CallLog(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "customerPhone":
 			out.Values[i] = ec._CallLog_customerPhone(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "customerName":
+			out.Values[i] = ec._CallLog_customerName(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

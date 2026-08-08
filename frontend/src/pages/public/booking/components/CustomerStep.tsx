@@ -23,7 +23,7 @@ interface CustomerStepProps {
 }
 
 const inputCls =
-    'w-full rounded-xl border border-border-main/70 bg-bg-primary/70 px-4 py-2.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 transition-all';
+    'w-full rounded-xl border border-border-main/70 bg-bg-primary px-4 py-2.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 transition-all';
 
 export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDone, onBack }: CustomerStepProps) => {
     const [name, setName] = useState('');
@@ -147,7 +147,7 @@ export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDon
                 <button
                     onClick={handleConfirm}
                     disabled={submitting}
-                    className="flex-1 cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex-1 cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-xs shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {submitting ? 'Booking your table…' : 'Confirm booking'}
                 </button>

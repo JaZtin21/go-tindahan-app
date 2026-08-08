@@ -36,7 +36,7 @@ export const RestaurantRegister = () => {
             <div className="flex items-center justify-center px-4 py-12 sm:px-8 lg:order-2">
                 <div className="w-full max-w-[470px]">
                     <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-lg shadow-brand-gold/25">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                             <UtensilsCrossed size={22} strokeWidth={2.2} />
                         </div>
                         <span className="text-xl font-black tracking-tight text-text-main">Hostly</span>
@@ -92,7 +92,7 @@ export const RestaurantRegister = () => {
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className={`mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black transition-all duration-200 active:scale-[0.98] shadow-lg shadow-brand-gold/20 ${
+                                className={`mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black transition-all duration-200 active:scale-[0.98] shadow-xs shadow-brand-gold/20 ${
                                     isLoading
                                         ? 'cursor-not-allowed bg-brand-gold/40 text-text-white/60'
                                         : 'cursor-pointer bg-brand-gold text-text-white hover:bg-brand-gold-hover hover:shadow-brand-gold/30'
@@ -135,7 +135,7 @@ export const RestaurantRegister = () => {
                 </div>
 
                 <div className="relative flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-lg shadow-brand-gold/25">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                         <UtensilsCrossed size={22} strokeWidth={2.2} />
                     </div>
                     <span className="text-xl font-black tracking-tight text-text-main">Hostly</span>

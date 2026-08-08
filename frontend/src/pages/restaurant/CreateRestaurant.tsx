@@ -11,6 +11,7 @@ import {
     CheckCircle2,
     ArrowRight,
     Hash,
+    Loader2,
 } from 'lucide-react';
 import { CREATE_RESTAURANT_MUTATION } from '~/api/graphql';
 import { useRestaurantAuth } from '~/config';
@@ -224,12 +225,13 @@ export const CreateRestaurant = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black transition-all duration-200 active:scale-[0.98] shadow-lg shadow-brand-gold/20 ${
+                        className={`mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black transition-all duration-200 active:scale-[0.98] shadow-xs shadow-brand-gold/20 ${
                             loading
                                 ? 'cursor-not-allowed bg-brand-gold/40 text-text-white/60'
                                 : 'cursor-pointer bg-brand-gold text-text-white hover:bg-brand-gold-hover hover:shadow-brand-gold/30'
                         }`}
                     >
+                        {loading && <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />}
                         {loading ? 'Creating…' : 'Create restaurant'}
                         {!loading && <ArrowRight size={16} strokeWidth={2.5} />}
                     </button>

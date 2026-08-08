@@ -10,10 +10,10 @@ interface PublicHeaderProps {
 // Minimal public header — no auth, no staff nav. Just the brand + a
 // "Staff login" escape hatch so testers can jump to the dashboard.
 export const PublicHeader = ({ stepLabel, stepCount }: PublicHeaderProps) => (
-    <header className="sticky top-0 z-40 border-b border-border-main/60 bg-bg-primary/70 backdrop-blur-xl shadow-sm shadow-black/[0.03]">
+    <header className="sticky top-0 z-40 border-b border-border-main/60 bg-bg-primary backdrop-blur-xl shadow-sm shadow-black/[0.03]">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 md:px-6 py-4">
             <Link to="/" className="flex items-center gap-2.5 text-lg font-black tracking-tight text-text-main no-underline transition-colors duration-200 hover:text-brand-gold">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-md shadow-brand-gold/25">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                     <UtensilsCrossed size={17} strokeWidth={2.2} />
                 </span>
                 Hostly

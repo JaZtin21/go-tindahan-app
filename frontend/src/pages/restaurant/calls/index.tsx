@@ -4,6 +4,7 @@ import { useQuery } from '@apollo/client/react';
 import { GET_CALL_LOGS_QUERY } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setCallLogs, setCallLogsError } from '~/store';
+import { ErrorState, Pagination } from '~/components';
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { CallLog } from '~/types/restaurant';
 import { CallLogTable } from './components/CallLogTable';
@@ -13,12 +14,15 @@ export const CallsPage = () => {
     const dispatch = useAppDispatch();
     const activeRestaurantId = useRestaurantId();
     const logs = useAppSelector((s) => s.callLogs.logs);
+    const logsStoreError = useAppSelector((s) => s.callLogs.error);
     const [selected, setSelected] = useState<CallLog | null>(null);
+    const [logPage, setLogPage] = useState(1);
+    const LOGS_PER_PAGE = 10;
 
-    const { data, loading, error } = useQuery(GET_CALL_LOGS_QUERY, {
+    const { data, loading, error, refetch } = useQuery(GET_CALL_LOGS_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
     // Sync the fetched logs into Redux whenever they arrive.
@@ -28,6 +32,15 @@ export const CallsPage = () => {
             dispatch(setCallLogs(fetched));
         }
     }, [data, dispatch]);
+
+    // Client-side pagination over the full (Redux-backed) log list. The
+    // summary KPIs below always reflect the entire dataset.
+    const totalLogPages = Math.max(1, Math.ceil(logs.length / LOGS_PER_PAGE));
+    const safeLogPage = Math.min(logPage, totalLogPages);
+    useEffect(() => {
+        if (logPage !== safeLogPage) setLogPage(safeLogPage);
+    }, [logPage, safeLogPage]);
+    const pagedLogs = logs.slice((safeLogPage - 1) * LOGS_PER_PAGE, safeLogPage * LOGS_PER_PAGE);
 
     const summary = useMemo(() => {
         const booked = logs.filter((l) => l.outcome === 'BOOKED').length;
@@ -71,15 +84,24 @@ export const CallsPage = () => {
                 ))}
             </div>
 
-            {loading ? (
+            {logsStoreError && (
+                <div className="mb-4">
+                    <ErrorState compact title="Action failed" message={logsStoreError} onDismiss={() => dispatch(setCallLogsError(null))} />
+                </div>
+            )}
+
+            {error ? (
+                <ErrorState title="Couldn't load call logs" message={error.message} onRetry={() => refetch()} />
+            ) : loading ? (
                 <div className="flex items-center justify-center py-16 gap-3">
                     <span className="h-4 w-4 rounded-full border-2 border-brand-gold border-t-transparent animate-spin"></span>
                     <p className="text-text-muted text-sm font-bold m-0">Loading call logs…</p>
                 </div>
-            ) : error ? (
-                <p className="text-brand-red text-sm font-bold">{error.message}</p>
             ) : (
-                <CallLogTable logs={logs} onSelect={setSelected} selectedId={selected?.id ?? null} />
+                <>
+                    <CallLogTable logs={pagedLogs} onSelect={setSelected} selectedId={selected?.id ?? null} />
+                    <Pagination page={safeLogPage} pageSize={LOGS_PER_PAGE} total={logs.length} onChange={setLogPage} />
+                </>
             )}
 
             {selected && <CallDetailModal call={selected} onClose={() => setSelected(null)} />}

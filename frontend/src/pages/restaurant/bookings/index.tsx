@@ -11,6 +11,7 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setBookings, setBookingsLoading, setBookingsError, setSelectedDate, removeBooking, upsertBooking } from '~/store';
+import { ErrorState } from '~/components';
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 import { BookingTimeline } from './components/BookingTimeline';
@@ -20,18 +21,21 @@ export const BookingsPage = () => {
     const dispatch = useAppDispatch();
     const activeRestaurantId = useRestaurantId();
     const bookings = useAppSelector((s) => s.bookings.bookings);
+    const bookingsStoreError = useAppSelector((s) => s.bookings.error);
     const selectedDate = useAppSelector((s) => s.bookings.selectedDate);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+    const [assigningId, setAssigningId] = useState<string | null>(null);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
 
     const { data: tablesData, loading: tablesLoading } = useQuery(GET_TABLES_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
         skip: !activeRestaurantId,
     });
 
-    const { data: bookingsData, loading: bookingsLoading } = useQuery(GET_BOOKINGS_QUERY, {
+    const { data: bookingsData, loading: bookingsLoading, error: bookingsQueryError, refetch: refetchBookings } = useQuery(GET_BOOKINGS_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '', date: selectedDate },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
     // Operating hours for the selected day — the timeline window should match
@@ -49,7 +53,7 @@ export const BookingsPage = () => {
         }
     }, [bookingsData, dispatch]);
 
-    const [cancelBooking, { loading: cancelling }] = useMutation(CANCEL_BOOKING_MUTATION);
+    const [cancelBooking] = useMutation(CANCEL_BOOKING_MUTATION);
     const [assignTable] = useMutation(ASSIGN_TABLE_MUTATION);
 
     useEffect(() => {
@@ -76,6 +80,7 @@ export const BookingsPage = () => {
     }, [hoursData, selectedDate]);
 
     const handleCancel = async (id: string) => {
+        setCancellingId(id);
         try {
             const { data }: any = await cancelBooking({ variables: { id } });
             if (data?.cancelBooking) {
@@ -85,10 +90,13 @@ export const BookingsPage = () => {
             }
         } catch (err: any) {
             dispatch(setBookingsError(err?.message ?? 'Failed to cancel booking'));
+        } finally {
+            setCancellingId(null);
         }
     };
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
+        setAssigningId(bookingId);
         try {
             const { data }: any = await assignTable({ variables: { bookingId, tableId } });
             if (data?.assignTable) {
@@ -96,6 +104,8 @@ export const BookingsPage = () => {
             }
         } catch (err: any) {
             dispatch(setBookingsError(err?.message ?? 'Failed to assign table'));
+        } finally {
+            setAssigningId(null);
         }
     };
 
@@ -136,7 +146,15 @@ export const BookingsPage = () => {
                 ))}
             </div>
 
-            {bookingsLoading || tablesLoading ? (
+            {bookingsStoreError && (
+                <div className="mb-4">
+                    <ErrorState compact title="Action failed" message={bookingsStoreError} onDismiss={() => dispatch(setBookingsError(null))} />
+                </div>
+            )}
+
+            {bookingsQueryError ? (
+                <ErrorState title="Couldn't load bookings" message={bookingsQueryError.message} onRetry={() => refetchBookings()} />
+            ) : bookingsLoading || tablesLoading ? (
                 <div className="flex items-center justify-center py-16 gap-3">
                     <span className="h-4 w-4 rounded-full border-2 border-brand-gold border-t-transparent animate-spin"></span>
                     <p className="text-text-muted text-sm font-bold m-0">Loading bookings…</p>
@@ -149,7 +167,8 @@ export const BookingsPage = () => {
                     onSelect={setSelectedBooking}
                     onCancel={handleCancel}
                     onAssignTable={handleAssignTable}
-                    cancelling={cancelling}
+                    cancellingId={cancellingId}
+                    assigningId={assigningId}
                 />
             )}
 

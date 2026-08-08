@@ -131,7 +131,7 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
             <button
                 onClick={runCheck}
                 disabled={loading || !requestedTime}
-                className="w-full cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-xs shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {loading ? 'Checking availability…' : 'Check availability'}
             </button>

@@ -1,30 +1,35 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Clock, CalendarX2 } from 'lucide-react';
 import { useQuery } from '@apollo/client/react';
 import { GET_OPERATING_HOURS_QUERY, GET_CLOSURES_QUERY } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
-import { setOperatingHours, setClosures } from '~/store';
+import { setOperatingHours, setClosures, setSettingsError } from '~/store';
+import { ErrorState } from '~/components';
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { Closure, OperatingHours } from '~/types/restaurant';
 import { OperatingHoursEditor } from './components/OperatingHoursEditor';
 import { ClosuresPanel } from './components/ClosuresPanel';
 
+type SettingsTab = 'hours' | 'closures';
+
 export const SettingsPage = () => {
     const dispatch = useAppDispatch();
     const activeRestaurantId = useRestaurantId();
+    const [tab, setTab] = useState<SettingsTab>('hours');
     const hours = useAppSelector((s) => s.settings.hours);
     const closures = useAppSelector((s) => s.settings.closures);
+    const settingsStoreError = useAppSelector((s) => s.settings.error);
 
-    const { data: hoursData, loading: hoursLoading } = useQuery(GET_OPERATING_HOURS_QUERY, {
+    const { data: hoursData, loading: hoursLoading, error: hoursError, refetch: refetchHours } = useQuery(GET_OPERATING_HOURS_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
-    const { data: closuresData, loading: closuresLoading } = useQuery(GET_CLOSURES_QUERY, {
+    const { data: closuresData, loading: closuresLoading, error: closuresError, refetch: refetchClosures } = useQuery(GET_CLOSURES_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
     // Sync fetched settings into Redux whenever they arrive.
@@ -39,7 +44,10 @@ export const SettingsPage = () => {
         return <p className="py-16 text-center text-text-muted text-sm font-bold">Select a restaurant to adjust settings.</p>;
     }
 
-    const loading = hoursLoading || closuresLoading;
+    // Gate per tab so one query in flight doesn't spin the other tab's content.
+    const loading = tab === 'hours' ? hoursLoading : closuresLoading;
+    const queryError = tab === 'hours' ? hoursError : closuresError;
+    const retryQuery = tab === 'hours' ? refetchHours : refetchClosures;
 
     const nextClosure = useMemo(() => {
         const today = new Date();
@@ -73,16 +81,49 @@ export const SettingsPage = () => {
                 )}
             </div>
 
-            {loading ? (
+            {/* Tab selector */}
+            <div className="mb-5 flex w-fit gap-1.5 rounded-2xl border border-border-main/60 bg-bg-primary/60 p-1.5 backdrop-blur-sm">
+                <button
+                    onClick={() => setTab('hours')}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all duration-200 active:scale-95 ${
+                        tab === 'hours'
+                            ? 'bg-brand-gold font-black text-text-white shadow-xs shadow-brand-gold/20'
+                            : 'font-bold text-text-sub hover:bg-item-hover hover:text-text-main'
+                    }`}
+                >
+                    <Clock size={15} strokeWidth={2.2} />
+                    Weekly Operating Hours
+                </button>
+                <button
+                    onClick={() => setTab('closures')}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all duration-200 active:scale-95 ${
+                        tab === 'closures'
+                            ? 'bg-brand-gold font-black text-text-white shadow-xs shadow-brand-gold/20'
+                            : 'font-bold text-text-sub hover:bg-item-hover hover:text-text-main'
+                    }`}
+                >
+                    <CalendarX2 size={15} strokeWidth={2.2} />
+                    Closures
+                </button>
+            </div>
+
+            {settingsStoreError && (
+                <div className="mb-4">
+                    <ErrorState compact title="Action failed" message={settingsStoreError} onDismiss={() => dispatch(setSettingsError(null))} />
+                </div>
+            )}
+
+            {queryError ? (
+                <ErrorState title="Couldn't load settings" message={queryError.message} onRetry={() => retryQuery()} />
+            ) : loading ? (
                 <div className="flex items-center justify-center py-16 gap-3">
                     <span className="h-4 w-4 rounded-full border-2 border-brand-gold border-t-transparent animate-spin"></span>
                     <p className="text-text-muted text-sm font-bold m-0">Loading settings…</p>
                 </div>
+            ) : tab === 'hours' ? (
+                <OperatingHoursEditor restaurantId={activeRestaurantId} hours={hours} />
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-                    <OperatingHoursEditor restaurantId={activeRestaurantId} hours={hours} />
-                    <ClosuresPanel restaurantId={activeRestaurantId} closures={closures} />
-                </div>
+                <ClosuresPanel restaurantId={activeRestaurantId} closures={closures} />
             )}
         </div>
     );

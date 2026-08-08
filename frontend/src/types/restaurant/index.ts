@@ -141,6 +141,7 @@ export interface CallLog {
     restaurantId?: string | null;
     vapiCallId: string;
     customerPhone?: string | null;
+    customerName?: string | null;
     bookingId?: string | null;
     transcript?: string | null;
     outcome?: CallOutcome | null;
@@ -279,6 +280,7 @@ export interface LogCallInput {
     restaurantId?: string | null;
     vapiCallId: string;
     customerPhone?: string | null;
+    customerName?: string | null;
     bookingId?: string | null;
     transcript?: string | null;
     outcome?: CallOutcome | null;

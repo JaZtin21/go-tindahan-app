@@ -34,12 +34,12 @@ export const RestaurantSidebar: React.FC<RestaurantSidebarProps> = ({ isOpen, se
 
     const menuItems = restaurantId
         ? [
-              { path: '/', label: 'All restaurants', icon: Store },
-              ...scopedItems.map((item) => ({
-                  ...item,
-                  path: `/${restaurantId}${item.path}`,
-              })),
-          ]
+            { path: '/', label: 'All restaurants', icon: Store },
+            ...scopedItems.map((item) => ({
+                ...item,
+                path: `/${restaurantId}${item.path}`,
+            })),
+        ]
         : [{ path: '/', label: 'All restaurants', icon: Store }];
 
     const navigateTo = (path: string) => {
@@ -58,9 +58,8 @@ export const RestaurantSidebar: React.FC<RestaurantSidebarProps> = ({ isOpen, se
             )}
 
             <aside
-                className={`fixed bottom-0 left-0 top-0 z-40 flex flex-col border-r border-border-main/60 bg-bg-primary/70 shadow-lg shadow-black/[0.04] backdrop-blur-xl transition-all duration-200 ease-in-out w-64 -translate-x-full md:translate-x-0 ${
-                    isOpen ? 'translate-x-0 md:w-56' : 'md:w-16'
-                }`}
+                className={`fixed bottom-0 left-0 top-0 z-40 flex flex-col border-r border-border-main/60 bg-bg-primary shadow-xs shadow-black/[0.04] backdrop-blur-xl transition-all duration-200 ease-in-out w-64 -translate-x-full md:translate-x-0 ${isOpen ? 'translate-x-0 md:w-56' : 'md:w-16'
+                    }`}
             >
                 {/* TOP HEADER BRANDING */}
                 <div className="flex h-16 w-full shrink-0 items-center border-b border-border-main/50">
@@ -71,7 +70,7 @@ export const RestaurantSidebar: React.FC<RestaurantSidebarProps> = ({ isOpen, se
                                 className="flex cursor-pointer items-center gap-2.5 bg-transparent outline-none"
                                 title="All restaurants"
                             >
-                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-md shadow-brand-gold/25">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold to-brand-green text-bg-black shadow-xs shadow-brand-gold/25">
                                     <Store size={16} strokeWidth={2.2} />
                                 </span>
                                 <span className="text-sm font-black tracking-tight text-text-main">Hostly</span>
@@ -112,23 +111,20 @@ export const RestaurantSidebar: React.FC<RestaurantSidebarProps> = ({ isOpen, se
                             <button
                                 key={item.path}
                                 onClick={() => navigateTo(item.path)}
-                                className={`group relative w-full cursor-pointer rounded-xl outline-none transition-all duration-150 ${
-                                    isOpen
+                                className={`group relative w-full cursor-pointer rounded-xl outline-none transition-all duration-150 ${isOpen
                                         ? 'flex items-center gap-3 px-3.5 py-2.5'
                                         : 'flex items-center justify-center md:py-2.5'
-                                } ${
-                                    isActive
+                                    } ${isActive
                                         ? 'text-brand-gold'
                                         : 'text-text-sub hover:bg-item-hover hover:text-text-main'
-                                }`}
+                                    }`}
                             >
                                 {isActive && (
                                     <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-gold" />
                                 )}
                                 <span
-                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                                        isActive ? 'bg-brand-gold/15' : 'bg-bg-secondary/60 group-hover:bg-bg-secondary'
-                                    }`}
+                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-brand-gold/15' : 'bg-bg-secondary/60 group-hover:bg-bg-secondary'
+                                        }`}
                                 >
                                     <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                                 </span>

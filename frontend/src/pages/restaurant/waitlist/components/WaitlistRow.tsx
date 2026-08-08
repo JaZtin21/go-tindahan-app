@@ -27,7 +27,7 @@ export const WaitlistRow = ({ entry, position, tables, onConvert, onNotify }: Wa
     return (
         <div className="card-lift flex flex-wrap items-center gap-4 px-4 py-3 border border-border-main/60 rounded-xl bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/40">
             <div
-                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-black shadow-md ${
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-black shadow-xs ${
                     entry.status === 'NOTIFIED'
                         ? 'bg-brand-gold/20 text-brand-gold ring-1 ring-brand-gold/30'
                         : 'bg-gradient-to-br from-brand-gold to-brand-gold-hover text-text-white shadow-brand-gold/25'

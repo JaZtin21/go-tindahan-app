@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Armchair, Plus, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Armchair, Plus, Pencil, Trash2, MapPin, Loader2 } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_TABLES_QUERY,
@@ -9,6 +9,7 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setTables, upsertTable, removeTable, setTablesError } from '~/store';
+import { ErrorState } from '~/components';
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { RestaurantTable } from '~/types/restaurant';
 import { TableFormModal } from './components/TableFormModal';
@@ -17,13 +18,16 @@ export const TablesPage = () => {
     const dispatch = useAppDispatch();
     const activeRestaurantId = useRestaurantId();
     const tables = useAppSelector((s) => s.tables.tables);
+    const tablesStoreError = useAppSelector((s) => s.tables.error);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<RestaurantTable | null>(null);
+    const [tableSaving, setTableSaving] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const { data, loading } = useQuery(GET_TABLES_QUERY, {
+    const { data, loading, error: queryError, refetch } = useQuery(GET_TABLES_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
         skip: !activeRestaurantId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'no-cache',
     });
 
     // Sync fetched tables into Redux whenever they arrive.
@@ -46,6 +50,7 @@ export const TablesPage = () => {
 
     const handleSave = async (input: { tableNumber: string; capacityMin: number; capacityMax: number; section?: string | null }) => {
         if (!activeRestaurantId) return;
+        setTableSaving(true);
         try {
             if (editing) {
                 const { data }: any = await updateTable({
@@ -58,20 +63,25 @@ export const TablesPage = () => {
                 });
                 if (data?.createTable) dispatch(upsertTable(data.createTable as RestaurantTable));
             }
+            setTableSaving(false);
             setModalOpen(false);
             setEditing(null);
         } catch (err: any) {
+            setTableSaving(false);
             dispatch(setTablesError(err?.message ?? 'Failed to save table'));
         }
     };
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('Deactivate this table? Past bookings keep their reference.')) return;
+        setDeletingId(id);
         try {
             const { data }: any = await deleteTable({ variables: { id } });
             if (data?.deleteTable) dispatch(removeTable(id));
         } catch (err: any) {
             dispatch(setTablesError(err?.message ?? 'Failed to delete table'));
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -107,14 +117,22 @@ export const TablesPage = () => {
                 </div>
                 <button
                     onClick={() => { setEditing(null); setModalOpen(true); }}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-black text-text-white shadow-md shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-95"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-black text-text-white shadow-xs shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-95"
                 >
                     <Plus size={15} strokeWidth={2.5} />
                     Add table
                 </button>
             </div>
 
-            {loading ? (
+            {tablesStoreError && (
+                <div className="mb-4">
+                    <ErrorState compact title="Action failed" message={tablesStoreError} onDismiss={() => dispatch(setTablesError(null))} />
+                </div>
+            )}
+
+            {queryError ? (
+                <ErrorState title="Couldn't load tables" message={queryError.message} onRetry={() => refetch()} />
+            ) : loading ? (
                 <div className="flex items-center justify-center py-16 gap-3">
                     <span className="h-4 w-4 rounded-full border-2 border-brand-gold border-t-transparent animate-spin"></span>
                     <p className="text-text-muted text-sm font-bold m-0">Loading tables…</p>
@@ -133,7 +151,11 @@ export const TablesPage = () => {
                             <h3 className="text-xs font-black text-text-sub uppercase tracking-wider mb-2.5">{section}</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                                 {tables.filter((t) => (t.section ?? null) === section).map((t) => (
-                                    <div key={t.id} className="card-lift flex flex-col gap-2 border border-border-main/60 rounded-xl p-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/50">
+                                    <div
+                                        key={t.id}
+                                        onClick={() => { setEditing(t); setModalOpen(true); }}
+                                        className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border-main/60 bg-bg-primary/60 p-3 transition-colors duration-150 hover:bg-item-hover"
+                                    >
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
@@ -147,18 +169,23 @@ export const TablesPage = () => {
                                         </div>
                                         <div className="flex gap-1.5">
                                             <button
-                                                onClick={() => { setEditing(t); setModalOpen(true); }}
-                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
+                                                onClick={(e) => { e.stopPropagation(); setEditing(t); setModalOpen(true); }}
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
                                             >
                                                 <Pencil size={12} strokeWidth={2.2} />
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(t.id)}
-                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20"
+                                                onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}
+                                                disabled={deletingId === t.id}
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <Trash2 size={12} strokeWidth={2.2} />
-                                                Delete
+                                                {deletingId === t.id ? (
+                                                    <Loader2 size={12} strokeWidth={2.2} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={12} strokeWidth={2.2} />
+                                                )}
+                                                {deletingId === t.id ? 'Deleting…' : 'Delete'}
                                             </button>
                                         </div>
                                     </div>
@@ -171,7 +198,11 @@ export const TablesPage = () => {
                             <h3 className="text-xs font-black text-text-sub uppercase tracking-wider mb-2.5">General</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                                 {tables.filter((t) => !t.section).map((t) => (
-                                    <div key={t.id} className="card-lift flex flex-col gap-2 border border-border-main/60 rounded-xl p-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/50">
+                                    <div
+                                        key={t.id}
+                                        onClick={() => { setEditing(t); setModalOpen(true); }}
+                                        className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border-main/60 bg-bg-primary/60 p-3 transition-colors duration-150 hover:bg-item-hover"
+                                    >
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
@@ -183,18 +214,23 @@ export const TablesPage = () => {
                                         </div>
                                         <div className="flex gap-1.5">
                                             <button
-                                                onClick={() => { setEditing(t); setModalOpen(true); }}
-                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
+                                                onClick={(e) => { e.stopPropagation(); setEditing(t); setModalOpen(true); }}
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
                                             >
                                                 <Pencil size={12} strokeWidth={2.2} />
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(t.id)}
-                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20"
+                                                onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}
+                                                disabled={deletingId === t.id}
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <Trash2 size={12} strokeWidth={2.2} />
-                                                Delete
+                                                {deletingId === t.id ? (
+                                                    <Loader2 size={12} strokeWidth={2.2} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={12} strokeWidth={2.2} />
+                                                )}
+                                                {deletingId === t.id ? 'Deleting…' : 'Delete'}
                                             </button>
                                         </div>
                                     </div>
@@ -208,6 +244,7 @@ export const TablesPage = () => {
             {modalOpen && (
                 <TableFormModal
                     editing={editing}
+                    saving={tableSaving}
                     onClose={() => { setModalOpen(false); setEditing(null); }}
                     onSave={handleSave}
                 />

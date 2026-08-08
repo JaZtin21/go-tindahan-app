@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Check } from 'lucide-react';
+import { Clock, Check, Loader2 } from 'lucide-react';
 import { useMutation } from '@apollo/client/react';
 import { SET_OPERATING_HOURS_MUTATION } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch } from '~/store';
@@ -85,7 +85,7 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
     };
 
     const inputCls =
-        'px-2.5 py-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 text-text-sub text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 disabled:opacity-50 transition-all duration-200';
+        'px-2.5 py-1.5 rounded-lg border border-border-main/70 bg-bg-primary text-text-sub text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 disabled:opacity-50 transition-all duration-200';
 
     return (
         <div className="glass-panel rounded-2xl overflow-hidden">
@@ -143,12 +143,12 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
                     <button
                         onClick={handleSave}
                         disabled={loading}
-                        className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
-                            loading
+                        className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${loading
                                 ? 'bg-brand-gold/40 text-text-white/60 cursor-not-allowed'
                                 : 'bg-brand-gold text-text-white hover:bg-brand-gold-hover cursor-pointer'
-                        }`}
+                            }`}
                     >
+                        {loading && <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />}
                         {loading ? 'Saving…' : 'Save hours'}
                     </button>
                     {saved && (

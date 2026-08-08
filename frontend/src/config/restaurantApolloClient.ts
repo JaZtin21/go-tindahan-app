@@ -200,6 +200,14 @@ const restaurantTransportSplitLink = ApolloLink.split(
 export const restaurantClient = new ApolloClient({
     link: restaurantTransportSplitLink,
     cache: new InMemoryCache(),
+    // The restaurant dashboard keeps its own Redux state per page — Apollo
+    // should never serve stale cached data or write results to its cache
+    // (mutation cache-writes used to re-emit stale query results and clobber
+    // the Redux slices). Always hit the network, store nothing.
+    defaultOptions: {
+        watchQuery: { fetchPolicy: 'no-cache' },
+        query: { fetchPolicy: 'no-cache' },
+    },
 });
 
 export default client;
