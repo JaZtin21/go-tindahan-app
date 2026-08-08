@@ -67,7 +67,7 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
         <div>
             {/* Opening hours strip — restaurant wall-clock, labelled so it's
                 not mistaken for the customer's local time */}
-            <div className="mb-5 rounded-2xl border border-border-main bg-bg-secondary/50 px-4 py-3">
+            <div className="mb-5 glass-panel rounded-2xl px-4 py-3">
                 <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-text-muted">
                     Opening hours{' '}
                     <span className="font-bold normal-case text-text-sub">
@@ -131,7 +131,7 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
             <button
                 onClick={runCheck}
                 disabled={loading || !requestedTime}
-                className="w-full rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-bg-black hover:bg-brand-gold-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer active:scale-[0.99]"
+                className="w-full cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {loading ? 'Checking availability…' : 'Check availability'}
             </button>
@@ -160,7 +160,7 @@ export const AvailabilityStep = ({ restaurant, onSlotPicked }: AvailabilityStepP
                                 <button
                                     onClick={() => onSlotPicked(slot, partySize, new Date(requestedTime).toISOString())}
                                     title={`${formatFull(slot.startTime)} (your local time)`}
-                                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-border-main bg-bg-secondary/60 px-4 py-3 text-left hover:border-brand-green/60 hover:bg-item-hover transition-all duration-200 cursor-pointer group"
+                                    className="card-lift w-full flex items-center justify-between gap-3 rounded-xl border border-border-main/60 bg-bg-primary/60 backdrop-blur-sm px-4 py-3 text-left hover:border-brand-green/60 cursor-pointer group"
                                 >
                                     <div>
                                         <p className="text-sm font-black text-text-main">

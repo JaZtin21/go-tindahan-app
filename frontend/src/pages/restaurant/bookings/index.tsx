@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
+import { CalendarCheck, Armchair, ClipboardList } from 'lucide-react';
+import { DatePickerDropdown } from '~/components/DatePickerDropdown';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_BOOKINGS_QUERY,
@@ -54,6 +56,14 @@ export const BookingsPage = () => {
 
     const tables: RestaurantTable[] = useMemo(() => (tablesData as any)?.tables ?? [], [tablesData]);
 
+    const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
+    const unassignedCount = activeBookings.filter((b) => !b.tableId).length;
+    const kpis = [
+        { icon: CalendarCheck, label: 'Bookings', value: activeBookings.length, tint: 'text-brand-gold' },
+        { icon: ClipboardList, label: 'Unassigned', value: unassignedCount, tint: 'text-brand-green' },
+        { icon: Armchair, label: 'Tables', value: tables.length, tint: 'text-brand-gold' },
+    ];
+
     // Resolve operating hours for the day-of-week of the selected date
     // (backend stores 0 = Sunday … 6 = Saturday, matching JS getDay()).
     const dayHours: OperatingHours | null | undefined = useMemo(() => {
@@ -100,18 +110,28 @@ export const BookingsPage = () => {
                         Daily grid timeline — what the AI voice agent has booked.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-green opacity-75"></span>
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-green"></span>
-                    </span>
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => dispatch(setSelectedDate(e.target.value))}
-                        className="px-3 py-2 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                    />
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-green opacity-75"></span>
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-green"></span>
+                        </span>
+                        <span className="text-xs font-black uppercase tracking-wider text-brand-green">Live</span>
+                    </div>
+                    <DatePickerDropdown value={selectedDate} onChange={(date) => dispatch(setSelectedDate(date))} />
                 </div>
+            </div>
+
+            <div className="mb-5 grid grid-cols-3 gap-2.5 sm:max-w-md">
+                {kpis.map(({ icon: Icon, label, value, tint }) => (
+                    <div key={label} className="glass-panel flex items-center gap-2.5 rounded-xl px-3.5 py-2.5">
+                        <Icon size={16} strokeWidth={2.2} className={`shrink-0 ${tint}`} />
+                        <div className="min-w-0">
+                            <p className="m-0 text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</p>
+                            <p className="m-0 truncate text-sm font-black text-text-main">{value}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
 
             {bookingsLoading || tablesLoading ? (

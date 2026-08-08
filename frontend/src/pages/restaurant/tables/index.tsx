@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Armchair, Plus, Pencil, Trash2, MapPin } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_TABLES_QUERY,
@@ -80,18 +81,36 @@ export const TablesPage = () => {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-xl font-black text-text-main tracking-tight m-0">Table Layout</h2>
-                    <p className="mt-1 text-xs font-bold text-text-muted m-0">
-                        Build and monitor your physical seating floor constraints.
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-green/15 text-brand-green">
+                            <Armchair size={18} strokeWidth={2.2} />
+                        </span>
+                        <div>
+                            <h2 className="m-0 text-xl font-black tracking-tight text-text-main">Table Layout</h2>
+                            <p className="m-0 mt-0.5 text-xs font-bold text-text-muted">
+                                Build and monitor your physical seating floor constraints.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                        <span className="flex items-center gap-1.5 rounded-full border border-border-main/60 bg-bg-primary/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-text-sub">
+                            <Armchair size={11} strokeWidth={2.2} className="text-brand-gold" />
+                            {tables.length} tables
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full border border-border-main/60 bg-bg-primary/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-text-sub">
+                            <MapPin size={11} strokeWidth={2.2} className="text-brand-green" />
+                            {sections.length} sections
+                        </span>
+                    </div>
                 </div>
                 <button
                     onClick={() => { setEditing(null); setModalOpen(true); }}
-                    className="px-4 py-2.5 rounded-xl bg-brand-gold text-bg-black font-black text-sm hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-95"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-black text-text-white shadow-md shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-95"
                 >
-                    + Add table
+                    <Plus size={15} strokeWidth={2.5} />
+                    Add table
                 </button>
             </div>
 
@@ -101,7 +120,10 @@ export const TablesPage = () => {
                     <p className="text-text-muted text-sm font-bold m-0">Loading tables…</p>
                 </div>
             ) : tables.length === 0 ? (
-                <div className="border border-dashed border-border-main rounded-2xl py-16 text-center text-text-muted text-sm font-bold">
+                <div className="glass-panel rounded-3xl border-dashed px-6 py-16 text-center text-text-muted text-sm font-bold">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-gold/10 text-brand-gold">
+                        <Armchair size={26} strokeWidth={2} />
+                    </div>
                     No tables yet. Add your first table to start accepting reservations.
                 </div>
             ) : (
@@ -111,24 +133,31 @@ export const TablesPage = () => {
                             <h3 className="text-xs font-black text-text-sub uppercase tracking-wider mb-2.5">{section}</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                                 {tables.filter((t) => (t.section ?? null) === section).map((t) => (
-                                    <div key={t.id} className="border border-border-main rounded-xl p-3 flex flex-col gap-1.5 bg-bg-primary hover:border-brand-gold/50 transition-colors duration-200">
-                                        <div className="flex justify-between items-center">
-                                            <strong className="text-sm text-text-main">🪑 {t.tableNumber}</strong>
-                                            <span className="text-[11px] font-bold text-text-muted">
+                                    <div key={t.id} className="card-lift flex flex-col gap-2 border border-border-main/60 rounded-xl p-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/50">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
+                                                    <Armchair size={16} strokeWidth={2.2} />
+                                                </span>
+                                                <strong className="truncate text-sm text-text-main">{t.tableNumber}</strong>
+                                            </div>
+                                            <span className="shrink-0 text-[11px] font-bold text-text-muted">
                                                 {t.capacityMin}–{t.capacityMax}
                                             </span>
                                         </div>
-                                        <div className="flex gap-1.5 mt-1">
+                                        <div className="flex gap-1.5">
                                             <button
                                                 onClick={() => { setEditing(t); setModalOpen(true); }}
-                                                className="flex-1 py-1.5 text-xs font-bold border border-border-main rounded-lg bg-bg-primary text-text-sub hover:bg-item-hover cursor-pointer transition-colors duration-150"
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
                                             >
+                                                <Pencil size={12} strokeWidth={2.2} />
                                                 Edit
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(t.id)}
-                                                className="flex-1 py-1.5 text-xs font-bold border border-brand-red/30 rounded-lg bg-brand-red/10 text-brand-red hover:bg-brand-red/20 cursor-pointer transition-colors duration-150"
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20"
                                             >
+                                                <Trash2 size={12} strokeWidth={2.2} />
                                                 Delete
                                             </button>
                                         </div>
@@ -142,22 +171,29 @@ export const TablesPage = () => {
                             <h3 className="text-xs font-black text-text-sub uppercase tracking-wider mb-2.5">General</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                                 {tables.filter((t) => !t.section).map((t) => (
-                                    <div key={t.id} className="border border-border-main rounded-xl p-3 flex flex-col gap-1.5 bg-bg-primary hover:border-brand-gold/50 transition-colors duration-200">
-                                        <div className="flex justify-between items-center">
-                                            <strong className="text-sm text-text-main">🪑 {t.tableNumber}</strong>
-                                            <span className="text-[11px] font-bold text-text-muted">{t.capacityMin}–{t.capacityMax}</span>
+                                    <div key={t.id} className="card-lift flex flex-col gap-2 border border-border-main/60 rounded-xl p-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/50">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
+                                                    <Armchair size={16} strokeWidth={2.2} />
+                                                </span>
+                                                <strong className="truncate text-sm text-text-main">{t.tableNumber}</strong>
+                                            </div>
+                                            <span className="shrink-0 text-[11px] font-bold text-text-muted">{t.capacityMin}–{t.capacityMax}</span>
                                         </div>
-                                        <div className="flex gap-1.5 mt-1">
+                                        <div className="flex gap-1.5">
                                             <button
                                                 onClick={() => { setEditing(t); setModalOpen(true); }}
-                                                className="flex-1 py-1.5 text-xs font-bold border border-border-main rounded-lg bg-bg-primary text-text-sub hover:bg-item-hover cursor-pointer transition-colors duration-150"
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 py-1.5 text-xs font-bold text-text-sub transition-colors duration-150 hover:bg-item-hover"
                                             >
+                                                <Pencil size={12} strokeWidth={2.2} />
                                                 Edit
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(t.id)}
-                                                className="flex-1 py-1.5 text-xs font-bold border border-brand-red/30 rounded-lg bg-brand-red/10 text-brand-red hover:bg-brand-red/20 cursor-pointer transition-colors duration-150"
+                                                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 py-1.5 text-xs font-bold text-brand-red transition-colors duration-150 hover:bg-brand-red/20"
                                             >
+                                                <Trash2 size={12} strokeWidth={2.2} />
                                                 Delete
                                             </button>
                                         </div>
@@ -172,7 +208,6 @@ export const TablesPage = () => {
             {modalOpen && (
                 <TableFormModal
                     editing={editing}
-                    existingSections={sections}
                     onClose={() => { setModalOpen(false); setEditing(null); }}
                     onSave={handleSave}
                 />

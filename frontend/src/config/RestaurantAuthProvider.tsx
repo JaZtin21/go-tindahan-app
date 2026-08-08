@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { UtensilsCrossed } from 'lucide-react';
 import { ApolloProvider } from '@apollo/client/react';
 // Import the new restaurant specific tokens and client instance from apolloClient
 import { restaurantClient, authLinkClient, setRestaurantAuthToken, setRestaurantRefreshHandler } from './restaurantApolloClient';
@@ -154,11 +155,18 @@ export const RestaurantAuthProvider = ({ children }: { children: React.ReactNode
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-bg-primary">
-                <div className="text-center">
-                    <div className="mx-auto w-10 h-10 mb-4 rounded-full border-4 border-border-main border-t-brand-gold animate-spin" />
-                    <h3 className="text-lg font-black text-text-main">Loading Restaurant Session…</h3>
-                    <p className="text-sm font-bold text-text-muted mt-1">Verifying backend tokens</p>
+            <div className="relative min-h-screen ambient-bg flex items-center justify-center px-4 overflow-hidden">
+                <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-brand-gold/20 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-brand-green/20 blur-3xl" />
+                <div className="glass-strong rounded-3xl px-10 py-12 text-center">
+                    <div className="relative mx-auto mb-6 h-14 w-14">
+                        <span className="absolute inset-0 rounded-2xl border-4 border-border-main border-t-brand-gold animate-spin" />
+                        <span className="absolute inset-0 flex items-center justify-center text-brand-gold">
+                            <UtensilsCrossed size={18} strokeWidth={2.2} />
+                        </span>
+                    </div>
+                    <h3 className="m-0 text-lg font-black text-text-main">Loading Restaurant Session…</h3>
+                    <p className="m-0 mt-1.5 text-sm font-bold text-text-muted">Verifying backend tokens</p>
                 </div>
             </div>
         );

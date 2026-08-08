@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Building2, UtensilsCrossed, AlertTriangle, Pencil, Trash2, Check } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_RESTAURANT_INFO_QUERY,
@@ -12,10 +13,10 @@ import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { MenuItem } from '~/types/restaurant';
 
 const inputCls =
-    'w-full px-3 py-2 rounded-xl border border-border-main bg-bg-primary text-sm font-semibold text-text-main placeholder:text-text-muted outline-none focus:border-brand-gold/60 transition-colors duration-150';
+    'w-full px-3 py-2 rounded-xl border border-border-main/70 bg-bg-primary/70 text-sm font-semibold text-text-main placeholder:text-text-muted outline-none focus:border-brand-gold/60 focus:ring-2 focus:ring-brand-gold/20 transition-all duration-150';
 const labelCls = 'block text-[11px] font-black uppercase tracking-wider text-text-muted mb-1.5';
 const btnPrimary =
-    'px-4 py-2.5 rounded-xl bg-brand-gold text-bg-black font-black text-sm hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-95';
+    'px-4 py-2.5 rounded-xl bg-brand-gold text-text-white font-black text-sm hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-95';
 const btnGhost =
     'px-4 py-2.5 rounded-xl border border-border-main bg-bg-primary text-text-sub font-bold text-sm hover:bg-item-hover transition-all duration-200 cursor-pointer active:scale-95';
 
@@ -201,8 +202,13 @@ export const InfoPage = () => {
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
                     {/* --- Restaurant profile card --- */}
-                    <section className="border border-border-main rounded-2xl bg-bg-primary p-5">
-                        <h3 className="text-sm font-black text-text-main tracking-tight m-0 mb-1">Profile</h3>
+                    <section className="glass-panel rounded-2xl p-5">
+                        <div className="mb-1 flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
+                                <Building2 size={15} strokeWidth={2.2} />
+                            </span>
+                            <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Profile</h3>
+                        </div>
                         <p className="text-[11px] font-bold text-text-muted mb-4">
                             Address, cuisine, and parking — callers hear these when they ask about the restaurant.
                         </p>
@@ -266,22 +272,34 @@ export const InfoPage = () => {
                             <button onClick={handleSaveInfo} disabled={savingInfo} className={btnPrimary}>
                                 {savingInfo ? 'Saving…' : 'Save info'}
                             </button>
-                            {infoSaved && <span className="text-xs font-bold text-brand-gold">Saved ✓</span>}
+                            {infoSaved && (
+                                <span className="flex items-center gap-1 text-xs font-bold text-brand-gold">
+                                    <Check size={13} strokeWidth={2.5} />
+                                    Saved
+                                </span>
+                            )}
                         </div>
                     </section>
 
                     {/* --- Menu card --- */}
-                    <section className="border border-border-main rounded-2xl bg-bg-primary p-5">
-                        <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-sm font-black text-text-main tracking-tight m-0">Menu</h3>
-                            <span className="text-[11px] font-bold text-text-muted">{items.length} item{items.length === 1 ? '' : 's'}</span>
+                    <section className="glass-panel rounded-2xl p-5">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-green/15 text-brand-green">
+                                    <UtensilsCrossed size={15} strokeWidth={2.2} />
+                                </span>
+                                <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Menu</h3>
+                            </div>
+                            <span className="rounded-full border border-border-main/60 bg-bg-primary/60 px-2.5 py-0.5 text-[11px] font-bold text-text-muted">
+                                {items.length} item{items.length === 1 ? '' : 's'}
+                            </span>
                         </div>
                         <p className="text-[11px] font-bold text-text-muted mb-4">
                             Callers can ask about dishes, prices, and allergens. Sold-out items can be toggled off instead of deleted.
                         </p>
 
                         {/* Add / edit form */}
-                        <div className="border border-brand-gold/30 rounded-xl bg-bg-secondary/50 p-3.5 mb-4">
+                        <div className="border border-brand-gold/30 rounded-xl bg-gradient-to-br from-brand-gold/10 to-transparent backdrop-blur-sm p-3.5 mb-4">
                             <p className="text-xs font-black text-brand-gold mb-2.5">{editing ? 'Edit item' : 'Add item'}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div>
@@ -329,13 +347,13 @@ export const InfoPage = () => {
                         </div>
 
                         {items.length === 0 ? (
-                            <div className="border border-dashed border-border-main rounded-xl py-10 text-center text-text-muted text-sm font-bold">
+                            <div className="border border-dashed border-border-main/70 rounded-xl py-10 text-center text-text-muted text-sm font-bold">
                                 No menu items yet — add your first dish above.
                             </div>
                         ) : (
                             <ul className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
                                 {items.map((m) => (
-                                    <li key={m.id} className="border border-border-main rounded-xl p-3 flex items-start justify-between gap-3 bg-bg-primary hover:border-brand-gold/40 transition-colors duration-150">
+                                    <li key={m.id} className="card-lift border border-border-main/60 rounded-xl p-3 flex items-start justify-between gap-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/40">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <strong className={`text-sm ${m.isAvailable ? 'text-text-main' : 'text-text-muted line-through'}`}>{m.name}</strong>
@@ -344,21 +362,26 @@ export const InfoPage = () => {
                                             </div>
                                             {m.description && <p className="text-xs font-semibold text-text-muted mt-1 truncate">{m.description}</p>}
                                             {m.allergens.length > 0 && (
-                                                <p className="text-[11px] font-bold text-brand-red/80 mt-1">⚠ {m.allergens.join(', ')}</p>
+                                                <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand-red/80">
+                                                    <AlertTriangle size={12} strokeWidth={2.2} />
+                                                    {m.allergens.join(', ')}
+                                                </p>
                                             )}
                                         </div>
                                         <div className="flex gap-1.5 shrink-0">
                                             <button
                                                 onClick={() => handleToggleAvailable(m)}
                                                 title={m.isAvailable ? 'Mark sold out' : 'Mark available'}
-                                                className={`px-2.5 py-1.5 text-[11px] font-black rounded-lg border transition-colors duration-150 cursor-pointer ${m.isAvailable ? 'border-border-main text-text-sub hover:bg-item-hover' : 'border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10'}`}
+                                                className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-black transition-colors duration-150 ${m.isAvailable ? 'border-border-main text-text-sub hover:bg-item-hover' : 'border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10'}`}
                                             >
                                                 {m.isAvailable ? 'In stock' : 'Sold out'}
                                             </button>
-                                            <button onClick={() => openEdit(m)} className="px-2.5 py-1.5 text-[11px] font-black rounded-lg border border-border-main text-text-sub hover:bg-item-hover transition-colors duration-150 cursor-pointer">
+                                            <button onClick={() => openEdit(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-border-main px-2.5 py-1.5 text-[11px] font-black text-text-sub transition-colors duration-150 hover:bg-item-hover">
+                                                <Pencil size={11} strokeWidth={2.2} />
                                                 Edit
                                             </button>
-                                            <button onClick={() => handleDeleteItem(m)} className="px-2.5 py-1.5 text-[11px] font-black rounded-lg border border-brand-red/30 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 transition-colors duration-150 cursor-pointer">
+                                            <button onClick={() => handleDeleteItem(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-brand-red/30 bg-brand-red/10 px-2.5 py-1.5 text-[11px] font-black text-brand-red transition-colors duration-150 hover:bg-brand-red/20">
+                                                <Trash2 size={11} strokeWidth={2.2} />
                                                 Delete
                                             </button>
                                         </div>

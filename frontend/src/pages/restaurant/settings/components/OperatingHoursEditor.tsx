@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Clock, Check } from 'lucide-react';
 import { useMutation } from '@apollo/client/react';
 import { SET_OPERATING_HOURS_MUTATION } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch } from '~/store';
@@ -84,13 +85,18 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
     };
 
     const inputCls =
-        'px-2.5 py-1.5 rounded-lg border border-border-main bg-bg-primary text-text-sub text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 disabled:opacity-50 transition-all duration-200';
+        'px-2.5 py-1.5 rounded-lg border border-border-main/70 bg-bg-primary/70 text-text-sub text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40 disabled:opacity-50 transition-all duration-200';
 
     return (
-        <div className="border border-border-main rounded-2xl overflow-hidden bg-bg-primary">
-            <div className="px-4 py-3.5 bg-bg-secondary border-b border-border-main">
-                <div className="font-black text-text-main text-sm">🕒 Weekly operating hours</div>
-                <div className="text-xs font-bold text-text-muted mt-0.5">0 = Sunday … 6 = Saturday</div>
+        <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3.5 bg-bg-secondary/70 border-b border-border-main/60">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
+                    <Clock size={16} strokeWidth={2.2} />
+                </span>
+                <div>
+                    <div className="font-black text-text-main text-sm">Weekly operating hours</div>
+                    <div className="text-xs font-bold text-text-muted mt-0.5">0 = Sunday … 6 = Saturday</div>
+                </div>
             </div>
             <div className="px-4 py-3.5">
                 {DAY_NAMES.map((name, day) => (
@@ -135,13 +141,18 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
                         disabled={loading}
                         className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
                             loading
-                                ? 'bg-brand-gold/40 text-bg-black/50 cursor-not-allowed'
-                                : 'bg-brand-gold text-bg-black hover:bg-brand-gold-hover cursor-pointer'
+                                ? 'bg-brand-gold/40 text-text-white/60 cursor-not-allowed'
+                                : 'bg-brand-gold text-text-white hover:bg-brand-gold-hover cursor-pointer'
                         }`}
                     >
                         {loading ? 'Saving…' : 'Save hours'}
                     </button>
-                    {saved && <span className="text-brand-green text-[13px] font-black">✓ Saved</span>}
+                    {saved && (
+                        <span className="flex items-center gap-1 text-[13px] font-black text-brand-green">
+                            <Check size={14} strokeWidth={2.5} />
+                            Saved
+                        </span>
+                    )}
                 </div>
             </div>
         </div>

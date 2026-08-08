@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { X } from 'lucide-react';
 import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 
 interface BookingTimelineProps {
@@ -53,12 +54,12 @@ const buildHourRange = (bookings: Booking[], dayHours?: OperatingHours | null): 
 };
 
 const STATUS_STYLES: Record<string, string> = {
-    PENDING: 'bg-amber-500/90',
-    CONFIRMED: 'bg-blue-500/90',
-    SEATED: 'bg-emerald-500/90',
-    COMPLETED: 'bg-gray-500/90',
-    CANCELLED: 'bg-brand-red',
-    NO_SHOW: 'bg-brand-red',
+    PENDING: 'bg-brand-gold/90 text-text-white',
+    CONFIRMED: 'bg-brand-green/90 text-bg-black',
+    SEATED: 'bg-brand-green/20 text-brand-green border border-brand-green/50',
+    COMPLETED: 'bg-item-hover text-text-muted border border-border-main',
+    CANCELLED: 'bg-brand-red/90 text-text-white',
+    NO_SHOW: 'bg-brand-red/60 text-text-white',
 };
 
 function fmtTime(iso: string): string {
@@ -80,7 +81,7 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                         {unassigned.map((b) => (
                             <div
                                 key={b.id}
-                                className="border border-brand-gold/60 rounded-xl px-3 py-2.5 bg-brand-gold/10 min-w-[180px]"
+                                className="card-lift border border-brand-gold/50 rounded-xl px-3 py-2.5 bg-brand-gold/10 backdrop-blur-sm min-w-[180px]"
                             >
                                 <div className="font-black text-sm text-text-main">
                                     {fmtTime(b.bookingTime)} · {b.partySize} pax
@@ -118,8 +119,8 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                     {tables.map((table) => {
                         const tableBookings = bookings.filter((b) => b.tableId === table.id && b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
                         return (
-                            <div key={table.id} className="border border-border-main rounded-xl min-w-[140px] bg-bg-primary">
-                                <div className="px-2.5 py-2 border-b border-border-sub bg-bg-secondary rounded-t-xl">
+                            <div key={table.id} className="border border-border-main/60 rounded-xl min-w-[140px] bg-bg-primary/60 backdrop-blur-sm">
+                                <div className="px-2.5 py-2 border-b border-border-sub bg-bg-secondary/70 rounded-t-xl">
                                     <div className="font-black text-xs text-text-main">
                                         {table.section ? `${table.section} · ` : ''}{table.tableNumber}
                                     </div>
@@ -135,11 +136,11 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                                         });
                                         return (
                                             <div key={h} className="min-h-[36px] flex flex-col gap-1">
-                                                <div className="text-[10px] font-bold text-border-muted">{String(h).padStart(2, '0')}:00</div>
+                                                <div className="text-[10px] font-bold text-text-muted">{String(h).padStart(2, '0')}:00</div>
                                                 {slotBookings.map((b) => (
                                                     <div
                                                         key={b.id}
-                                                        className={`rounded-lg px-1.5 py-1 text-[11px] relative text-white ${STATUS_STYLES[b.status] ?? 'bg-blue-500/90'}`}
+                                                        className={`rounded-lg px-1.5 py-1 text-[11px] relative ${STATUS_STYLES[b.status] ?? 'bg-brand-gold/90 text-text-white'}`}
                                                         title={b.specialRequests ?? ''}
                                                     >
                                                         <div className="font-bold">
@@ -152,10 +153,11 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                                                             <button
                                                                 onClick={() => onCancel(b.id)}
                                                                 disabled={cancelling}
-                                                                className="absolute top-0.5 right-0.5 bg-white/25 border-none text-white rounded px-1 text-[10px] cursor-pointer hover:bg-white/40 transition-colors duration-150"
+                                                                className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md border-none bg-white/30 text-bg-black backdrop-blur-sm transition-colors duration-150 hover:bg-white/60 disabled:opacity-50"
                                                                 title="Cancel booking"
+                                                                aria-label={`Cancel booking at ${fmtTime(b.bookingTime)}`}
                                                             >
-                                                                ✕
+                                                                <X size={10} strokeWidth={3} />
                                                             </button>
                                                         )}
                                                     </div>

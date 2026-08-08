@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BellRing, Users } from 'lucide-react';
 import type { RestaurantTable, WaitlistEntry } from '~/types/restaurant';
 
 interface WaitlistRowProps {
@@ -24,24 +25,34 @@ export const WaitlistRow = ({ entry, position, tables, onConvert, onNotify }: Wa
     };
 
     return (
-        <div className="flex items-center gap-4 px-4 py-3 border border-border-main rounded-xl bg-bg-primary hover:border-brand-gold/40 transition-colors duration-200">
+        <div className="card-lift flex flex-wrap items-center gap-4 px-4 py-3 border border-border-main/60 rounded-xl bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/40">
             <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0 ${
-                    entry.status === 'NOTIFIED' ? 'bg-brand-gold/20 text-brand-gold' : 'bg-brand-gold text-bg-black'
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-black shadow-md ${
+                    entry.status === 'NOTIFIED'
+                        ? 'bg-brand-gold/20 text-brand-gold ring-1 ring-brand-gold/30'
+                        : 'bg-gradient-to-br from-brand-gold to-brand-gold-hover text-text-white shadow-brand-gold/25'
                 }`}
             >
                 {position}
             </div>
 
-            <div className="flex-1 min-w-0">
-                <div className="font-black text-sm text-text-main">
-                    Party of {entry.partySize}
-                    <span className="font-bold text-text-muted ml-2 text-xs">
-                        requested {fmtTime(entry.requestedTime)}
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-black text-sm text-text-main">
+                    <span className="flex items-center gap-1.5">
+                        <Users size={14} strokeWidth={2.2} className="text-brand-gold" />
+                        Party of {entry.partySize}
                     </span>
+                    <span className="text-xs font-bold text-text-muted">requested {fmtTime(entry.requestedTime)}</span>
                 </div>
-                <div className="text-xs font-bold text-text-muted">
-                    {entry.status === 'NOTIFIED' ? '🔔 Notified — waiting for reply' : 'Waiting for a table'}
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-text-muted">
+                    {entry.status === 'NOTIFIED' ? (
+                        <>
+                            <BellRing size={13} strokeWidth={2.2} className="text-brand-gold" />
+                            Notified — waiting for reply
+                        </>
+                    ) : (
+                        'Waiting for a table'
+                    )}
                 </div>
             </div>
 

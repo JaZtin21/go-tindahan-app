@@ -150,3 +150,60 @@
         -webkit-text-stroke: 0px transparent !important;
     }
 }
+
+/* ============================================================================
+   GLASSMORPHISM HELPERS — theme-aware (light & dark via CSS variables).
+   Declared inside @layer components so Tailwind utilities (border-dashed,
+   border-brand-green/40, …) can still override them in the cascade.
+   ============================================================================ */
+@layer components {
+
+    /* Frosted surface for cards, modals, and panels sitting over ambient colour */
+    .glass-panel {
+        background: color-mix(in srgb, var(--color-bg-primary) 66%, transparent);
+        -webkit-backdrop-filter: blur(18px) saturate(150%);
+        backdrop-filter: blur(18px) saturate(150%);
+        border: 1px solid color-mix(in srgb, var(--color-border-main) 55%, transparent);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Stronger frost — nav bars, sidebars, modals that need more readability */
+    .glass-strong {
+        background: color-mix(in srgb, var(--color-bg-primary) 84%, transparent);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        backdrop-filter: blur(24px) saturate(160%);
+        border: 1px solid color-mix(in srgb, var(--color-border-main) 65%, transparent);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.10);
+    }
+
+    /* Soft ambient backdrop — brand-tinted radial glows over the page background.
+       Gives glass surfaces something to blur and adds depth without noise. */
+    .ambient-bg {
+        background:
+            radial-gradient(52rem 52rem at 115% -12%, color-mix(in srgb, var(--color-brand-gold) 14%, transparent), transparent 62%),
+            radial-gradient(46rem 46rem at -18% 112%, color-mix(in srgb, var(--color-brand-green) 13%, transparent), transparent 62%),
+            var(--color-bg-primary);
+    }
+
+    /* Gentle card hover lift used across dashboard cards */
+    .card-lift {
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+    }
+
+    .card-lift:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.10);
+    }
+}
+
+/* Modal entrance — used by glass modals */
+@keyframes modal-pop {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

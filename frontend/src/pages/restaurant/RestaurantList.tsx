@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Store, MapPin, ChefHat, Plus, ChevronRight } from 'lucide-react';
 import { useRestaurantAuth } from '~/config/RestaurantAuthProvider';
 import { useAppDispatch, useAppSelector } from '~/store';
 import { setOwner, setActiveRestaurant } from '~/store';
@@ -27,13 +28,19 @@ export const RestaurantList = () => {
 
     if (restaurants.length === 0) {
         return (
-            <div className="text-center py-16">
-                <div className="text-4xl mb-3">🍽️</div>
-                <p className="text-text-muted text-sm font-bold">You don't have any restaurants yet.</p>
+            <div className="glass-panel mx-auto max-w-lg rounded-3xl border-dashed px-6 py-16 text-center">
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold/25 to-brand-green/25 text-bg-black ring-1 ring-brand-gold/20">
+                    <Store size={28} strokeWidth={2} />
+                </div>
+                <h3 className="m-0 text-lg font-black text-text-main">No restaurants yet</h3>
+                <p className="mx-auto mt-1.5 max-w-xs text-xs font-bold leading-relaxed text-text-muted">
+                    Create your first restaurant to start taking AI-powered bookings.
+                </p>
                 <Link
                     to="/create-restaurant"
-                    className="inline-block mt-4 px-6 py-3 rounded-xl bg-brand-gold text-bg-black font-black text-sm hover:bg-brand-gold-hover transition-all duration-200 no-underline active:scale-95"
+                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-lg shadow-brand-gold/20"
                 >
+                    <Plus size={16} strokeWidth={2.5} />
                     Create your first restaurant
                 </Link>
             </div>
@@ -41,19 +48,22 @@ export const RestaurantList = () => {
     }
 
     return (
-        <div className="max-w-[760px] mx-auto">
-            <div className="flex justify-between items-center mb-1">
-                <h2 className="text-2xl font-black text-text-main tracking-tight m-0">Your Restaurants</h2>
+        <div className="mx-auto max-w-[780px]">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="m-0 text-2xl font-black tracking-tight text-text-main">Your restaurants</h2>
+                    <p className="mt-1 text-xs font-bold text-text-muted">
+                        {restaurants.length} {restaurants.length === 1 ? 'location' : 'locations'} · pick one to open its dashboard
+                    </p>
+                </div>
                 <Link
                     to="/create-restaurant"
-                    className="px-4 py-2 rounded-xl bg-brand-gold text-bg-black font-black text-xs hover:bg-brand-gold-hover transition-all duration-200 no-underline active:scale-95"
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-xs font-black text-text-white no-underline transition-all duration-200 hover:bg-brand-gold-hover active:scale-95 shadow-md shadow-brand-gold/20"
                 >
-                    + New restaurant
+                    <Plus size={15} strokeWidth={2.5} />
+                    New restaurant
                 </Link>
             </div>
-            <p className="text-xs font-bold text-text-muted mb-5">
-                Pick a restaurant to open its dashboard — bookings, tables, hours and more.
-            </p>
 
             <div className="flex flex-col gap-3">
                 {restaurants.map(({ restaurant, role }) => {
@@ -62,31 +72,40 @@ export const RestaurantList = () => {
                         <button
                             key={restaurant.id}
                             onClick={() => openRestaurant(restaurant.id)}
-                            className={`group flex items-center justify-between gap-4 w-full text-left px-5 py-4 rounded-2xl border transition-all duration-200 cursor-pointer active:scale-[0.99] ${
+                            className={`card-lift group flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border p-4 text-left sm:p-5 ${
                                 active
-                                    ? 'border-brand-gold/60 bg-brand-gold/5'
-                                    : 'border-border-main bg-bg-primary hover:border-brand-gold/40 hover:bg-item-hover'
+                                    ? 'border-brand-gold/60 bg-brand-gold/10'
+                                    : 'border-border-main/60 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/40 hover:bg-bg-primary/90'
                             }`}
                         >
-                            <div className="flex items-center gap-4 min-w-0">
-                                <div className="h-11 w-11 rounded-xl bg-brand-gold/15 text-brand-gold flex items-center justify-center text-xl shrink-0">
-                                    🍽️
+                            <div className="flex min-w-0 items-center gap-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-gold/25 to-brand-green/25 text-brand-gold ring-1 ring-brand-gold/20 transition-transform duration-300 group-hover:scale-105">
+                                    <Store size={22} strokeWidth={2} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="font-black text-text-main text-sm truncate">{restaurant.name}</div>
-                                    <div className="text-xs font-bold text-text-muted truncate">
-                                        {restaurant.suburb ? `${restaurant.suburb}, ` : ''}
-                                        {restaurant.state ?? ''}
-                                        {restaurant.cuisineType ? ` · ${restaurant.cuisineType}` : ''}
+                                    <div className="truncate font-black text-sm text-text-main">{restaurant.name}</div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs font-bold text-text-muted">
+                                        <span className="flex items-center gap-1">
+                                            <MapPin size={12} strokeWidth={2.2} className="text-brand-gold" />
+                                            {restaurant.suburb ? `${restaurant.suburb}, ` : ''}
+                                            {restaurant.state ?? ''}
+                                        </span>
+                                        {restaurant.cuisineType && (
+                                            <span className="flex items-center gap-1">
+                                                <ChefHat size={12} strokeWidth={2.2} className="text-brand-green" />
+                                                {restaurant.cuisineType}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                                <span className="px-2.5 py-1 rounded-full bg-bg-secondary border border-border-main text-[10px] font-black uppercase tracking-wider text-text-muted">
+
+                            <div className="flex shrink-0 items-center gap-3">
+                                <span className="rounded-full border border-brand-gold/30 bg-brand-gold/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-brand-gold">
                                     {role.toLowerCase()}
                                 </span>
-                                <span className="text-brand-gold font-black text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    Open →
+                                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-main/60 bg-bg-primary/60 text-text-muted transition-all duration-200 group-hover:border-brand-gold/40 group-hover:bg-brand-gold/10 group-hover:text-brand-gold">
+                                    <ChevronRight size={16} strokeWidth={2.2} />
                                 </span>
                             </div>
                         </button>

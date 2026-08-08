@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CalendarCheck, Users } from 'lucide-react';
 import { useMutation } from '@apollo/client/react';
 import {
     CREATE_BOOKING_MUTATION,
@@ -22,7 +23,7 @@ interface CustomerStepProps {
 }
 
 const inputCls =
-    'w-full rounded-xl border border-border-main bg-bg-secondary px-4 py-2.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 transition-all';
+    'w-full rounded-xl border border-border-main/70 bg-bg-primary/70 px-4 py-2.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20 transition-all';
 
 export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDone, onBack }: CustomerStepProps) => {
     const [name, setName] = useState('');
@@ -94,11 +95,15 @@ export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDon
     return (
         <div>
             {/* Summary of the chosen table */}
-            <div className="mb-6 rounded-2xl border border-brand-green/30 bg-brand-green/5 px-4 py-3.5">
+            <div className="mb-6 rounded-2xl border border-brand-green/30 bg-brand-green/10 backdrop-blur-sm px-4 py-3.5">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                        <p className="text-sm font-black text-text-main">{restaurant.name}</p>
-                        <p className="text-xs text-text-muted mt-0.5">
+                        <p className="flex items-center gap-1.5 text-sm font-black text-text-main">
+                            <CalendarCheck size={14} strokeWidth={2.2} className="text-brand-green" />
+                            {restaurant.name}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
+                            <Users size={12} strokeWidth={2.2} className="text-brand-green" />
                             Table {slot.table.tableNumber} · {partySize} guests · {formatFull(requestedTime)}{' '}
                             <span className="font-bold text-text-sub">{tzAbbrev(new Date(requestedTime))}</span>
                         </p>
@@ -142,7 +147,7 @@ export const CustomerStep = ({ restaurant, slot, partySize, requestedTime, onDon
                 <button
                     onClick={handleConfirm}
                     disabled={submitting}
-                    className="flex-1 rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-bg-black hover:bg-brand-gold-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer active:scale-[0.99]"
+                    className="flex-1 cursor-pointer rounded-xl bg-brand-gold px-4 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {submitting ? 'Booking your table…' : 'Confirm booking'}
                 </button>

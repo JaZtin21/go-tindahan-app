@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, CalendarCheck2 } from 'lucide-react';
 import type { AvailableSlot, Booking, Customer, Restaurant } from '~/types/restaurant';
 import { PublicHeader, StepShell } from './components/Shared';
 import { tzAbbrev } from './components/timeFormat';
@@ -47,7 +48,7 @@ export const PublicBookingPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-bg-primary text-text-main transition-colors duration-300">
+        <div className="min-h-screen ambient-bg text-text-main transition-colors duration-300">
             <PublicHeader stepLabel={STEP_LABELS[step]} stepCount={step === 'done' ? 3 : ['pick', 'availability', 'details'].indexOf(step) + 1} />
 
             <main className="mx-auto w-full max-w-3xl px-4 md:px-6 py-8">
@@ -119,9 +120,9 @@ export const PublicBookingPage = () => {
                 )}
 
                 {step === 'done' && result && (
-                    <div className="rounded-2xl border border-brand-green/40 bg-brand-green/5 p-8 text-center">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-green/15 text-2xl">
-                            ✓
+                    <div className="glass-panel rounded-3xl border-brand-green/40 p-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-green/15 text-brand-green">
+                            <Check size={28} strokeWidth={2.5} />
                         </div>
                         <h2 className="text-xl font-black tracking-tight text-text-main">Table booked!</h2>
                         <p className="mt-1 text-sm text-text-muted">
@@ -131,7 +132,8 @@ export const PublicBookingPage = () => {
                             })}{' '}
                             <span className="font-bold text-text-sub">{tzAbbrev(new Date(result.booking.bookingTime))}</span>
                         </p>
-                        <div className="mx-auto mt-4 inline-block rounded-xl border border-border-main bg-bg-secondary px-4 py-2 text-xs font-bold text-text-sub">
+                        <div className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-xl border border-border-main/70 bg-bg-secondary/70 px-4 py-2 text-xs font-bold text-text-sub">
+                            <CalendarCheck2 size={13} strokeWidth={2.2} className="text-brand-green" />
                             Booking ref: <span className="text-brand-green">{result.booking.id.slice(0, 8).toUpperCase()}</span>
                         </div>
                         <p className="mt-4 text-xs text-text-muted">
@@ -144,7 +146,7 @@ export const PublicBookingPage = () => {
                                 setSlot(null);
                                 setResult(null);
                             }}
-                            className="mt-6 rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-bg-black hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-[0.99]"
+                            className="mt-6 cursor-pointer rounded-xl bg-brand-gold px-6 py-3 text-sm font-black text-text-white shadow-lg shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-[0.99]"
                         >
                             Book another table
                         </button>

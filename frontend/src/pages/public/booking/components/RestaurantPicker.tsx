@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowRight, MapPin } from 'lucide-react';
 import { useQuery } from '@apollo/client/react';
 import { GET_RESTAURANTS_QUERY } from '~/api/queries/graphql/restaurant';
 import type { Restaurant } from '~/types/restaurant';
@@ -76,22 +77,24 @@ export const RestaurantPicker = ({ onSelect }: RestaurantPickerProps) => {
                     <li key={r.id}>
                         <button
                             onClick={() => onSelect(r)}
-                            className="w-full text-left rounded-2xl border border-border-main bg-bg-secondary/60 p-4 hover:border-brand-gold/60 hover:bg-item-hover hover:shadow-md transition-all duration-200 cursor-pointer group"
+                            className="card-lift w-full text-left rounded-2xl border border-border-main/60 bg-bg-primary/60 backdrop-blur-sm p-4 hover:border-brand-gold/60 cursor-pointer group"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <h3 className="font-black text-text-main group-hover:text-brand-gold transition-colors duration-200">
                                         {r.name}
                                     </h3>
-                                    <p className="text-xs text-text-muted mt-0.5 truncate">
-                                        {r.cuisineType ?? 'Modern Australian'} · {r.suburb}, {r.state} {r.postcode}
+                                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
+                                        <MapPin size={12} strokeWidth={2.2} className="shrink-0 text-brand-gold" />
+                                        <span className="truncate">{r.suburb}, {r.state} {r.postcode}</span>
                                     </p>
                                     <p className="text-xs text-text-muted mt-0.5">
                                         Up to {r.maxPartySize} guests · {r.addressLine1}
                                     </p>
                                 </div>
-                                <span className="shrink-0 rounded-lg bg-brand-green/10 px-2.5 py-1 text-[11px] font-bold text-brand-green">
-                                    Book →
+                                <span className="flex shrink-0 items-center gap-1 rounded-lg bg-brand-green/10 px-2.5 py-1 text-[11px] font-bold text-brand-green transition-colors duration-200 group-hover:bg-brand-green group-hover:text-bg-black">
+                                    Book
+                                    <ArrowRight size={12} strokeWidth={2.5} />
                                 </span>
                             </div>
                         </button>

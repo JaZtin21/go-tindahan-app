@@ -1,4 +1,5 @@
 import React from 'react';
+import { PhoneCall } from 'lucide-react';
 import type { CallLog } from '~/types/restaurant';
 
 interface CallLogTableProps {
@@ -8,10 +9,10 @@ interface CallLogTableProps {
 }
 
 const OUTCOME_STYLES: Record<string, string> = {
-    BOOKED: 'bg-emerald-100 text-emerald-800',
-    NO_AVAILABILITY: 'bg-red-100 text-red-800',
-    TRANSFERRED: 'bg-blue-100 text-blue-800',
-    ABANDONED: 'bg-gray-100 text-gray-700',
+    BOOKED: 'bg-brand-green/90 text-bg-black',
+    NO_AVAILABILITY: 'bg-brand-red/90 text-text-white',
+    TRANSFERRED: 'bg-brand-gold/90 text-text-white',
+    ABANDONED: 'bg-item-hover text-text-muted',
 };
 
 function fmtDateTime(iso: string): string {
@@ -24,15 +25,19 @@ function fmtDateTime(iso: string): string {
 export const CallLogTable = ({ logs, onSelect, selectedId }: CallLogTableProps) => {
     if (logs.length === 0) {
         return (
-            <div className="border border-dashed border-border-main rounded-2xl py-16 text-center text-text-muted text-sm font-bold">
+            <div className="glass-panel rounded-3xl border-dashed px-6 py-16 text-center text-sm font-bold text-text-muted">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-gold/10 text-brand-gold">
+                    <PhoneCall size={26} strokeWidth={2} />
+                </div>
                 No calls logged yet. Calls from the AI voice agent will appear here.
             </div>
         );
     }
 
     return (
-        <div className="border border-border-main rounded-2xl overflow-hidden bg-bg-primary">
-            <table className="w-full border-collapse text-[13px]">
+        <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[13px] min-w-[560px]">
                 <thead>
                     <tr className="bg-bg-secondary text-left">
                         <th className="px-3 py-2.5 text-[11px] font-black uppercase tracking-wider text-text-muted">Time</th>
@@ -75,6 +80,7 @@ export const CallLogTable = ({ logs, onSelect, selectedId }: CallLogTableProps) 
                     })}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 };

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { CalendarDays, Plus, Trash2 } from 'lucide-react';
+import { DatePickerDropdown } from '~/components/DatePickerDropdown';
 import { useMutation } from '@apollo/client/react';
 import { CREATE_CLOSURE_MUTATION, DELETE_CLOSURE_MUTATION } from '~/api/queries/graphql/restaurant';
 import { useAppDispatch } from '~/store';
@@ -44,35 +46,35 @@ export const ClosuresPanel = ({ restaurantId, closures }: ClosuresPanelProps) =>
     };
 
     const inputCls =
-        'px-3.5 py-2.5 rounded-xl border border-border-main bg-bg-primary text-text-main text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200';
+        'px-3.5 py-2.5 rounded-xl border border-border-main/70 bg-bg-primary/70 text-text-main text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-gold/40 transition-all duration-200';
 
     return (
-        <div className="border border-border-main rounded-2xl overflow-hidden bg-bg-primary">
-            <div className="px-4 py-3.5 bg-bg-secondary border-b border-border-main">
-                <div className="font-black text-text-main text-sm">📅 Sudden closures</div>
-                <div className="text-xs font-bold text-text-muted mt-0.5">
-                    One-off dates when the kitchen is closed (public holidays, events).
+        <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3.5 bg-bg-secondary/70 border-b border-border-main/60">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-green/15 text-brand-green">
+                    <CalendarDays size={16} strokeWidth={2.2} />
+                </span>
+                <div>
+                    <div className="font-black text-text-main text-sm">Sudden closures</div>
+                    <div className="text-xs font-bold text-text-muted mt-0.5">
+                        One-off dates when the kitchen is closed (public holidays, events).
+                    </div>
                 </div>
             </div>
 
             <form onSubmit={handleAdd} className="px-4 py-3.5 flex flex-col gap-2.5">
                 <div className="flex gap-2.5">
-                    <input
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        required
-                        className={inputCls + ' flex-1'}
-                    />
+                    <DatePickerDropdown value={date} onChange={setDate} className="flex-1" />
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`px-4 py-2.5 rounded-xl font-black text-sm transition-all duration-200 active:scale-95 ${
+                        className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 font-black text-sm transition-all duration-200 active:scale-95 ${
                             loading
-                                ? 'bg-brand-gold/40 text-bg-black/50 cursor-not-allowed'
-                                : 'bg-brand-gold text-bg-black hover:bg-brand-gold-hover cursor-pointer'
+                                ? 'bg-brand-gold/40 text-text-white/60 cursor-not-allowed'
+                                : 'bg-brand-gold text-text-white hover:bg-brand-gold-hover cursor-pointer'
                         }`}
                     >
+                        <Plus size={14} strokeWidth={2.5} />
                         Add
                     </button>
                 </div>
@@ -92,7 +94,7 @@ export const ClosuresPanel = ({ restaurantId, closures }: ClosuresPanelProps) =>
                         {closures.map((c) => (
                             <div
                                 key={c.id}
-                                className="flex justify-between items-center px-3 py-2.5 border border-brand-gold/40 bg-brand-gold/10 rounded-xl"
+                                className="flex justify-between items-center px-3 py-2.5 border border-brand-gold/40 bg-brand-gold/10 rounded-xl backdrop-blur-sm"
                             >
                                 <div>
                                     <div className="font-black text-[13px] text-text-main">
@@ -104,8 +106,9 @@ export const ClosuresPanel = ({ restaurantId, closures }: ClosuresPanelProps) =>
                                 </div>
                                 <button
                                     onClick={() => handleDelete(c.id)}
-                                    className="px-2.5 py-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 text-brand-red text-xs font-black hover:bg-brand-red/20 cursor-pointer transition-colors duration-150"
+                                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-red/30 bg-brand-red/10 px-2.5 py-1.5 text-xs font-black text-brand-red transition-colors duration-150 hover:bg-brand-red/20"
                                 >
+                                    <Trash2 size={12} strokeWidth={2.2} />
                                     Remove
                                 </button>
                             </div>

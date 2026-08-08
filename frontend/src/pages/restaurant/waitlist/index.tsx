@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Hourglass, Users } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_WAITLIST_QUERY,
@@ -74,11 +75,22 @@ export const WaitlistPage = () => {
     return (
         <div>
             <div className="flex justify-between items-center mb-4 flex-wrap gap-2.5">
-                <div>
-                    <h2 className="text-xl font-black text-text-main tracking-tight m-0">Live Waitlist</h2>
-                    <p className="mt-1 text-xs font-bold text-text-muted m-0">
-                        Overflow queue when the system is full — assign a table the moment one opens.
-                    </p>
+                <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
+                        <Hourglass size={18} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="m-0 text-xl font-black tracking-tight text-text-main">Live Waitlist</h2>
+                            <span className="flex items-center gap-1 rounded-full border border-brand-gold/30 bg-brand-gold/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand-gold">
+                                <Users size={11} strokeWidth={2.2} />
+                                {entries.length}
+                            </span>
+                        </div>
+                        <p className="m-0 mt-0.5 text-xs font-bold text-text-muted">
+                            Overflow queue when the system is full — assign a table the moment one opens.
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-1.5">
                     {(['WAITING', 'NOTIFIED'] as const).map((s) => (
@@ -87,8 +99,8 @@ export const WaitlistPage = () => {
                             onClick={() => setStatusFilter(s)}
                             className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer active:scale-95 ${
                                 statusFilter === s
-                                    ? 'bg-brand-gold text-bg-black'
-                                    : 'border border-border-main bg-bg-primary text-text-sub hover:bg-item-hover'
+                                    ? 'bg-brand-gold text-text-white shadow-md shadow-brand-gold/20'
+                                    : 'border border-border-main/70 bg-bg-primary/70 text-text-sub hover:bg-item-hover'
                             }`}
                         >
                             {s === 'WAITING' ? 'Waiting' : 'Notified'}

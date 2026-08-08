@@ -8,7 +8,6 @@ import {
     RestaurantDashboard,
     CreateRestaurant,
     BookingsPage,
-    WaitlistPage,
     TablesPage,
     CallsPage,
     SettingsPage,
@@ -61,7 +60,6 @@ export const RestaurantApp = () => {
                     <Route path="/:restaurantId" element={<RestaurantLayout />}>
                         <Route index element={<RestaurantDashboard />} />
                         <Route path="bookings" element={<BookingsPage />} />
-                        <Route path="waitlist" element={<WaitlistPage />} />
                         <Route path="tables" element={<TablesPage />} />
                         <Route path="calls" element={<CallsPage />} />
                         <Route path="settings" element={<SettingsPage />} />

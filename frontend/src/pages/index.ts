@@ -8,7 +8,6 @@ export {
     RestaurantList,
     RestaurantDashboard,
     BookingsPage,
-    WaitlistPage,
     TablesPage,
     CallsPage,
     SettingsPage,
