@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, Armchair, ClipboardList } from 'lucide-react';
 import { DatePickerDropdown } from '~/components/DatePickerDropdown';
 import { useQuery, useMutation } from '@apollo/client/react';
@@ -14,12 +14,14 @@ import { setBookings, setBookingsLoading, setBookingsError, setSelectedDate, rem
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { Booking, OperatingHours, RestaurantTable } from '~/types/restaurant';
 import { BookingTimeline } from './components/BookingTimeline';
+import { BookingDetailModal } from './components/BookingDetailModal';
 
 export const BookingsPage = () => {
     const dispatch = useAppDispatch();
     const activeRestaurantId = useRestaurantId();
     const bookings = useAppSelector((s) => s.bookings.bookings);
     const selectedDate = useAppSelector((s) => s.bookings.selectedDate);
+    const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
     const { data: tablesData, loading: tablesLoading } = useQuery(GET_TABLES_QUERY, {
         variables: { restaurantId: activeRestaurantId ?? '' },
@@ -144,9 +146,18 @@ export const BookingsPage = () => {
                     tables={tables}
                     bookings={bookings}
                     dayHours={dayHours}
+                    onSelect={setSelectedBooking}
                     onCancel={handleCancel}
                     onAssignTable={handleAssignTable}
                     cancelling={cancelling}
+                />
+            )}
+
+            {selectedBooking && (
+                <BookingDetailModal
+                    booking={selectedBooking}
+                    tables={tables}
+                    onClose={() => setSelectedBooking(null)}
                 />
             )}
         </div>

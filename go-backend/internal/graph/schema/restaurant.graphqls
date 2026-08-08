@@ -131,6 +131,7 @@ type Booking {
   id: String!
   restaurantId: String!
   customerId: String!
+  customer: Customer
   tableId: String
   partySize: Int!
   bookingTime: String!

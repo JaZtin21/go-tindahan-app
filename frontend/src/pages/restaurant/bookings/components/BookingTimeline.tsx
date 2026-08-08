@@ -7,6 +7,7 @@ interface BookingTimelineProps {
     bookings: Booking[];
     // Operating hours for the *selected day* (already resolved by the page).
     dayHours?: OperatingHours | null;
+    onSelect: (booking: Booking) => void;
     onCancel: (id: string) => void;
     onAssignTable: (bookingId: string, tableId: string) => void;
     cancelling: boolean;
@@ -67,7 +68,7 @@ function fmtTime(iso: string): string {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssignTable, cancelling }: BookingTimelineProps) => {
+export const BookingTimeline = ({ tables, bookings, dayHours, onSelect, onCancel, onAssignTable, cancelling }: BookingTimelineProps) => {
     const unassigned = bookings.filter((b) => !b.tableId && b.status !== 'CANCELLED' && b.status !== 'NO_SHOW');
     const HOURS = useMemo(() => buildHourRange(bookings, dayHours), [bookings, dayHours]);
 
@@ -81,7 +82,8 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                         {unassigned.map((b) => (
                             <div
                                 key={b.id}
-                                className="card-lift border border-brand-gold/50 rounded-xl px-3 py-2.5 bg-brand-gold/10 backdrop-blur-sm min-w-[180px]"
+                                onClick={() => onSelect(b)}
+                                className="card-lift cursor-pointer border border-brand-gold/50 rounded-xl px-3 py-2.5 bg-brand-gold/10 backdrop-blur-sm min-w-[180px] transition-colors duration-150 hover:border-brand-gold/70"
                             >
                                 <div className="font-black text-sm text-text-main">
                                     {fmtTime(b.bookingTime)} · {b.partySize} pax
@@ -92,6 +94,7 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                                 {tables.length > 0 && (
                                     <select
                                         value=""
+                                        onClick={(e) => e.stopPropagation()}
                                         onChange={(e) => e.target.value && onAssignTable(b.id, e.target.value)}
                                         className="px-2 py-1.5 rounded-lg border border-border-main bg-bg-primary text-text-sub text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-gold/40 cursor-pointer"
                                     >
@@ -140,18 +143,22 @@ export const BookingTimeline = ({ tables, bookings, dayHours, onCancel, onAssign
                                                 {slotBookings.map((b) => (
                                                     <div
                                                         key={b.id}
-                                                        className={`rounded-lg px-1.5 py-1 text-[11px] relative ${STATUS_STYLES[b.status] ?? 'bg-brand-gold/90 text-text-white'}`}
-                                                        title={b.specialRequests ?? ''}
+                                                        onClick={() => onSelect(b)}
+                                                        className={`rounded-lg px-1.5 py-1 text-[11px] relative cursor-pointer transition-transform duration-100 hover:brightness-110 active:scale-[0.98] ${STATUS_STYLES[b.status] ?? 'bg-brand-gold/90 text-text-white'}`}
+                                                        title={b.customer?.name ? `${b.customer.name} · ${b.specialRequests ?? 'no notes'}` : b.specialRequests ?? ''}
                                                     >
                                                         <div className="font-bold">
                                                             {fmtTime(b.bookingTime)} · {b.partySize}p
                                                         </div>
                                                         <div className="text-[9px] opacity-90">
-                                                            {b.source} · {b.status}
+                                                            {b.customer?.name || 'Guest'} · {b.source}
                                                         </div>
                                                         {b.status !== 'COMPLETED' && b.status !== 'SEATED' && (
                                                             <button
-                                                                onClick={() => onCancel(b.id)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onCancel(b.id);
+                                                                }}
                                                                 disabled={cancelling}
                                                                 className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md border-none bg-white/30 text-bg-black backdrop-blur-sm transition-colors duration-150 hover:bg-white/60 disabled:opacity-50"
                                                                 title="Cancel booking"

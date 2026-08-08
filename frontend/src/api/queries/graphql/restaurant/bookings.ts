@@ -28,6 +28,7 @@ export const GET_BOOKING_QUERY = gql`
   query GetBooking($id: String!) {
     booking(id: $id) {
       id restaurantId customerId tableId partySize bookingTime durationMinutes status specialRequests paymentStatus source createdAt updatedAt
+      customer { id name phone email }
     }
   }
 `;
@@ -36,6 +37,7 @@ export const GET_BOOKINGS_QUERY = gql`
   query GetBookings($restaurantId: String!, $date: String, $status: BookingStatus) {
     bookings(restaurantId: $restaurantId, date: $date, status: $status) {
       id restaurantId customerId tableId partySize bookingTime durationMinutes status specialRequests paymentStatus source createdAt
+      customer { id name phone email }
     }
   }
 `;
@@ -74,6 +76,7 @@ export const CANCEL_BOOKING_MUTATION = gql`
   mutation CancelBooking($id: String!) {
     cancelBooking(id: $id) {
       id restaurantId customerId tableId partySize bookingTime durationMinutes status specialRequests paymentStatus source createdAt updatedAt
+      customer { id name phone email }
     }
   }
 `;
@@ -82,6 +85,7 @@ export const ASSIGN_TABLE_MUTATION = gql`
   mutation AssignTable($bookingId: String!, $tableId: String!) {
     assignTable(bookingId: $bookingId, tableId: $tableId) {
       id restaurantId customerId tableId partySize bookingTime durationMinutes status specialRequests paymentStatus source createdAt updatedAt
+      customer { id name phone email }
     }
   }
 `;

@@ -676,6 +676,8 @@ func (r *mutationResolver) UpdateBooking(ctx context.Context, id string, input m
 	b.BookingTime = bt.Format(time.RFC3339)
 	b.CreatedAt = createdAt.Format(time.RFC3339)
 	b.UpdatedAt = updatedAt.Format(time.RFC3339)
+	// Populate the nullable Booking.customer so the dashboard shows who booked.
+	b.Customer, _ = utils.LoadCustomer(ctx, r.Resolver.DB, b.CustomerID)
 	return &b, nil
 }
 
@@ -889,6 +891,8 @@ func (r *mutationResolver) ConvertWaitlistToBooking(ctx context.Context, id stri
 	b.DurationMinutes = turnDuration
 	b.CreatedAt = bCreatedAt.Format(time.RFC3339)
 	b.UpdatedAt = bUpdatedAt.Format(time.RFC3339)
+	// Populate the nullable Booking.customer so the dashboard shows who booked.
+	b.Customer, _ = utils.LoadCustomer(ctx, r.Resolver.DB, b.CustomerID)
 	return &b, nil
 }
 
@@ -1064,6 +1068,8 @@ func (r *queryResolver) Booking(ctx context.Context, id string) (*model.Booking,
 	b.BookingTime = bt.Format(time.RFC3339)
 	b.CreatedAt = createdAt.Format(time.RFC3339)
 	b.UpdatedAt = updatedAt.Format(time.RFC3339)
+	// Populate the nullable Booking.customer so the dashboard shows who booked.
+	b.Customer, _ = utils.LoadCustomer(ctx, r.Resolver.DB, b.CustomerID)
 	return &b, nil
 }
 
@@ -1105,6 +1111,27 @@ func (r *queryResolver) Bookings(ctx context.Context, restaurantID string, date 
 		b.CreatedAt = createdAt.Format(time.RFC3339)
 		b.UpdatedAt = updatedAt.Format(time.RFC3339)
 		results = append(results, &b)
+	}
+
+	// Batch-load customers for the list (one query instead of N+1) and attach
+	// them to each booking. Fail-soft: a missing customer leaves the field null.
+	if len(results) > 0 {
+		ids := make([]string, 0, len(results))
+		seen := map[string]bool{}
+		for _, b := range results {
+			if !seen[b.CustomerID] {
+				seen[b.CustomerID] = true
+				ids = append(ids, b.CustomerID)
+			}
+		}
+		customers, err := utils.LoadCustomers(ctx, r.Resolver.DB, ids)
+		if err != nil {
+			log.Printf("⚠️ Failed to load customers for bookings: %v", err)
+		} else {
+			for _, b := range results {
+				b.Customer = customers[b.CustomerID]
+			}
+		}
 	}
 
 	return results, nil

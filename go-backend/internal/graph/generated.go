@@ -52,6 +52,7 @@ type ComplexityRoot struct {
 	Booking struct {
 		BookingTime     func(childComplexity int) int
 		CreatedAt       func(childComplexity int) int
+		Customer        func(childComplexity int) int
 		CustomerID      func(childComplexity int) int
 		DurationMinutes func(childComplexity int) int
 		ID              func(childComplexity int) int
@@ -676,6 +677,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Booking.CreatedAt(childComplexity), true
+	case "Booking.customer":
+		if e.ComplexityRoot.Booking.Customer == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Booking.Customer(childComplexity), true
 	case "Booking.customerId":
 		if e.ComplexityRoot.Booking.CustomerID == nil {
 			break
@@ -3251,6 +3258,8 @@ func (ec *executionContext) childFields_Booking(ctx context.Context, field graph
 		return ec.fieldContext_Booking_restaurantId(ctx, field)
 	case "customerId":
 		return ec.fieldContext_Booking_customerId(ctx, field)
+	case "customer":
+		return ec.fieldContext_Booking_customer(ctx, field)
 	case "tableId":
 		return ec.fieldContext_Booking_tableId(ctx, field)
 	case "partySize":
@@ -5565,6 +5574,38 @@ func (ec *executionContext) _Booking_customerId(ctx context.Context, field graph
 }
 func (ec *executionContext) fieldContext_Booking_customerId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Booking", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Booking_customer(ctx context.Context, field graphql.CollectedField, obj *model.Booking) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Booking_customer(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Customer, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Customer) graphql.Marshaler {
+			return ec.marshalOCustomer2ᚖgoᚑbackendᚋinternalᚋgraphᚋmodelᚐCustomer(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Booking_customer(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Booking",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Customer(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _Booking_tableId(ctx context.Context, field graphql.CollectedField, obj *model.Booking) (ret graphql.Marshaler) {
@@ -19410,6 +19451,11 @@ func (ec *executionContext) _Booking(ctx context.Context, sel ast.SelectionSet, 
 		case "customerId":
 			out.Values[i] = ec._Booking_customerId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "customer":
+			out.Values[i] = ec._Booking_customer(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		case "tableId":

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, UtensilsCrossed, AlertTriangle, Pencil, Trash2, Check } from 'lucide-react';
+import { Building2, UtensilsCrossed, AlertTriangle, Pencil, Trash2, Check, Plus, Info } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
     GET_RESTAURANT_INFO_QUERY,
@@ -11,17 +11,15 @@ import {
 } from '~/api/queries/graphql/restaurant';
 import { useRestaurantId } from '~/utils/useRestaurantId';
 import type { MenuItem } from '~/types/restaurant';
+import { MenuItemModal } from './components/MenuItemModal';
 
 const inputCls =
     'w-full px-3 py-2 rounded-xl border border-border-main/70 bg-bg-primary/70 text-sm font-semibold text-text-main placeholder:text-text-muted outline-none focus:border-brand-gold/60 focus:ring-2 focus:ring-brand-gold/20 transition-all duration-150';
 const labelCls = 'block text-[11px] font-black uppercase tracking-wider text-text-muted mb-1.5';
 const btnPrimary =
     'px-4 py-2.5 rounded-xl bg-brand-gold text-text-white font-black text-sm hover:bg-brand-gold-hover transition-all duration-200 cursor-pointer active:scale-95';
-const btnGhost =
-    'px-4 py-2.5 rounded-xl border border-border-main bg-bg-primary text-text-sub font-bold text-sm hover:bg-item-hover transition-all duration-200 cursor-pointer active:scale-95';
 
 const dollars = (cents: number) => (cents / 100).toFixed(2);
-const toCents = (dollars: string) => Math.max(0, Math.round((parseFloat(dollars) || 0) * 100));
 
 interface InfoForm {
     name: string;
@@ -36,8 +34,20 @@ interface InfoForm {
     parkingInfo: string;
 }
 
+interface MenuItemInput {
+    name: string;
+    priceCents: number;
+    category: string;
+    description: string;
+    allergens: string[];
+    isAvailable: boolean;
+}
+
+type InfoTab = 'info' | 'menu';
+
 export const InfoPage = () => {
     const activeRestaurantId = useRestaurantId();
+    const [tab, setTab] = useState<InfoTab>('info');
 
     // --- Restaurant profile -------------------------------------------------
     const { data: infoData, loading: infoLoading } = useQuery(GET_RESTAURANT_INFO_QUERY, {
@@ -92,51 +102,42 @@ export const InfoPage = () => {
     });
     const items = useMemo(() => ((menuData as any)?.menuItems as MenuItem[]) ?? [], [menuData]);
 
-    const [createItem] = useMutation(CREATE_MENU_ITEM_MUTATION);
+    const [createItem, { loading: savingItem }] = useMutation(CREATE_MENU_ITEM_MUTATION);
     const [updateItem] = useMutation(UPDATE_MENU_ITEM_MUTATION);
     const [deleteItem] = useMutation(DELETE_MENU_ITEM_MUTATION);
 
     const [editing, setEditing] = useState<MenuItem | null>(null);
-    const [itemForm, setItemForm] = useState({
-        name: '', price: '0.00', category: '', description: '', allergens: '', isAvailable: true,
-    });
+    const [menuModalOpen, setMenuModalOpen] = useState(false);
 
-    const resetItemForm = () => {
-        setItemForm({ name: '', price: '0.00', category: '', description: '', allergens: '', isAvailable: true });
+    const openAdd = () => {
         setEditing(null);
+        setMenuModalOpen(true);
     };
 
     const openEdit = (m: MenuItem) => {
         setEditing(m);
-        setItemForm({
-            name: m.name,
-            price: dollars(m.priceCents),
-            category: m.category ?? '',
-            description: m.description ?? '',
-            allergens: (m.allergens ?? []).join(', '),
-            isAvailable: m.isAvailable,
-        });
+        setMenuModalOpen(true);
     };
 
-    const handleSaveItem = async () => {
+    const closeModal = () => {
+        setMenuModalOpen(false);
+        setEditing(null);
+    };
+
+    const handleSaveItem = async (input: MenuItemInput) => {
         if (!activeRestaurantId) return;
-        if (!itemForm.name.trim()) {
-            window.alert('Item name is required.');
-            return;
-        }
-        const allergens = itemForm.allergens.split(',').map((s) => s.trim()).filter(Boolean);
         try {
             if (editing) {
                 await updateItem({
                     variables: {
                         id: editing.id,
                         input: {
-                            name: itemForm.name.trim(),
-                            priceCents: toCents(itemForm.price),
-                            category: itemForm.category.trim() || null,
-                            description: itemForm.description.trim() || null,
-                            allergens,
-                            isAvailable: itemForm.isAvailable,
+                            name: input.name,
+                            priceCents: input.priceCents,
+                            category: input.category || null,
+                            description: input.description || null,
+                            allergens: input.allergens,
+                            isAvailable: input.isAvailable,
                         },
                     },
                 });
@@ -145,16 +146,16 @@ export const InfoPage = () => {
                     variables: {
                         input: {
                             restaurantId: activeRestaurantId,
-                            name: itemForm.name.trim(),
-                            priceCents: toCents(itemForm.price),
-                            category: itemForm.category.trim() || null,
-                            description: itemForm.description.trim() || null,
-                            allergens,
+                            name: input.name,
+                            priceCents: input.priceCents,
+                            category: input.category || null,
+                            description: input.description || null,
+                            allergens: input.allergens,
                         },
                     },
                 });
             }
-            resetItemForm();
+            closeModal();
             refetchMenu();
         } catch (err: any) {
             window.alert(err?.message ?? 'Failed to save menu item');
@@ -165,7 +166,7 @@ export const InfoPage = () => {
         if (!window.confirm(`Delete "${m.name}" from the menu?`)) return;
         try {
             await deleteItem({ variables: { id: m.id } });
-            if (editing?.id === m.id) resetItemForm();
+            if (editing?.id === m.id) closeModal();
             refetchMenu();
         } catch (err: any) {
             window.alert(err?.message ?? 'Failed to delete menu item');
@@ -187,210 +188,202 @@ export const InfoPage = () => {
 
     const loading = infoLoading || menuLoading;
 
+    const tabBtn = (active: boolean) =>
+        `flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all duration-200 active:scale-95 ${
+            active
+                ? 'bg-brand-gold font-black text-text-white shadow-md shadow-brand-gold/20'
+                : 'font-bold text-text-sub hover:bg-item-hover hover:text-text-main'
+        }`;
+
     return (
         <div>
-            <h2 className="text-xl font-black text-text-main tracking-tight m-0">Restaurant Info & Menu</h2>
+            <h2 className="m-0 text-xl font-black tracking-tight text-text-main">Restaurant Info & Menu</h2>
             <p className="mt-1 mb-5 text-xs font-bold text-text-muted">
                 This is what the AI phone agent reads from — hours come from Settings, everything here is answered directly to callers.
             </p>
 
+            {/* Tab selector */}
+            <div className="mb-5 flex w-fit gap-1.5 rounded-2xl border border-border-main/60 bg-bg-primary/60 p-1.5 backdrop-blur-sm">
+                <button onClick={() => setTab('info')} className={tabBtn(tab === 'info')}>
+                    <Info size={15} strokeWidth={2.2} />
+                    Restaurant Info
+                </button>
+                <button onClick={() => setTab('menu')} className={tabBtn(tab === 'menu')}>
+                    <UtensilsCrossed size={15} strokeWidth={2.2} />
+                    Menu
+                </button>
+            </div>
+
             {loading ? (
-                <div className="flex items-center justify-center py-16 gap-3">
-                    <span className="h-4 w-4 rounded-full border-2 border-brand-gold border-t-transparent animate-spin"></span>
-                    <p className="text-text-muted text-sm font-bold m-0">Loading…</p>
+                <div className="flex items-center justify-center gap-3 py-16">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold border-t-transparent"></span>
+                    <p className="m-0 text-sm font-bold text-text-muted">Loading…</p>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-                    {/* --- Restaurant profile card --- */}
-                    <section className="glass-panel rounded-2xl p-5">
-                        <div className="mb-1 flex items-center gap-2.5">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
-                                <Building2 size={15} strokeWidth={2.2} />
+            ) : tab === 'info' ? (
+                /* ------------------------- RESTAURANT INFO TAB ------------------------- */
+                <section className="glass-panel rounded-2xl p-5 sm:p-6">
+                    <div className="mb-1 flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-gold">
+                            <Building2 size={15} strokeWidth={2.2} />
+                        </span>
+                        <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Profile</h3>
+                    </div>
+                    <p className="mb-4 text-[11px] font-bold text-text-muted">
+                        Address, cuisine, and parking — callers hear these when they ask about the restaurant.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label className={labelCls}>Name</label>
+                            <input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Phone</label>
+                            <input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Email</label>
+                            <input className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Cuisine</label>
+                            <input className={inputCls} value={form.cuisineType} onChange={(e) => setForm({ ...form, cuisineType: e.target.value })} placeholder="e.g. Italian" />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className={labelCls}>Address line</label>
+                            <input className={inputCls} value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Suburb</label>
+                            <input className={inputCls} value={form.suburb} onChange={(e) => setForm({ ...form, suburb: e.target.value })} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className={labelCls}>State</label>
+                                <input className={inputCls} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Postcode</label>
+                                <input className={inputCls} value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className={labelCls}>Description (short blurb callers hear)</label>
+                            <textarea
+                                className={`${inputCls} min-h-[70px] resize-y`}
+                                value={form.description}
+                                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                placeholder="e.g. Family-run modern Filipino kitchen in the heart of the district."
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className={labelCls}>Parking</label>
+                            <input
+                                className={inputCls}
+                                value={form.parkingInfo}
+                                onChange={(e) => setForm({ ...form, parkingInfo: e.target.value })}
+                                placeholder="e.g. Free street parking after 6 PM, paid lot across the road"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-3">
+                        <button onClick={handleSaveInfo} disabled={savingInfo} className={btnPrimary}>
+                            {savingInfo ? 'Saving…' : 'Save info'}
+                        </button>
+                        {infoSaved && (
+                            <span className="flex items-center gap-1 text-xs font-bold text-brand-gold">
+                                <Check size={13} strokeWidth={2.5} />
+                                Saved
                             </span>
-                            <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Profile</h3>
+                        )}
+                    </div>
+                </section>
+            ) : (
+                /* ----------------------------- MENU TAB ----------------------------- */
+                <section className="glass-panel rounded-2xl p-5 sm:p-6">
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-green/15 text-brand-green">
+                                <UtensilsCrossed size={15} strokeWidth={2.2} />
+                            </span>
+                            <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Menu</h3>
                         </div>
-                        <p className="text-[11px] font-bold text-text-muted mb-4">
-                            Address, cuisine, and parking — callers hear these when they ask about the restaurant.
-                        </p>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label className={labelCls}>Name</label>
-                                <input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>Phone</label>
-                                <input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>Email</label>
-                                <input className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>Cuisine</label>
-                                <input className={inputCls} value={form.cuisineType} onChange={(e) => setForm({ ...form, cuisineType: e.target.value })} placeholder="e.g. Italian" />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className={labelCls}>Address line</label>
-                                <input className={inputCls} value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>Suburb</label>
-                                <input className={inputCls} value={form.suburb} onChange={(e) => setForm({ ...form, suburb: e.target.value })} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className={labelCls}>State</label>
-                                    <input className={inputCls} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Postcode</label>
-                                    <input className={inputCls} value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} />
-                                </div>
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className={labelCls}>Description (short blurb callers hear)</label>
-                                <textarea
-                                    className={`${inputCls} min-h-[70px] resize-y`}
-                                    value={form.description}
-                                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                    placeholder="e.g. Family-run modern Filipino kitchen in the heart of the district."
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className={labelCls}>Parking</label>
-                                <input
-                                    className={inputCls}
-                                    value={form.parkingInfo}
-                                    onChange={(e) => setForm({ ...form, parkingInfo: e.target.value })}
-                                    placeholder="e.g. Free street parking after 6 PM, paid lot across the road"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 mt-4">
-                            <button onClick={handleSaveInfo} disabled={savingInfo} className={btnPrimary}>
-                                {savingInfo ? 'Saving…' : 'Save info'}
-                            </button>
-                            {infoSaved && (
-                                <span className="flex items-center gap-1 text-xs font-bold text-brand-gold">
-                                    <Check size={13} strokeWidth={2.5} />
-                                    Saved
-                                </span>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* --- Menu card --- */}
-                    <section className="glass-panel rounded-2xl p-5">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-green/15 text-brand-green">
-                                    <UtensilsCrossed size={15} strokeWidth={2.2} />
-                                </span>
-                                <h3 className="m-0 text-sm font-black tracking-tight text-text-main">Menu</h3>
-                            </div>
+                        <div className="flex items-center gap-2">
                             <span className="rounded-full border border-border-main/60 bg-bg-primary/60 px-2.5 py-0.5 text-[11px] font-bold text-text-muted">
                                 {items.length} item{items.length === 1 ? '' : 's'}
                             </span>
+                            <button
+                                onClick={openAdd}
+                                className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-brand-gold px-3.5 py-2 text-xs font-black text-text-white shadow-md shadow-brand-gold/20 transition-all duration-200 hover:bg-brand-gold-hover active:scale-95"
+                            >
+                                <Plus size={14} strokeWidth={2.5} />
+                                Add item
+                            </button>
                         </div>
-                        <p className="text-[11px] font-bold text-text-muted mb-4">
-                            Callers can ask about dishes, prices, and allergens. Sold-out items can be toggled off instead of deleted.
-                        </p>
+                    </div>
+                    <p className="mb-4 text-[11px] font-bold text-text-muted">
+                        Callers can ask about dishes, prices, and allergens. Sold-out items can be toggled off instead of deleted.
+                    </p>
 
-                        {/* Add / edit form */}
-                        <div className="border border-brand-gold/30 rounded-xl bg-gradient-to-br from-brand-gold/10 to-transparent backdrop-blur-sm p-3.5 mb-4">
-                            <p className="text-xs font-black text-brand-gold mb-2.5">{editing ? 'Edit item' : 'Add item'}</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                <div>
-                                    <label className={labelCls}>Name *</label>
-                                    <input className={inputCls} value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} placeholder="e.g. Pork Sisig" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Price ($)</label>
-                                    <input className={inputCls} value={itemForm.price} onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })} inputMode="decimal" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Category</label>
-                                    <input className={inputCls} value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} placeholder="e.g. Mains" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Allergens (comma separated)</label>
-                                    <input className={inputCls} value={itemForm.allergens} onChange={(e) => setItemForm({ ...itemForm, allergens: e.target.value })} placeholder="e.g. peanuts, gluten" />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <label className={labelCls}>Description</label>
-                                    <input className={inputCls} value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} placeholder="e.g. Crispy pork belly, onion, chilli, calamansi" />
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between mt-3">
-                                <label className="flex items-center gap-2 text-xs font-bold text-text-sub cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={itemForm.isAvailable}
-                                        onChange={(e) => setItemForm({ ...itemForm, isAvailable: e.target.checked })}
-                                        className="h-4 w-4 accent-brand-gold"
-                                    />
-                                    Available
-                                </label>
-                                <div className="flex gap-2">
-                                    {editing && (
-                                        <button onClick={resetItemForm} className={btnGhost}>
-                                            Cancel
+                    {items.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border-main/70 py-10 text-center text-sm font-bold text-text-muted">
+                            No menu items yet — add your first dish to get started.
+                        </div>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {items.map((m) => (
+                                <li
+                                    key={m.id}
+                                    className="card-lift flex items-start justify-between gap-3 rounded-xl border border-border-main/60 bg-bg-primary/60 p-3 backdrop-blur-sm hover:border-brand-gold/40"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <strong className={`text-sm ${m.isAvailable ? 'text-text-main' : 'text-text-muted line-through'}`}>{m.name}</strong>
+                                            {m.category && <span className="rounded-full border border-border-main px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-text-muted">{m.category}</span>}
+                                            <span className="text-sm font-black text-brand-gold">${dollars(m.priceCents)}</span>
+                                        </div>
+                                        {m.description && <p className="mt-1 truncate text-xs font-semibold text-text-muted">{m.description}</p>}
+                                        {m.allergens.length > 0 && (
+                                            <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand-red/80">
+                                                <AlertTriangle size={12} strokeWidth={2.2} />
+                                                {m.allergens.join(', ')}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex shrink-0 gap-1.5">
+                                        <button
+                                            onClick={() => handleToggleAvailable(m)}
+                                            title={m.isAvailable ? 'Mark sold out' : 'Mark available'}
+                                            className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-black transition-colors duration-150 ${
+                                                m.isAvailable ? 'border-border-main text-text-sub hover:bg-item-hover' : 'border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10'
+                                            }`}
+                                        >
+                                            {m.isAvailable ? 'In stock' : 'Sold out'}
                                         </button>
-                                    )}
-                                    <button onClick={handleSaveItem} className={btnPrimary}>
-                                        {editing ? 'Save changes' : '+ Add item'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                                        <button onClick={() => openEdit(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-border-main px-2.5 py-1.5 text-[11px] font-black text-text-sub transition-colors duration-150 hover:bg-item-hover">
+                                            <Pencil size={11} strokeWidth={2.2} />
+                                            Edit
+                                        </button>
+                                        <button onClick={() => handleDeleteItem(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-brand-red/30 bg-brand-red/10 px-2.5 py-1.5 text-[11px] font-black text-brand-red transition-colors duration-150 hover:bg-brand-red/20">
+                                            <Trash2 size={11} strokeWidth={2.2} />
+                                            Delete
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+            )}
 
-                        {items.length === 0 ? (
-                            <div className="border border-dashed border-border-main/70 rounded-xl py-10 text-center text-text-muted text-sm font-bold">
-                                No menu items yet — add your first dish above.
-                            </div>
-                        ) : (
-                            <ul className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
-                                {items.map((m) => (
-                                    <li key={m.id} className="card-lift border border-border-main/60 rounded-xl p-3 flex items-start justify-between gap-3 bg-bg-primary/60 backdrop-blur-sm hover:border-brand-gold/40">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <strong className={`text-sm ${m.isAvailable ? 'text-text-main' : 'text-text-muted line-through'}`}>{m.name}</strong>
-                                                {m.category && <span className="text-[10px] font-black uppercase tracking-wider text-text-muted border border-border-main rounded-full px-2 py-0.5">{m.category}</span>}
-                                                <span className="text-sm font-black text-brand-gold">${dollars(m.priceCents)}</span>
-                                            </div>
-                                            {m.description && <p className="text-xs font-semibold text-text-muted mt-1 truncate">{m.description}</p>}
-                                            {m.allergens.length > 0 && (
-                                                <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand-red/80">
-                                                    <AlertTriangle size={12} strokeWidth={2.2} />
-                                                    {m.allergens.join(', ')}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => handleToggleAvailable(m)}
-                                                title={m.isAvailable ? 'Mark sold out' : 'Mark available'}
-                                                className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-black transition-colors duration-150 ${m.isAvailable ? 'border-border-main text-text-sub hover:bg-item-hover' : 'border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10'}`}
-                                            >
-                                                {m.isAvailable ? 'In stock' : 'Sold out'}
-                                            </button>
-                                            <button onClick={() => openEdit(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-border-main px-2.5 py-1.5 text-[11px] font-black text-text-sub transition-colors duration-150 hover:bg-item-hover">
-                                                <Pencil size={11} strokeWidth={2.2} />
-                                                Edit
-                                            </button>
-                                            <button onClick={() => handleDeleteItem(m)} className="flex cursor-pointer items-center gap-1 rounded-lg border border-brand-red/30 bg-brand-red/10 px-2.5 py-1.5 text-[11px] font-black text-brand-red transition-colors duration-150 hover:bg-brand-red/20">
-                                                <Trash2 size={11} strokeWidth={2.2} />
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-                </div>
+            {menuModalOpen && (
+                <MenuItemModal
+                    editing={editing}
+                    saving={savingItem}
+                    onClose={closeModal}
+                    onSave={handleSaveItem}
+                />
             )}
         </div>
     );

@@ -102,20 +102,24 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
                 {DAY_NAMES.map((name, day) => (
                     <div
                         key={day}
-                        className="flex items-center gap-3 py-2 border-b border-border-sub flex-wrap"
+                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2.5 border-b border-border-sub"
                     >
-                        <label className="w-[110px] text-[13px] font-black text-text-main">{name}</label>
-                        <label className="text-xs font-bold text-text-sub flex items-center gap-1.5 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={drafts[day].isClosed}
-                                onChange={(e) => setDay(day, { isClosed: e.target.checked })}
-                                className="accent-brand-gold"
-                            />
-                            Closed
-                        </label>
+                        {/* Day label + Closed toggle — stays together as one group */}
+                        <div className="flex items-center gap-3">
+                            <label className="w-[110px] text-[13px] font-black text-text-main">{name}</label>
+                            <label className="text-xs font-bold text-text-sub flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={drafts[day].isClosed}
+                                    onChange={(e) => setDay(day, { isClosed: e.target.checked })}
+                                    className="accent-brand-gold"
+                                />
+                                Closed
+                            </label>
+                        </div>
+                        {/* Time selectors — own container so both move down together on wrap */}
                         {!drafts[day].isClosed && (
-                            <>
+                            <div className="flex items-center gap-2">
                                 <input
                                     type="time"
                                     value={drafts[day].openTime}
@@ -131,7 +135,7 @@ export const OperatingHoursEditor = ({ restaurantId, hours }: OperatingHoursEdit
                                     onChange={(e) => setDay(day, { closeTime: e.target.value })}
                                     className={inputCls}
                                 />
-                            </>
+                            </div>
                         )}
                     </div>
                 ))}

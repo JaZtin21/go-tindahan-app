@@ -41,6 +41,7 @@ type Booking struct {
 	ID              string        `json:"id"`
 	RestaurantID    string        `json:"restaurantId"`
 	CustomerID      string        `json:"customerId"`
+	Customer        *Customer     `json:"customer,omitempty"`
 	TableID         *string       `json:"tableId,omitempty"`
 	PartySize       int           `json:"partySize"`
 	BookingTime     string        `json:"bookingTime"`

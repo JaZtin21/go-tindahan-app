@@ -101,6 +101,7 @@ export interface Booking {
     id: string;
     restaurantId: string;
     customerId: string;
+    customer?: Customer | null;
     tableId?: string | null;
     partySize: number;
     bookingTime: string; // ISO 8601

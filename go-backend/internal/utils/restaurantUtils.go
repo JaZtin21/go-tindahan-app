@@ -349,6 +349,55 @@ func LoadOwnerRestaurantRoles(ctx context.Context, db *pgxpool.Pool, ownerID str
 	return results, nil
 }
 
+// LoadCustomer fetches a single customer by id. Lives here (not in a
+// resolvers.go file) so it survives `go generate`. Returns (nil, nil) when
+// the customer doesn't exist — Booking.customer is nullable to tolerate
+// orphaned customer ids.
+func LoadCustomer(ctx context.Context, db *pgxpool.Pool, id string) (*model.Customer, error) {
+	var c model.Customer
+	var createdAt time.Time
+	err := db.QueryRow(ctx, `
+		SELECT id, phone, name, email, created_at FROM customers WHERE id = $1
+	`, id).Scan(&c.ID, &c.Phone, &c.Name, &c.Email, &createdAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		log.Printf("🔴 DATABASE QUERY FAILED IN LOADCUSTOMER: %v", err)
+		return nil, err
+	}
+	c.CreatedAt = createdAt.Format(time.RFC3339)
+	return &c, nil
+}
+
+// LoadCustomers fetches customers by their ids in one query — the Bookings
+// list resolver uses this so it doesn't N+1 the customers table per row.
+func LoadCustomers(ctx context.Context, db *pgxpool.Pool, ids []string) (map[string]*model.Customer, error) {
+	result := map[string]*model.Customer{}
+	if len(ids) == 0 {
+		return result, nil
+	}
+	rows, err := db.Query(ctx, `
+		SELECT id, phone, name, email, created_at FROM customers WHERE id = ANY($1)
+	`, ids)
+	if err != nil {
+		log.Printf("🔴 DATABASE QUERY FAILED IN LOADCUSTOMERS: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c model.Customer
+		var createdAt time.Time
+		if err := rows.Scan(&c.ID, &c.Phone, &c.Name, &c.Email, &createdAt); err != nil {
+			log.Printf("⚠️ Failed to scan customer row: %v", err)
+			continue
+		}
+		c.CreatedAt = createdAt.Format(time.RFC3339)
+		result[c.ID] = &c
+	}
+	return result, nil
+}
+
 // GetGinContext pulls the *gin.Context back out of the request context.
 // VERIFY this matches how your server actually injects it (check your
 // gqlgen HTTP handler setup / whatever middleware puts it on ctx under this
