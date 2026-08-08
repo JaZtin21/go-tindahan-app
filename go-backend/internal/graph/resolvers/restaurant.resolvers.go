@@ -1017,9 +1017,34 @@ func (r *queryResolver) Closures(ctx context.Context, restaurantID string) ([]*m
 
 // Customer is the resolver for the customer field.
 func (r *queryResolver) Customer(ctx context.Context, phone string) (*model.Customer, error) {
-	// Staff-only customer lookup — resolve which restaurants the caller manages
-	// is impractical at this layer, so the @isAuthenticated directive plus the
-	// callers (staff dashboard) are the access boundary.
+	// Staff-only customer lookup. The endpoint takes no restaurantId, so
+	// authorize by requiring the caller to be a member of at least one
+	// restaurant (any role). @isAuthenticated alone is not sufficient — a
+	// diner-app session would also pass it and could enumerate customer
+	// records by phone.
+	currentUser, ok := ctx.Value("currentUser").(middleware.CachedUser)
+	if !ok || currentUser.ID == "" {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "unauthorized: authentication required for customer lookup",
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
+		})
+		return nil, nil
+	}
+	var isStaff bool
+	if err := r.Resolver.DB.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM restaurant_staff WHERE owner_id = $1)`, currentUser.ID,
+	).Scan(&isStaff); err != nil {
+		log.Printf("🔴 STAFF CHECK FAILED IN CUSTOMER: %v", err)
+		return nil, err
+	}
+	if !isStaff {
+		graphql.AddError(ctx, &gqlerror.Error{
+			Message:    "forbidden: staff access required for customer lookup",
+			Extensions: map[string]any{"code": "FORBIDDEN"},
+		})
+		return nil, nil
+	}
+
 	var c model.Customer
 	var createdAt time.Time
 
